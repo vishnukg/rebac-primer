@@ -323,7 +323,7 @@ The payload may contain claims:
 {
   "sub": "github|12345",
   "iss": "https://auth.example.com/",
-  "aud": "ts-rebac-primer",
+  "aud": "rebac-primer",
   "exp": 1760000000
 }
 ```
