@@ -17,13 +17,14 @@ This chapter teaches only the graph theory needed for authorization.
 
 ## Scene
 
-Alice can edit the roadmap because she is in the platform team, and the platform
-team can edit the Acme workspace, and the roadmap belongs to the Acme workspace.
+The workspace editor can edit the roadmap document because she is in the platform team,
+the platform team can edit the product workspace, and the roadmap document belongs to
+the product workspace.
 
 That sentence is already a graph.
 
 ```text
-Alice -> Platform Team -> Acme Workspace -> Roadmap
+workspace editor -> platform team -> product workspace -> roadmap document
 ```
 
 ReBAC makes that graph explicit and asks whether a useful path exists.
@@ -35,17 +36,17 @@ A node is a thing in the graph.
 In this repo, nodes are OpenFGA objects:
 
 ```text
-user:alice
-team:platform
-workspace:acme
-document:roadmap
+user:workspaceEditor
+team:platformTeam
+workspace:productWorkspace
+document:roadmapDocument
 ```
 
 Diagram:
 
 ```text
 ┌────────────┐   ┌───────────────┐   ┌────────────────┐   ┌──────────────────┐
-│ user:alice │   │ team:platform │   │ workspace:acme │   │ document:roadmap │
+│ user:workspaceEditor │   │ team:platformTeam │   │ workspace:productWorkspace │   │ document:roadmapDocument │
 └────────────┘   └───────────────┘   └────────────────┘   └──────────────────┘
 ```
 
@@ -56,25 +57,25 @@ Nodes are the nouns.
 An edge connects two nodes.
 
 ```text
-user:alice --member--> team:platform
+user:workspaceEditor --member--> team:platformTeam
 ```
 
 In OpenFGA tuple form, the same fact is stored as:
 
 ```text
-(team:platform, member, user:alice)
+(team:platformTeam, member, user:workspaceEditor)
 ```
 
 The tuple is written from object perspective:
 
 ```text
-team:platform has member user:alice
+team:platformTeam has member user:workspaceEditor
 ```
 
 When drawing it for intuition, it is often easier to read from user outward:
 
 ```text
-user:alice is member of team:platform
+user:workspaceEditor is member of team:platformTeam
 ```
 
 Both are the same relationship. Be comfortable flipping the sentence.
@@ -84,8 +85,8 @@ Both are the same relationship. Be comfortable flipping the sentence.
 Edges have labels.
 
 ```text
-user:alice --member--> team:platform
-user:bob   --viewer--> workspace:acme
+user:workspaceEditor --member--> team:platformTeam
+user:workspaceViewer   --viewer--> workspace:productWorkspace
 ```
 
 The label matters. A `viewer` edge does not mean the same thing as an `editor`
@@ -108,7 +109,7 @@ can_edit
 Most ReBAC relationships are directed.
 
 ```text
-document:roadmap --workspace--> workspace:acme
+document:roadmapDocument --workspace--> workspace:productWorkspace
 ```
 
 This says the document belongs to the workspace.
@@ -120,7 +121,7 @@ Direction matters because traversal follows model rules.
 Diagram:
 
 ```text
-document:roadmap ──workspace──► workspace:acme
+document:roadmapDocument ──workspace──► workspace:productWorkspace
 ```
 
 Do not casually reverse arrows unless the model says that reverse relationship
@@ -130,13 +131,13 @@ exists.
 
 A path is a sequence of connected edges.
 
-Alice's edit path:
+The workspace editor's edit path:
 
 ```text
-user:alice
-  ──member──► team:platform
-  ──editor──► workspace:acme
-  ◄─workspace── document:roadmap
+user:workspaceEditor
+  ──member──► team:platformTeam
+  ──editor──► workspace:productWorkspace
+  ◄─workspace── document:roadmapDocument
   ──editor/can_edit──► allowed
 ```
 
@@ -144,7 +145,7 @@ The drawing mixes intuitive direction with OpenFGA's object-centric relations.
 The important point is the chain of facts:
 
 ```text
-Alice is in team.
+The workspace editor is in team.
 Team edits workspace.
 Document belongs to workspace.
 Workspace editor implies document editor.
@@ -164,7 +165,7 @@ Can I get from node A to node B by following allowed edges?
 ReBAC check asks a reachability question:
 
 ```text
-Can user:alice reach document:roadmap#can_edit?
+Can user:workspaceEditor reach document:roadmapDocument#can_edit?
 ```
 
 If yes:
@@ -188,7 +189,7 @@ Traversal means walking the graph.
 The authorizer starts with a question:
 
 ```text
-Check(user:alice, can_edit, document:roadmap)
+Check(user:workspaceEditor, can_edit, document:roadmapDocument)
 ```
 
 Then it expands relations using the model:
@@ -206,9 +207,9 @@ Traversal is not random. It follows the model definitions.
 Tuples are facts:
 
 ```text
-team:platform member user:alice
-workspace:acme editor team:platform#member
-document:roadmap workspace workspace:acme
+team:platformTeam member user:workspaceEditor
+workspace:productWorkspace editor team:platformTeam#member
+document:roadmapDocument workspace workspace:productWorkspace
 ```
 
 The model is the map that says how facts can be combined:
@@ -237,35 +238,35 @@ If tuples are data, the model is logic.
 This is a subject set:
 
 ```text
-team:platform#member
+team:platformTeam#member
 ```
 
 It means:
 
 ```text
-the set of users reachable through team:platform member
+the set of users reachable through team:platformTeam member
 ```
 
 So this tuple:
 
 ```text
-workspace:acme editor team:platform#member
+workspace:productWorkspace editor team:platformTeam#member
 ```
 
 means:
 
 ```text
-any user reachable as a member of team:platform is an editor of workspace:acme
+any user reachable as a member of team:platformTeam is an editor of workspace:productWorkspace
 ```
 
 Diagram:
 
 ```text
-user:alice ──member──► team:platform
+user:workspaceEditor ──member──► team:platformTeam
                               │
-                              │ team:platform#member
+                              │ team:platformTeam#member
                               ▼
-                       workspace:acme editor
+                       workspace:productWorkspace editor
 ```
 
 Subject sets let one tuple represent many users.
@@ -306,10 +307,10 @@ Deep graphs are not automatically bad, but they are harder to debug.
 Good ReBAC model design keeps common authorization paths explainable:
 
 ```text
-Alice can edit roadmap because:
-  Alice is member of platform.
-  Platform edits Acme.
-  Roadmap belongs to Acme.
+The workspace editor can edit the roadmap document because:
+  the workspace editor is a member of the platform team.
+  the platform team edits the product workspace.
+  the roadmap document belongs to the product workspace.
 ```
 
 If the explanation takes a paragraph, simplify the model.
@@ -318,7 +319,7 @@ If the explanation takes a paragraph, simplify the model.
 
 | Graph term | ReBAC meaning |
 |------------|---------------|
-| node | object such as `user:alice` or `document:roadmap` |
+| node | object such as `user:workspaceEditor` or `document:roadmapDocument` |
 | edge | tuple relationship |
 | label | relation name such as `member` or `editor` |
 | path | chain of relationships proving access |
@@ -337,7 +338,7 @@ Is there a valid path from the user to the requested relation on the object?
 Example:
 
 ```text
-Is there a valid path from user:alice to document:roadmap#can_edit?
+Is there a valid path from user:workspaceEditor to document:roadmapDocument#can_edit?
 ```
 
 Answer:
@@ -352,19 +353,19 @@ no  -> denied
 Draw this graph on paper:
 
 ```text
-team:platform member user:alice
-workspace:acme editor team:platform#member
-workspace:acme viewer user:bob
-document:roadmap workspace workspace:acme
+team:platformTeam member user:workspaceEditor
+workspace:productWorkspace editor team:platformTeam#member
+workspace:productWorkspace viewer user:workspaceViewer
+document:roadmapDocument workspace workspace:productWorkspace
 ```
 
 Then answer:
 
 ```text
-Can Alice edit roadmap?
-Can Bob edit roadmap?
-Can Bob read roadmap?
-Can Chandra read roadmap?
+Can the workspace editor edit the roadmap document?
+Can the workspace viewer edit the roadmap document?
+Can the workspace viewer read the roadmap document?
+Can the outside collaborator read the roadmap document?
 ```
 
 Do not run the tests first. Predict from the graph.

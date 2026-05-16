@@ -404,7 +404,7 @@ the default for everything.
 This repo usually prefers explicit composition:
 
 ```ts
-const store = new MemoryTupleStore(tutorialTuples());
+const store = new MemoryTupleStore(seedRelationshipTuples());
 const authorizer = new GraphAuthorizer(store);
 const repository = new InMemoryDocumentRepository();
 const service = new DocumentService(repository, authorizer);
@@ -464,7 +464,7 @@ export type AppServices = {
 };
 
 export function createServices(): AppServices {
-  const store = new MemoryTupleStore(tutorialTuples());
+  const store = new MemoryTupleStore(seedRelationshipTuples());
   const authorizer = new GraphAuthorizer(store);
   const repository = new InMemoryDocumentRepository();
 
@@ -590,7 +590,7 @@ Create a small composition module:
 ```ts
 // src/app/create-services.ts
 export function createServices() {
-  const store = new MemoryTupleStore(tutorialTuples());
+  const store = new MemoryTupleStore(seedRelationshipTuples());
   const authorizer = new GraphAuthorizer(store);
   const repository = new InMemoryDocumentRepository();
 

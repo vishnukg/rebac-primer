@@ -16,16 +16,16 @@ real ReBAC systems almost always start with an authenticated user.
 
 ## Scene
 
-Alice opens the document app. Before the app can ask:
+The workspace editor opens the document app. Before the app can ask:
 
 ```text
-Can Alice edit document:roadmap?
+Can the workspace editor edit document:roadmapDocument?
 ```
 
 it must first know:
 
 ```text
-Is this request really from Alice?
+Is this request really from the workspace editor?
 ```
 
 That is authentication.
@@ -105,7 +105,7 @@ The app eventually gets tokens that prove the login happened.
 OAuth uses a few standard roles:
 
 ```text
-Resource Owner       the user, such as Alice
+Resource Owner       the user, such as the workspace editor
 Client               your app
 Authorization Server the identity provider issuing tokens
 Resource Server      API protected by tokens
@@ -114,7 +114,7 @@ Resource Server      API protected by tokens
 In a small app, "client" and "resource server" may both be your backend.
 
 ```text
-Alice             -> resource owner
+The workspace editor -> resource owner
 TS ReBAC app      -> client and resource server
 GitHub/Auth0/etc. -> authorization server
 ```
@@ -286,7 +286,7 @@ You usually need both:
 ```text
 Access token has documents.write scope
 AND
-OpenFGA says user:alice can_edit document:roadmap
+OpenFGA says user:workspaceEditor can_edit document:roadmapDocument
 ```
 
 Diagram:
@@ -421,7 +421,7 @@ Authorization uses that user id in a check.
 In this repo's tutorial data:
 
 ```text
-OAuth subject -> user:alice
+OAuth subject -> user:workspaceEditor
 ```
 
 In a real app:
@@ -499,8 +499,8 @@ CLI calls API
 API validates token and performs ReBAC check
 ```
 
-For this tutorial, the CLI is intentionally simpler and lets you type `alice`,
-`bob`, or `chandra`. That keeps the first lesson focused on authorization.
+For this tutorial, the CLI is intentionally simpler and lets you type `workspaceEditor`,
+`workspaceViewer`, or `outsideCollaborator`. That keeps the first lesson focused on authorization.
 
 ## Where OAuth should live in the architecture
 
@@ -537,13 +537,13 @@ Keep authentication, authorization, and business logic separate.
 OAuth can tell the app:
 
 ```text
-this request is from user:alice
+this request is from user:workspaceEditor
 ```
 
 OAuth does not naturally answer:
 
 ```text
-can user:alice edit document:roadmap because she is in team:platform?
+can user:workspaceEditor edit document:roadmapDocument because she is in team:platformTeam?
 ```
 
 That second question is the ReBAC question.
@@ -571,8 +571,8 @@ You might be tempted to put every team and permission in a JWT.
 That becomes stale quickly:
 
 ```text
-Alice leaves team:platform
-Alice still has old token saying she is in team:platform
+The workspace editor leaves team:platformTeam
+The workspace editor still has an old token saying she is in team:platformTeam
 ```
 
 Prefer stable identity in the token and fresh authorization checks for important
@@ -591,7 +591,7 @@ user:github:12345
 over:
 
 ```text
-user:alice@example.com
+user:workspaceEditor@example.com
 ```
 
 ### Mistake 4: Treating OAuth scopes as object permissions

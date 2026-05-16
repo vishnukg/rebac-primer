@@ -48,9 +48,11 @@ describe("OpenFGA model", () => {
     const example = relationshipGraphExample;
 
     // Act
-    const hasAliceEditPath = example.includes("therefore user:alice can_edit document:roadmap");
+    const hasWorkspaceEditorEditPath = example.includes(
+      "therefore user:workspaceEditor can_edit document:roadmapDocument"
+    );
 
     // Assert
-    expect(hasAliceEditPath).toBe(true);
+    expect(hasWorkspaceEditorEditPath).toBe(true);
   });
 });

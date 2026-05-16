@@ -2,17 +2,17 @@ import { describe, expect, it } from "vitest";
 import { createServices } from "../src/app/create-services.js";
 
 describe("createServices", () => {
-  it("given_default_composition_when_services_are_created_then_tutorial_document_and_authorizer_are_ready", async () => {
+  it("given_default_composition_when_services_are_created_then_seed_document_and_authorizer_are_ready", async () => {
     // Arrange
-    const roadmapId = "roadmap";
+    const roadmapId = "roadmapDocument";
 
     // Act
     const services = await createServices();
-    const document = await services.documents.read(roadmapId, "user:bob");
+    const document = await services.documents.read(roadmapId, "user:workspaceViewer");
     const decision = await services.authorizer.check({
-      user: "user:alice",
+      user: "user:workspaceEditor",
       relation: "can_edit",
-      object: "document:roadmap"
+      object: "document:roadmapDocument"
     });
 
     // Assert

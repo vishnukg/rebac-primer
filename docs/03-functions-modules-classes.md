@@ -178,10 +178,10 @@ the smaller `Authorizer` interface to the rest of the app.
 These are plain functions:
 
 ```ts
-user("alice");
-team("platform");
-workspace("acme");
-document("roadmap");
+user("workspaceEditor");
+team("platformTeam");
+workspace("productWorkspace");
+document("roadmapDocument");
 ```
 
 They do not need classes because they do not own state. They are small
@@ -253,9 +253,9 @@ This repo leans object-oriented for application structure:
 
 It uses functions and type aliases for value-level vocabulary:
 
-- `user("alice")`
-- `workspace("acme")`
-- `document("roadmap")`
+- `user("workspaceEditor")`
+- `workspace("productWorkspace")`
+- `document("roadmapDocument")`
 - `tuple(...)`
 - `parseObject(...)`
 - `isObjectOfType(...)`

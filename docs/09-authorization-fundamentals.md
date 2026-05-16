@@ -23,9 +23,9 @@ Viewers can read.
 Then customers ask:
 
 ```text
-Can Bob edit only documents in workspace:acme?
-Can Alice edit documents because she is in team:platform?
-Can Chandra read one shared document but nothing else?
+Can the workspace viewer edit only documents in workspace:productWorkspace?
+Can the workspace editor edit documents because she is in team:platformTeam?
+Can the outside collaborator read one shared document but nothing else?
 ```
 
 Now global roles are not enough.
@@ -49,12 +49,12 @@ Architecture:
        │
        ▼
 ┌──────────────┐
-│ Authenticate │ "this is user:alice"
+│ Authenticate │ "this is user:workspaceEditor"
 └──────┬───────┘
        │
        ▼
 ┌──────────────┐
-│ Authorize    │ "can user:alice edit document:roadmap?"
+│ Authorize    │ "can user:workspaceEditor edit document:roadmapDocument?"
 └──────┬───────┘
        │
        ▼
@@ -85,14 +85,14 @@ compare most often.
 RBAC grants permissions through roles.
 
 ```text
-user:alice -> role:editor
+user:workspaceEditor -> role:editor
 role:editor -> permission:edit_document
 ```
 
 Diagram:
 
 ```text
-user:alice
+user:workspaceEditor
     │
     ▼
 role:editor
@@ -111,7 +111,7 @@ support_agent can view support tickets
 RBAC struggles when permissions are object-specific:
 
 ```text
-Alice can edit this document but not that document.
+The workspace editor can edit this document but not that document.
 ```
 
 ## Role explosion
@@ -169,15 +169,15 @@ inside policy expressions.
 ReBAC decides from relationships.
 
 ```text
-user:alice member team:platform
-team:platform editor workspace:acme
-document:roadmap workspace workspace:acme
+user:workspaceEditor member team:platformTeam
+team:platformTeam editor workspace:productWorkspace
+document:roadmapDocument workspace workspace:productWorkspace
 ```
 
 Diagram:
 
 ```text
-user:alice -> team:platform -> workspace:acme -> document:roadmap
+user:workspaceEditor -> team:platformTeam -> workspace:productWorkspace -> document:roadmapDocument
 ```
 
 ReBAC is strong when your product is naturally relational:
@@ -216,23 +216,23 @@ ABAC may add context checks like tenant or risk.
 Product rule:
 
 ```text
-Members of team:platform can edit documents in workspace:acme.
+Members of team:platformTeam can edit documents in workspace:productWorkspace.
 ```
 
 RBAC version:
 
 ```text
 create workspace_acme_editor role
-assign every platform member to role
+assign every platformTeam member to role
 remember to update role when team changes
 ```
 
 ReBAC version:
 
 ```text
-team:platform member user:alice
-workspace:acme editor team:platform#member
-document:roadmap workspace workspace:acme
+team:platformTeam member user:workspaceEditor
+workspace:productWorkspace editor team:platformTeam#member
+document:roadmapDocument workspace workspace:productWorkspace
 ```
 
 Now team membership is the source of truth.
@@ -311,9 +311,9 @@ This repo has tests for those patterns.
 Write the authorization question for these actions:
 
 ```text
-Alice reads roadmap.
-Bob edits roadmap.
-Chandra creates a document in workspace:acme.
+The workspace editor reads roadmap document.
+The workspace viewer edits roadmap document.
+The outside collaborator creates a document in workspace:productWorkspace.
 ```
 
 Format:
@@ -326,8 +326,8 @@ Check(<user>, <relation>, <object>)
 Example:
 
 ```text
-Can user:alice edit document:roadmap?
-Check(user:alice, can_edit, document:roadmap)
+Can user:workspaceEditor edit document:roadmapDocument?
+Check(user:workspaceEditor, can_edit, document:roadmapDocument)
 ```
 
 ## Checkpoint

@@ -9,11 +9,11 @@ describe("InMemoryDocumentRepository", () => {
 
     // Act
     await repository.save({
-      id: "roadmap",
+      id: "roadmapDocument",
       title: "Roadmap",
       body: "v1",
-      workspace: workspace("acme"),
-      updatedBy: "user:alice"
+      workspace: workspace("productWorkspace"),
+      updatedBy: "user:workspaceEditor"
     });
     const documents = await repository.list();
 

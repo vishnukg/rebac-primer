@@ -5,12 +5,19 @@ import { document, tuple } from "../src/authz/types.js";
 import { DocumentNotFoundError, ForbiddenError } from "../src/domain/document.js";
 import { InMemoryDocumentRepository } from "../src/domain/repository.js";
 import { DocumentService } from "../src/domain/service.js";
-import { acme, alice, bob, chandra, roadmap, tutorialTuples } from "../src/testing/fixtures.js";
+import {
+  outsideCollaborator,
+  productWorkspace,
+  roadmapDocument,
+  seedRelationshipTuples,
+  workspaceEditor,
+  workspaceViewer
+} from "../src/testing/fixtures.js";
 
 describe("DocumentService", () => {
   it("given_workspace_editor_when_creating_document_then_document_is_created", async () => {
     // Arrange
-    const store = new MemoryTupleStore(tutorialTuples());
+    const store = new MemoryTupleStore(seedRelationshipTuples());
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
       new GraphAuthorizer(store)
@@ -21,17 +28,17 @@ describe("DocumentService", () => {
       id: "strategy",
       title: "Strategy",
       body: "Ship carefully.",
-      workspace: acme,
-      actor: alice
+      workspace: productWorkspace,
+      actor: workspaceEditor
     });
 
     // Assert
-    expect(created.updatedBy).toBe(alice);
+    expect(created.updatedBy).toBe(workspaceEditor);
   });
 
   it("given_workspace_viewer_when_creating_document_then_forbidden_error_is_thrown", async () => {
     // Arrange
-    const store = new MemoryTupleStore(tutorialTuples());
+    const store = new MemoryTupleStore(seedRelationshipTuples());
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
       new GraphAuthorizer(store)
@@ -42,8 +49,8 @@ describe("DocumentService", () => {
       id: "incident-plan",
       title: "Incident Plan",
       body: "Draft",
-      workspace: acme,
-      actor: bob
+      workspace: productWorkspace,
+      actor: workspaceViewer
     });
 
     // Assert
@@ -53,37 +60,37 @@ describe("DocumentService", () => {
   it("given_document_owner_when_updating_document_then_content_is_saved", async () => {
     // Arrange
     const store = new MemoryTupleStore([
-      ...tutorialTuples(),
-      tuple(document("roadmap"), "owner", chandra)
+      ...seedRelationshipTuples(),
+      tuple(document("roadmapDocument"), "owner", outsideCollaborator)
     ]);
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
       new GraphAuthorizer(store)
     );
     await service.create({
-      id: "roadmap",
+      id: "roadmapDocument",
       title: "Roadmap",
       body: "v1",
-      workspace: acme,
-      actor: alice
+      workspace: productWorkspace,
+      actor: workspaceEditor
     });
 
     // Act
     const updated = await service.update({
-      id: "roadmap",
+      id: "roadmapDocument",
       body: "v2",
-      actor: chandra
+      actor: outsideCollaborator
     });
 
     // Assert
     expect(updated.body).toBe("v2");
-    expect(updated.updatedBy).toBe(chandra);
-    expect(roadmap).toBe("document:roadmap");
+    expect(updated.updatedBy).toBe(outsideCollaborator);
+    expect(roadmapDocument).toBe("document:roadmapDocument");
   });
 
   it("given_actor_without_read_path_when_reading_document_then_forbidden_error_is_thrown", async () => {
     // Arrange
-    const store = new MemoryTupleStore(tutorialTuples());
+    const store = new MemoryTupleStore(seedRelationshipTuples());
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
       new GraphAuthorizer(store)
@@ -92,12 +99,12 @@ describe("DocumentService", () => {
       id: "private-plan",
       title: "Private Plan",
       body: "v1",
-      workspace: acme,
-      actor: alice
+      workspace: productWorkspace,
+      actor: workspaceEditor
     });
 
     // Act
-    const readPromise = service.read("private-plan", chandra);
+    const readPromise = service.read("private-plan", outsideCollaborator);
 
     // Assert
     await expect(readPromise).rejects.toBeInstanceOf(ForbiddenError);
@@ -105,7 +112,7 @@ describe("DocumentService", () => {
 
   it("given_missing_document_when_updating_then_not_found_error_is_thrown", async () => {
     // Arrange
-    const store = new MemoryTupleStore(tutorialTuples());
+    const store = new MemoryTupleStore(seedRelationshipTuples());
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
       new GraphAuthorizer(store)
@@ -115,7 +122,7 @@ describe("DocumentService", () => {
     const updatePromise = service.update({
       id: "missing",
       body: "v2",
-      actor: alice
+      actor: workspaceEditor
     });
 
     // Assert

@@ -5,9 +5,10 @@ proving behavior.
 
 ## Scene
 
-Alice, Bob, and Chandra are your test audience. Alice should edit. Bob should
-read but fail to edit. Chandra should be denied. If the tests can prove those
-three stories, they are doing more than checking lines of code.
+The workspace editor, the workspace viewer, and the outside collaborator are your test
+audience. The workspace editor should edit. The workspace viewer should read but fail
+to edit. The outside collaborator should be denied. If the tests can prove those three
+stories, they are doing more than checking lines of code.
 
 This repo uses Vitest because it is fast, TypeScript-friendly, and familiar if
 you have seen Jest-style tests.
@@ -51,13 +52,13 @@ import { describe, expect, it } from "vitest";
 describe("GraphAuthorizer", () => {
   it("given_team_member_workspace_editor_when_checking_document_edit_then_access_is_allowed", async () => {
     // Arrange
-    const authorizer = new GraphAuthorizer(new MemoryTupleStore(tutorialTuples()));
+    const authorizer = new GraphAuthorizer(new MemoryTupleStore(seedRelationshipTuples()));
 
     // Act
     const result = await authorizer.check({
-      user: alice,
+      user: workspaceEditor,
       relation: "can_edit",
-      object: roadmap
+      object: roadmapDocument
     });
 
     // Assert
@@ -106,13 +107,13 @@ Example:
 
 ```ts
 // Arrange
-const authorizer = new GraphAuthorizer(new MemoryTupleStore(tutorialTuples()));
+const authorizer = new GraphAuthorizer(new MemoryTupleStore(seedRelationshipTuples()));
 
 // Act
 const result = await authorizer.check({
-  user: bob,
+  user: workspaceViewer,
   relation: "can_edit",
-  object: roadmap
+  object: roadmapDocument
 });
 
 // Assert
@@ -121,8 +122,8 @@ expect(result.allowed).toBe(false);
 
 This is small, but it tells a story:
 
-- Bob exists.
-- Bob asks to edit the roadmap.
+- The workspace viewer exists.
+- The workspace viewer asks to edit the roadmap document.
 - The graph denies him.
 
 That is more valuable than a test that asserts an internal method was called.
@@ -140,7 +141,7 @@ function serviceWithTuples() {}
 The repetition is acceptable because this is a teaching repo. A reader should
 see the whole setup, action, and assertion without jumping around the file.
 
-Production fixtures such as `tutorialTuples()` are allowed because they are part
+Production fixtures such as `seedRelationshipTuples()` are allowed because they are part
 of the lesson data, not a hidden test helper.
 
 The current convention is also enforced by review:
@@ -158,22 +159,23 @@ Vitest works naturally with `async` tests:
 ```ts
 it("given_workspace_viewer_when_creating_document_then_forbidden_error_is_thrown", async () => {
   // Arrange
-  const store = new MemoryTupleStore(tutorialTuples());
+  const store = new MemoryTupleStore(seedRelationshipTuples());
   const service = new DocumentService(
     new InMemoryDocumentRepository(),
     new GraphAuthorizer(store)
   );
 
-  // Act + Assert
-  await expect(
-    service.create({
-      id: "incident-plan",
-      title: "Incident Plan",
-      body: "Draft",
-      workspace: acme,
-      actor: bob
-    })
-  ).rejects.toBeInstanceOf(ForbiddenError);
+  // Act
+  const createPromise = service.create({
+    id: "incident-plan",
+    title: "Incident Plan",
+    body: "Draft",
+    workspace: productWorkspace,
+    actor: workspaceViewer
+  });
+
+  // Assert
+  await expect(createPromise).rejects.toBeInstanceOf(ForbiddenError);
 });
 ```
 
@@ -187,12 +189,12 @@ Two details matter:
 Open `src/testing/fixtures.ts`.
 
 ```ts
-export function tutorialTuples(): readonly TupleKey[] {
+export function seedRelationshipTuples(): readonly TupleKey[] {
   return [
-    tuple(platform, "member", alice),
-    tuple(acme, "editor", subjectSet(platform, "member")),
-    tuple(acme, "viewer", bob),
-    tuple(roadmap, "workspace", acme)
+    tuple(platformTeam, "member", workspaceEditor),
+    tuple(productWorkspace, "editor", subjectSet(platformTeam, "member")),
+    tuple(productWorkspace, "viewer", workspaceViewer),
+    tuple(roadmapDocument, "workspace", productWorkspace)
   ];
 }
 ```
@@ -227,7 +229,7 @@ Prefer:
 
 ```ts
 await expect(
-  authorizer.check({ user: alice, relation: "can_edit", object: roadmap })
+  authorizer.check({ user: workspaceEditor, relation: "can_edit", object: roadmapDocument })
 ).resolves.toMatchObject({ allowed: true });
 ```
 
@@ -247,8 +249,8 @@ For authorization, the most important cases are:
 - unrelated user denied
 - service method rejects denied action
 
-The "near-miss" case is especially important. Bob can read the roadmap, but he
-cannot edit it. That proves the graph is not simply letting everyone through.
+The "near-miss" case is especially important. The workspace viewer can read the roadmap
+document, but cannot edit it. That proves the graph is not simply letting everyone through.
 
 ## Exercise
 
@@ -258,13 +260,13 @@ Add a new test for this rule:
 workspace viewers can comment on documents but cannot edit them
 ```
 
-Use `can_comment` and `can_edit` against `bob`.
+Use `can_comment` and `can_edit` against `workspaceViewer`.
 
 Before running the test, predict the result from the tuples:
 
 ```text
-workspace:acme viewer user:bob
-document:roadmap workspace workspace:acme
+workspace:productWorkspace viewer user:workspaceViewer
+document:roadmapDocument workspace workspace:productWorkspace
 document can_comment = viewer
 document can_edit = editor
 ```

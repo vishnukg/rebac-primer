@@ -9,25 +9,25 @@ Can this subject perform this action on this object?
 RBAC usually answers with roles:
 
 ```text
-alice has role editor
+workspace editor has role editor
 editors can edit documents
-therefore alice can edit documents
+therefore the workspace editor can edit documents
 ```
 
 That works until the important question becomes:
 
 ```text
-Can Alice edit this specific document?
+Can the workspace editor edit this specific document?
 ```
 
 That is where relationship-based access control becomes useful.
 
 ## Scene
 
-You are building collaborative docs. A global `editor` role is too blunt. Alice
-should edit the Acme roadmap because she is on the platform team. Bob should
-read it but fail to edit it. Chandra should get nothing unless the graph gives
-her a path.
+You are building collaborative docs. A global `editor` role is too blunt. The workspace
+editor should edit the roadmap document because she is on the platform team. The
+workspace viewer should read it but fail to edit it. The outside collaborator should get
+nothing unless the graph gives her a path.
 
 ReBAC is how you model that without creating a new role for every document.
 
@@ -38,15 +38,15 @@ ReBAC stores authorization as relationships between things.
 In this repo:
 
 ```text
-user:alice is a member of team:platform
-team:platform is an editor of workspace:acme
-document:roadmap belongs to workspace:acme
+user:workspaceEditor is a member of team:platformTeam
+team:platformTeam is an editor of workspace:productWorkspace
+document:roadmapDocument belongs to workspace:productWorkspace
 ```
 
 From those facts, the system can answer:
 
 ```text
-Can user:alice edit document:roadmap?
+Can user:workspaceEditor edit document:roadmapDocument?
 ```
 
 Yes, because a path exists through the graph.
@@ -97,25 +97,25 @@ question: allowed or denied.
 Here is the tutorial graph:
 
 ```text
-user:alice
+user:workspaceEditor
    |
    | member
    v
-team:platform
+team:platformTeam
    |
-   | editor via team:platform#member
+   | editor via team:platformTeam#member
    v
-workspace:acme
+workspace:productWorkspace
    ^
    | workspace
    |
-document:roadmap
+document:roadmapDocument
 ```
 
 The important thing is not the drawing. The important thing is the path:
 
 ```text
-alice -> platform team -> acme workspace -> roadmap document -> can_edit
+workspaceEditor -> platform team -> product workspace -> roadmap document -> can_edit
 ```
 
 That path is what authorization checks evaluate.
@@ -126,10 +126,10 @@ The same graph as tuples:
 ┌──────────────────┬──────────┬──────────────────────┐
 │ object           │ relation │ user                 │
 ├──────────────────┼──────────┼──────────────────────┤
-│ team:platform    │ member   │ user:alice           │
-│ workspace:acme   │ editor   │ team:platform#member │
-│ workspace:acme   │ viewer   │ user:bob             │
-│ document:roadmap │ workspace│ workspace:acme       │
+│ team:platformTeam    │ member   │ user:workspaceEditor           │
+│ workspace:productWorkspace   │ editor   │ team:platformTeam#member │
+│ workspace:productWorkspace   │ viewer   │ user:workspaceViewer             │
+│ document:roadmapDocument │ workspace│ workspace:productWorkspace       │
 └──────────────────┴──────────┴──────────────────────┘
 ```
 
@@ -140,13 +140,13 @@ Tuples are the data. The model explains how to interpret them.
 Objects are typed ids:
 
 ```text
-user:alice
-team:platform
-workspace:acme
-document:roadmap
+user:workspaceEditor
+team:platformTeam
+workspace:productWorkspace
+document:roadmapDocument
 ```
 
-The type before the colon matters. `user:alice` and `team:alice` are different
+The type before the colon matters. `user:workspaceEditor` and `team:workspaceEditor` are different
 objects.
 
 This repo models object ids in TypeScript:
@@ -165,16 +165,16 @@ Relations are named edges.
 Examples:
 
 ```text
-team:platform member user:alice
-workspace:acme editor team:platform#member
-document:roadmap workspace workspace:acme
+team:platformTeam member user:workspaceEditor
+workspace:productWorkspace editor team:platformTeam#member
+document:roadmapDocument workspace workspace:productWorkspace
 ```
 
 Read each one aloud:
 
-- Alice is a member of the platform team.
-- Members of the platform team are editors of the Acme workspace.
-- The roadmap document belongs to the Acme workspace.
+- The workspace editor is a member of the platform team.
+- Members of the platform team are editors of the product workspace.
+- The roadmap document belongs to the product workspace.
 
 If you cannot read a tuple aloud, your model is probably unclear.
 
@@ -189,13 +189,13 @@ A tuple is one stored fact:
 In code:
 
 ```ts
-tuple(workspace("acme"), "editor", subjectSet(team("platform"), "member"))
+tuple(workspace("productWorkspace"), "editor", subjectSet(team("platformTeam"), "member"))
 ```
 
 This means:
 
 ```text
-workspace:acme has editor team:platform#member
+workspace:productWorkspace has editor team:platformTeam#member
 ```
 
 That single tuple grants editor access to every current and future member of the
@@ -209,13 +209,13 @@ You model the relationship once.
 This is a direct user:
 
 ```text
-user:alice
+user:workspaceEditor
 ```
 
 This is a subject set:
 
 ```text
-team:platform#member
+team:platformTeam#member
 ```
 
 A subject set means "the set of users who have this relation on this object."
@@ -223,23 +223,23 @@ A subject set means "the set of users who have this relation on this object."
 So:
 
 ```text
-workspace:acme editor team:platform#member
+workspace:productWorkspace editor team:platformTeam#member
 ```
 
 means:
 
 ```text
-anyone who is a member of team:platform is an editor of workspace:acme
+anyone who is a member of team:platformTeam is an editor of workspace:productWorkspace
 ```
 
-Subject sets are why team membership changes are powerful. If Alice leaves the
+Subject sets are why team membership changes are powerful. If the workspace editor leaves the
 team, remove one tuple:
 
 ```text
-team:platform member user:alice
+team:platformTeam member user:workspaceEditor
 ```
 
-Alice immediately loses inherited workspace and document access.
+The workspace editor immediately loses inherited workspace and document access.
 
 ## Permissions vs relationships
 
@@ -282,7 +282,7 @@ Check(user, relation, object)
 Example:
 
 ```text
-Check(user:alice, can_edit, document:roadmap)
+Check(user:workspaceEditor, can_edit, document:roadmapDocument)
 ```
 
 The graph evaluator tries to prove the relation.
@@ -290,11 +290,11 @@ The graph evaluator tries to prove the relation.
 In this repo, `GraphAuthorizer` produces a trace:
 
 ```text
-Check whether user:alice has can_edit on document:roadmap
+Check whether user:workspaceEditor has can_edit on document:roadmapDocument
 document.can_edit includes document.editor
-document.editor can inherit workspace.editor from workspace:acme
-Resolve subject set team:platform#member: does it contain user:alice?
-Found direct tuple (team:platform, member, user:alice)
+document.editor can inherit workspace.editor from workspace:productWorkspace
+Resolve subject set team:platformTeam#member: does it contain user:workspaceEditor?
+Found direct tuple (team:platformTeam, member, user:workspaceEditor)
 Result: allowed
 ```
 
@@ -311,15 +311,15 @@ DocumentService        Authorizer          Tuple graph
       │                    │ find document     │
       │                    │ workspace         │
       │                    ├──────────────────►│
-      │                    │ workspace:acme    │
+      │                    │ workspace:productWorkspace    │
       │                    │◄──────────────────┤
       │                    │ resolve editor    │
       │                    ├──────────────────►│
-      │                    │ team:platform     │
+      │                    │ team:platformTeam     │
       │                    │◄──────────────────┤
       │                    │ resolve member    │
       │                    ├──────────────────►│
-      │                    │ user:alice found  │
+      │                    │ user:workspaceEditor found  │
       │                    │◄──────────────────┤
       │ allowed            │                   │
       │◄───────────────────┤                   │
@@ -327,20 +327,20 @@ DocumentService        Authorizer          Tuple graph
 
 ## Denial is absence of a path
 
-Bob has viewer access:
+The workspace viewer has viewer access:
 
 ```text
-workspace:acme viewer user:bob
+workspace:productWorkspace viewer user:workspaceViewer
 ```
 
-So Bob can read and comment. But Bob cannot edit because there is no path from
-Bob to `document:roadmap#editor`.
+So the workspace viewer can read and comment. But the workspace viewer cannot edit because
+there is no path from `user:workspaceViewer` to `document:roadmapDocument#editor`.
 
 That "near miss" is important:
 
 ```text
-Bob can read.
-Bob cannot edit.
+The workspace viewer can read.
+The workspace viewer cannot edit.
 ```
 
 Good authorization tests should include near misses. They prove your model is
@@ -354,12 +354,12 @@ Run:
 npm run dev
 ```
 
-Read the trace for Alice, Bob, and Chandra.
+Read the trace for the workspace editor, the workspace viewer, and the outside collaborator.
 
-Then change `src/testing/fixtures.ts` so Bob is an editor instead of a viewer:
+Then change `src/testing/fixtures.ts` so the workspace viewer is an editor instead of a viewer:
 
 ```ts
-tuple(acme, "editor", bob)
+tuple(productWorkspace, "editor", workspaceViewer)
 ```
 
 Predict the new result before running the demo again.
@@ -369,7 +369,7 @@ Predict the new result before running the demo again.
 Explain why this one tuple is powerful:
 
 ```text
-workspace:acme editor team:platform#member
+workspace:productWorkspace editor team:platformTeam#member
 ```
 
 Good answer: it grants workspace editor access to the set of current and future

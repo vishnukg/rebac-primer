@@ -48,9 +48,9 @@ mistakes are caught while the code is still cheap to fix.
 Here is the story you will keep coming back to:
 
 ```text
-Alice edits the roadmap because she is in the platform team.
-Bob can read the roadmap but cannot edit it.
-Chandra has no path through the graph, so access is denied.
+The workspace editor edits the roadmap document because she is in the platform team.
+The workspace viewer can read the roadmap document but cannot edit it.
+The outside collaborator has no path through the graph, so access is denied.
 ```
 
 That tiny cast of users keeps the examples grounded.
@@ -126,9 +126,9 @@ Checkpoint: explain why `DocumentService` depends on `Authorizer`, not
 
 1. Read `05-testing-with-vitest.md`.
 2. Run `npm test`.
-3. Change `tutorialTuples()` and predict which tests fail.
+3. Change `seedRelationshipTuples()` and predict which tests fail.
 
-Checkpoint: explain why Bob can read but cannot edit.
+Checkpoint: explain why the workspace viewer can read but cannot edit.
 
 ### Day 5: Understand Node modules
 
@@ -147,7 +147,7 @@ Checkpoint: explain why relative ESM imports use `.js` in TypeScript source.
 5. Read `12-openfga-model.md`.
 6. Run `npm run dev` and inspect the graph trace.
 
-Checkpoint: draw the path from `user:alice` to `document:roadmap#can_edit`.
+Checkpoint: draw the path from `user:workspaceEditor` to `document:roadmapDocument#can_edit`.
 
 ### Day 7+: Local services and client/server
 
@@ -213,7 +213,7 @@ The entertaining part of this repo is the feedback loop:
 
 - break a relation and watch the compiler object
 - remove a tuple and watch access disappear
-- run the terminal client as Alice, Bob, then Chandra
+- run the terminal client as the workspace editor, the workspace viewer, then the outside collaborator
 - start services locally and make the graph answer real HTTP requests
 
 Every chapter should leave you with something you can run, break, or explain.

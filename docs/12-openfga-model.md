@@ -175,19 +175,19 @@ That is graph traversal.
 Diagram:
 
 ```text
-document:roadmap
+document:roadmapDocument
       │
       │ workspace
       ▼
-workspace:acme
+workspace:productWorkspace
       │
       │ editor
       ▼
-team:platform#member
+team:platformTeam#member
       │
       │ member
       ▼
-user:alice
+user:workspaceEditor
 ```
 
 The `from` keyword is what lets document access flow from the parent workspace.
@@ -205,14 +205,14 @@ editor -> can_edit
 owner  -> can_delete
 ```
 
-So if Alice is a workspace editor, and the roadmap document belongs to that
+So if the workspace editor is a workspace editor, and the roadmap document belongs to that
 workspace:
 
 ```text
-Alice can edit the roadmap.
-Alice can read the roadmap.
-Alice can comment on the roadmap.
-Alice cannot delete the roadmap unless she is also an owner.
+The workspace editor can edit the roadmap document.
+The workspace editor can read the roadmap document.
+The workspace editor can comment on the roadmap document.
+The workspace editor cannot delete the roadmap document unless she is also an owner.
 ```
 
 This is the kind of rule you want in the model, not scattered across handlers.
@@ -255,18 +255,18 @@ Do not start by typing DSL. Start with the rule.
 
 ## Tuple examples
 
-These tuples are enough to grant Alice edit access:
+These tuples are enough to grant the workspace editor edit access:
 
 ```text
-(team:platform, member, user:alice)
-(workspace:acme, editor, team:platform#member)
-(document:roadmap, workspace, workspace:acme)
+(team:platformTeam, member, user:workspaceEditor)
+(workspace:productWorkspace, editor, team:platformTeam#member)
+(document:roadmapDocument, workspace, workspace:productWorkspace)
 ```
 
 No tuple says:
 
 ```text
-(document:roadmap, editor, user:alice)
+(document:roadmapDocument, editor, user:workspaceEditor)
 ```
 
 That is the point. The access is inherited.

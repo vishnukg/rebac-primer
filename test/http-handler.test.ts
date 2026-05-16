@@ -30,8 +30,8 @@ describe("handleHttpRequest", () => {
       { documents: services.documents },
       {
         method: "GET",
-        path: "/documents/roadmap",
-        query: new URLSearchParams({ actorId: "bob" })
+        path: "/documents/roadmapDocument",
+        query: new URLSearchParams({ actorId: "workspaceViewer" })
       }
     );
 
@@ -39,8 +39,8 @@ describe("handleHttpRequest", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({
       document: {
-        id: "roadmap",
-        updatedBy: "user:alice"
+        id: "roadmapDocument",
+        updatedBy: "user:workspaceEditor"
       }
     });
   });
@@ -54,9 +54,9 @@ describe("handleHttpRequest", () => {
       { documents: services.documents },
       {
         method: "PATCH",
-        path: "/documents/roadmap",
+        path: "/documents/roadmapDocument",
         query: new URLSearchParams(),
-        body: { actorId: "bob", body: "Should not save" }
+        body: { actorId: "workspaceViewer", body: "Should not save" }
       }
     );
 
@@ -94,7 +94,7 @@ describe("handleHttpRequest", () => {
       { documents: services.documents },
       {
         method: "GET",
-        path: "/documents/roadmap",
+        path: "/documents/roadmapDocument",
         query: new URLSearchParams()
       }
     );

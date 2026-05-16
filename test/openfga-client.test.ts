@@ -29,18 +29,18 @@ describe("OpenFgaAuthorizer", () => {
 
     // Act
     const result = await authorizer.check({
-      user: user("alice"),
+      user: user("workspaceEditor"),
       relation: "can_read",
-      object: document("roadmap")
+      object: document("roadmapDocument")
     });
 
     // Assert
     expect(result.allowed).toBe(true);
     expect(result.trace).toEqual(["OpenFGA evaluated the relationship graph remotely"]);
     expect(sdk.check).toHaveBeenCalledWith({
-      user: "user:alice",
+      user: "user:workspaceEditor",
       relation: "can_read",
-      object: "document:roadmap"
+      object: "document:roadmapDocument"
     });
   });
 
@@ -54,7 +54,7 @@ describe("OpenFgaAuthorizer", () => {
       apiUrl: "http://openfga.test",
       storeId: "store-1"
     });
-    const ownerTuple = tuple(document("roadmap"), "owner", user("alice"));
+    const ownerTuple = tuple(document("roadmapDocument"), "owner", user("workspaceEditor"));
 
     // Act
     await authorizer.writeTuples([ownerTuple]);
@@ -63,9 +63,9 @@ describe("OpenFgaAuthorizer", () => {
     expect(sdk.write).toHaveBeenCalledWith({
       writes: [
         {
-          user: "user:alice",
+          user: "user:workspaceEditor",
           relation: "owner",
-          object: "document:roadmap"
+          object: "document:roadmapDocument"
         }
       ]
     });

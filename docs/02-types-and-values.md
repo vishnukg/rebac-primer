@@ -28,7 +28,7 @@ JavaScript gives you runtime primitives:
 
 ```ts
 const count = 3;          // number
-const name = "alice";     // string
+const name = "workspaceEditor";     // string
 const allowed = true;     // boolean
 const missing = undefined;
 ```
@@ -85,8 +85,8 @@ export type RebacObject<TType extends ObjectType = ObjectType> =
 That lets TypeScript distinguish these:
 
 ```ts
-const alice: RebacObject<"user"> = "user:alice";
-const roadmap: RebacObject<"document"> = "document:roadmap";
+const workspaceEditor: RebacObject<"user"> = "user:workspaceEditor";
+const roadmapDocument: RebacObject<"document"> = "document:roadmapDocument";
 ```
 
 This is not runtime validation. The compiler uses it while checking code.
@@ -121,7 +121,7 @@ represent a family of related shapes.
 You could write this everywhere:
 
 ```ts
-const alice = "user:alice" as RebacObject<"user">;
+const workspaceEditor = "user:workspaceEditor" as RebacObject<"user">;
 ```
 
 Do not make that the normal style. A cast tells TypeScript, "trust me." That is
@@ -138,8 +138,8 @@ export function user(id: string): RebacObject<"user"> {
 Now calling code is readable:
 
 ```ts
-const alice = user("alice");
-const roadmap = document("roadmap");
+const workspaceEditor = user("workspaceEditor");
+const roadmapDocument = document("roadmapDocument");
 ```
 
 The helper also validates empty ids at runtime.
@@ -231,7 +231,7 @@ There are legitimate casts. `as const` is often fine because it preserves litera
 types:
 
 ```ts
-const graph = ["user:alice", "document:roadmap"] as const;
+const graph = ["user:workspaceEditor", "document:roadmapDocument"] as const;
 ```
 
 But casts that silence uncertainty should be rare.

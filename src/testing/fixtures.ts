@@ -1,18 +1,18 @@
 import { document, subjectSet, team, tuple, user, workspace } from "../authz/types.js";
 import type { TupleKey } from "../authz/types.js";
 
-export const alice = user("alice");
-export const bob = user("bob");
-export const chandra = user("chandra");
-export const platform = team("platform");
-export const acme = workspace("acme");
-export const roadmap = document("roadmap");
+export const workspaceEditor = user("workspaceEditor");
+export const workspaceViewer = user("workspaceViewer");
+export const outsideCollaborator = user("outsideCollaborator");
+export const platformTeam = team("platformTeam");
+export const productWorkspace = workspace("productWorkspace");
+export const roadmapDocument = document("roadmapDocument");
 
-export function tutorialTuples(): readonly TupleKey[] {
+export function seedRelationshipTuples(): readonly TupleKey[] {
   return [
-    tuple(platform, "member", alice),
-    tuple(acme, "editor", subjectSet(platform, "member")),
-    tuple(acme, "viewer", bob),
-    tuple(roadmap, "workspace", acme)
+    tuple(platformTeam, "member", workspaceEditor),
+    tuple(productWorkspace, "editor", subjectSet(platformTeam, "member")),
+    tuple(productWorkspace, "viewer", workspaceViewer),
+    tuple(roadmapDocument, "workspace", productWorkspace)
   ];
 }

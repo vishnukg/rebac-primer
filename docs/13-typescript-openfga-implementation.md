@@ -97,9 +97,9 @@ This is the useful part:
 
 ```ts
 const result = await authorizer.check({
-  user: alice,
+  user: workspaceEditor,
   relation: "can_edit",
-  object: roadmap
+  object: roadmapDocument
 });
 
 console.log(result.trace);
@@ -161,7 +161,7 @@ everywhere.
 Example tuple:
 
 ```ts
-tuple(workspace("acme"), "editor", subjectSet(team("platform"), "member"))
+tuple(workspace("productWorkspace"), "editor", subjectSet(team("platformTeam"), "member"))
 ```
 
 This becomes an OpenFGA write request.

@@ -49,16 +49,16 @@ make client
 
 The client is a simple interactive terminal UI. It lets you:
 
-- read the seeded `roadmap` document
-- update the `roadmap` document
+- read the seeded `roadmapDocument`
+- update the `roadmapDocument`
 - try different actors
 
 Actors:
 
 ```text
-alice    -> can edit through team membership
-bob      -> can read as workspace viewer
-chandra  -> denied by default
+workspaceEditor       -> can edit through team membership
+workspaceViewer       -> can read as workspace viewer
+outsideCollaborator   -> denied by default
 ```
 
 ## API routes
@@ -66,30 +66,30 @@ chandra  -> denied by default
 ```text
 GET /health
 POST /documents
-GET /documents/:id?actorId=alice
+GET /documents/:id?actorId=workspaceEditor
 PATCH /documents/:id
 ```
 
 Example read:
 
 ```bash
-curl "http://127.0.0.1:4000/documents/roadmap?actorId=bob"
+curl "http://127.0.0.1:4000/documents/roadmapDocument?actorId=workspaceViewer"
 ```
 
 Example update:
 
 ```bash
-curl -X PATCH "http://127.0.0.1:4000/documents/roadmap" \
+curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
   -H "content-type: application/json" \
-  -d '{"actorId":"alice","body":"Updated from curl"}'
+  -d '{"actorId":"workspaceEditor","body":"Updated from curl"}'
 ```
 
-Bob can read but cannot update:
+The workspace viewer can read but cannot update:
 
 ```bash
-curl -X PATCH "http://127.0.0.1:4000/documents/roadmap" \
+curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
   -H "content-type: application/json" \
-  -d '{"actorId":"bob","body":"Should fail"}'
+  -d '{"actorId":"workspaceViewer","body":"Should fail"}'
 ```
 
 ## Where ReBAC is enforced
@@ -104,7 +104,7 @@ await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "ed
 
 That is the important boundary.
 
-The client does not decide whether Bob can edit. The server decides. The server
+The client does not decide whether the workspace viewer can edit. The server decides. The server
 uses the domain service. The domain service uses the authorizer.
 
 ```text
@@ -186,9 +186,9 @@ make client
 Try the client as three actors:
 
 ```text
-alice
-bob
-chandra
+workspaceEditor
+workspaceViewer
+outsideCollaborator
 ```
 
 If you can predict who can read and who can edit before pressing Enter, the

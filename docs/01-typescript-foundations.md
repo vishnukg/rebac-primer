@@ -37,13 +37,13 @@ Types do not exist at runtime. They are design-time guardrails.
 This compiles:
 
 ```ts
-const userId: string = "alice";
+const userId: string = "workspaceEditor";
 ```
 
 At runtime, Node only sees JavaScript:
 
 ```js
-const userId = "alice";
+const userId = "workspaceEditor";
 ```
 
 So TypeScript is not a runtime permission system. It cannot stop an attacker by
@@ -164,7 +164,7 @@ change. If a relationship changes, write or delete a tuple.
 That is why `TupleKey` is `Readonly`.
 
 ```ts
-const owner = tuple(document("roadmap"), "owner", user("alice"));
+const owner = tuple(document("roadmapDocument"), "owner", user("workspaceEditor"));
 owner.relation = "viewer"; // compiler error
 ```
 

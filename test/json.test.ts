@@ -5,13 +5,13 @@ import { isJsonObject, readJson, stringField } from "../src/http/json.js";
 describe("JSON HTTP helpers", () => {
   it("given_object_json_body_when_reading_json_then_object_is_returned", async () => {
     // Arrange
-    const request = Readable.from([JSON.stringify({ actorId: "alice" })]);
+    const request = Readable.from([JSON.stringify({ actorId: "workspaceEditor" })]);
 
     // Act
     const body = await readJson(request);
 
     // Assert
-    expect(body).toEqual({ actorId: "alice" });
+    expect(body).toEqual({ actorId: "workspaceEditor" });
   });
 
   it("given_empty_request_body_when_reading_json_then_empty_object_is_returned", async () => {

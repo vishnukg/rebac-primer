@@ -28,8 +28,8 @@ type document
 `;
 
 export const relationshipGraphExample = [
-  "team:platform#member contains user:alice",
-  "workspace:acme#editor contains team:platform#member",
-  "document:roadmap#workspace points at workspace:acme",
-  "therefore user:alice can_edit document:roadmap"
+  "team:platformTeam#member contains user:workspaceEditor",
+  "workspace:productWorkspace#editor contains team:platformTeam#member",
+  "document:roadmapDocument#workspace points at workspace:productWorkspace",
+  "therefore user:workspaceEditor can_edit document:roadmapDocument"
 ] as const;
