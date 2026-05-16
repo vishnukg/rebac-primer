@@ -1,6 +1,7 @@
-node_modules/
-dist/
-coverage/
+typescript/node_modules/
+typescript/dist/
+typescript/coverage/
+go/bin/
 .env
 .data/
 *.log

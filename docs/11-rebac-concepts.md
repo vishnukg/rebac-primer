@@ -149,14 +149,24 @@ document:roadmapDocument
 The type before the colon matters. `user:workspaceEditor` and `team:workspaceEditor` are different
 objects.
 
-This repo models object ids in TypeScript:
+This repo models object ids in TypeScript as branded strings:
 
 ```ts
+// typescript/src/authz/types.ts
 export type RebacObject<TType extends ObjectType = ObjectType> =
   `${TType}:${string}`;
 ```
 
-That is a small example of TypeScript supporting the authorization model.
+In Go the same idea uses named types — a `string` that the compiler treats as a
+distinct type:
+
+```go
+// go/internal/authz/types.go
+type Object string  // "type:id" — e.g. "workspace:productWorkspace"
+```
+
+Both approaches make it a compile error to pass a raw string where a typed object
+is expected.
 
 ## Relations
 
@@ -186,10 +196,18 @@ A tuple is one stored fact:
 (object, relation, user)
 ```
 
-In code:
+In TypeScript:
 
 ```ts
+// typescript/src/testing/fixtures.ts
 tuple(workspace("productWorkspace"), "editor", subjectSet(team("platformTeam"), "member"))
+```
+
+In Go:
+
+```go
+// go/internal/fixtures/fixtures.go
+authz.Tuple(ProductWorkspace, authz.RelationWorkspaceEditor, authz.SubjectSet(PlatformTeam, authz.RelationTeamMember))
 ```
 
 This means:
@@ -344,21 +362,31 @@ not simply too permissive.
 
 ## Exercise
 
-Run:
+**TypeScript:** run the demo and read the trace:
 
 ```bash
-npm run dev
+make ts-server   # start the server
+# or inside the container: npm run dev
 ```
 
-Read the trace for the workspace editor, the workspace viewer, and the outside collaborator.
-
-Then change `src/testing/fixtures.ts` so the workspace viewer is an editor instead of a viewer:
+Then change `typescript/src/testing/fixtures.ts` so the workspace viewer is an
+editor instead of a viewer:
 
 ```ts
 tuple(productWorkspace, "editor", workspaceViewer)
 ```
 
-Predict the new result before running the demo again.
+**Go:** run the graph test with verbose output and read every trace line:
+
+```bash
+make go-test
+# or: go test -v ./internal/authz/...
+```
+
+Open `go/internal/authz/graph_test.go` and change the fixture similarly. Predict
+the new result before running the test again.
+
+For both implementations: predict the new result before running anything.
 
 ## Checkpoint
 

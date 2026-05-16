@@ -1,107 +1,99 @@
-# TS ReBAC Primer: learn TypeScript by building OpenFGA authorization
+# ReBAC Primer: TypeScript and Go
 
-This repository is a TypeScript course for programmers who want to learn two
-things together:
-
-- practical TypeScript for backend services
-- relationship-based access control (ReBAC) with OpenFGA
+This repository teaches relationship-based access control (ReBAC) with OpenFGA
+through two parallel implementations of the same application — one in TypeScript,
+one in Go.
 
 The project domain is a collaborative document workspace. Workspaces contain
 documents, teams get workspace access, and users inherit permissions through a
-relationship graph. That small domain is enough to teach TypeScript types,
-interfaces, async code, testing, and the core OpenFGA mental model.
-
-The docs are designed to be read as a TypeScript primer, not as thin notes
-beside the code. Start with the course map and work through the TypeScript track
-before going deep on ReBAC.
-
-The tutorial style is deliberately hands-on: each chapter gives you a scene,
-the concept, the code to inspect, something to try, and a checkpoint question.
-The goal is to keep the material useful without turning it into a dry reference
-manual.
-
-If you are new to authorization, read these before the OpenFGA model:
-
-- [OAuth-based authentication](docs/08-oauth-authentication.md)
-- [Authorization fundamentals](docs/09-authorization-fundamentals.md)
-- [Graph theory for ReBAC](docs/10-graph-theory-for-rebac.md)
-- [ReBAC concepts](docs/11-rebac-concepts.md)
-
-## Start here
-
-1. Read [docs/00-course-map.md](docs/00-course-map.md).
-2. Install dependencies: `npm install`
-3. Run tests: `npm test`
-4. Run the tutorial demo: `npm run dev`
-5. Read docs in order while jumping into the referenced code.
-6. Keep new code aligned with [docs/06-typescript-code-style.md](docs/06-typescript-code-style.md).
+relationship graph. That domain is small enough to stay concrete but rich enough
+to demonstrate the core ideas in both languages.
 
 ## Repository map
 
-- `src/domain`: TypeScript domain model and service layer
-- `src/authz/model.ts`: OpenFGA authorization model DSL
-- `src/authz/types.ts`: strongly typed tuple, object, and relation helpers
-- `src/authz/memory-store.ts`: in-memory tuple graph used by unit tests
-- `src/authz/graph-authorizer.ts`: small evaluator that explains graph traversal
-- `src/authz/openfga-client.ts`: real OpenFGA SDK adapter
-- `src/server.ts`: small HTTP server for client/server ReBAC practice
-- `src/client/tui.ts`: interactive terminal client
-- `test`: Vitest tests that double as executable lessons
-- `docs`: ordered course notes for TypeScript and ReBAC
-- `deployments`: local OpenFGA docker-compose setup
-- `practice/collab-docs-lite`: capstone exercise
+```
+typescript/       TypeScript implementation
+  src/authz/      Authorization types, tuple store, graph evaluator, OpenFGA adapter
+  src/domain/     Document model and service layer
+  src/http/       HTTP handler and server
+  src/app/        Composition root
+  src/client/     Interactive terminal client
+  test/           Vitest tests
 
-## Why this layout
+go/               Go implementation
+  internal/authz/     Authorization types, tuple store, graph evaluator, OpenFGA adapter
+  internal/domain/    Document model and service layer
+  internal/httpserver/ HTTP handler and routing
+  internal/fixtures/  Shared test data
+  internal/app/       Composition root
+  cmd/server/         Entry point
 
-The repo keeps the teaching loop short. Most tests use an in-memory graph so
-you can learn the model without running infrastructure. The OpenFGA adapter is
-still included so the same application boundary can talk to a real OpenFGA
-server when you are ready.
+docs/             Tutorial chapters (read these in order)
+deployments/      Docker Compose for both implementations + OpenFGA
+```
+
+## Where to start
+
+Read [docs/00-course-map.md](docs/00-course-map.md) for the full learning path.
+
+Short version:
+
+1. TypeScript foundations → docs 01–07
+2. Authorization theory → docs 08–11
+3. OpenFGA model → doc 12–13
+4. Docker and local services → docs 20–23
+5. Go implementation → docs 40–41
 
 ## Commands
 
-This repo follows the 3 Musketeers workflow:
+This repo uses the [3 Musketeers](https://3musketeers.io/) pattern:
+
+```
+make → docker compose → containerized tools
+```
+
+**TypeScript** (server on port 4000):
+
+```bash
+make ts-deps
+make ts-build
+make ts-test
+make ts-check
+make ts-server
+make ts-client
+```
+
+**Go** (server on port 4001):
+
+```bash
+make go-build
+make go-test
+make go-check
+make go-server
+```
+
+**Shared**:
+
+```bash
+make openfga-up    # start local OpenFGA
+make openfga-down  # stop everything
+make clean         # remove containers, volumes, and build output
+```
+
+Run `make` with no arguments to see all targets.
+
+## The authorization story
 
 ```text
-make -> docker compose -> containerized Node tools
+The workspace editor can edit the roadmap document
+  because she is in the platform team
+  which is an editor of the product workspace
+  which the roadmap document lives in.
+
+The workspace viewer can read but not edit.
+
+The outside collaborator has no path through the graph — access is denied.
 ```
 
-Use these targets when Docker is running:
-
-```bash
-make deps
-make build
-make test
-make coverage
-make check
-make server
-make client
-```
-
-The npm scripts still exist because they are useful inside the container and for
-quick local debugging, but the Makefile is the project interface.
-
-```bash
-npm install
-npm test
-npm run build
-npm run dev
-npm run server
-npm run client
-```
-
-To start OpenFGA locally:
-
-```bash
-docker compose -f deployments/docker-compose.yml up -d
-```
-
-Then use `src/authz/openfga-client.ts` as the production adapter for the same
-`Authorizer` interface used in the tests.
-
-For the client/server demo, run:
-
-```bash
-make server
-make client
-```
+Both implementations answer the same question with the same graph traversal
+algorithm. Reading them side by side is the lesson.

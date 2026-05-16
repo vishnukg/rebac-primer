@@ -20,7 +20,12 @@ application code can stay boring.
 
 ## The model in this repo
 
-Open `src/authz/model.ts`.
+The model is defined in both implementations — the DSL is identical:
+
+- TypeScript: `typescript/src/authz/model.ts`
+- Go: `go/internal/authz/model.go`
+
+Open either one.
 
 The model contains four types:
 
@@ -306,14 +311,20 @@ define archiver: [user] or owner
 define can_archive: archiver
 ```
 
-Then mirror that in TypeScript:
+**TypeScript** — mirror the model change in code:
 
-1. add `"archiver"` and `"can_archive"` to `DocumentRelation`
-2. update `GraphAuthorizer`
-3. add tests for owner allowed and viewer denied
+1. Add `"archiver"` and `"can_archive"` to `DocumentRelation` in `typescript/src/authz/types.ts`
+2. Add the expansion rule to `GraphAuthorizer` in `typescript/src/authz/graph-authorizer.ts`
+3. Add tests: owner is allowed, viewer is denied
 
-This exercise forces the OpenFGA model and TypeScript vocabulary to stay in
-sync.
+**Go** — mirror the same change:
+
+1. Add `RelationDocumentArchiver` and `RelationDocumentCanArchive` constants to `go/internal/authz/types.go`
+2. Add the expansion rule in `expandDocument` in `go/internal/authz/graph.go`
+3. Add a test in `go/internal/authz/graph_test.go` following the AAA pattern
+
+This exercise forces the model, the TypeScript vocabulary, and the Go constants to
+stay in sync — which is the real cost of running dual implementations.
 
 ## Checkpoint
 

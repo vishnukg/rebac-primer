@@ -1,28 +1,51 @@
 services:
-  tools:
+  ts-tools:
     build:
-      context: ..
-      dockerfile: deployments/Dockerfile
+      context: ../typescript
+      dockerfile: Dockerfile
       target: deps
     working_dir: /workspace
     volumes:
-      - ..:/workspace
-      - node_modules:/workspace/node_modules
+      - ../typescript:/workspace
+      - ts_node_modules:/workspace/node_modules
     environment:
-      REBAC_API_URL: "http://app:4000"
+      REBAC_API_URL: "http://ts-app:4000"
     profiles:
-      - tools
+      - ts-tools
 
-  app:
+  ts-app:
     build:
-      context: ..
-      dockerfile: deployments/Dockerfile
+      context: ../typescript
+      dockerfile: Dockerfile
     environment:
       PORT: "4000"
     ports:
       - "4000:4000"
     profiles:
-      - app
+      - ts-app
+
+  go-tools:
+    build:
+      context: ../go
+      dockerfile: Dockerfile
+      target: dev
+    working_dir: /workspace
+    volumes:
+      - ../go:/workspace
+      - go_cache:/root/go/pkg/mod
+    profiles:
+      - go-tools
+
+  go-app:
+    build:
+      context: ../go
+      dockerfile: Dockerfile
+    environment:
+      PORT: "4001"
+    ports:
+      - "4001:4001"
+    profiles:
+      - go-app
 
   openfga:
     image: openfga/openfga:latest
@@ -36,4 +59,5 @@ services:
       - "3000:3000"
 
 volumes:
-  node_modules:
+  ts_node_modules:
+  go_cache:
