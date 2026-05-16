@@ -51,6 +51,47 @@ Can user:alice edit document:roadmap?
 
 Yes, because a path exists through the graph.
 
+## Architecture view
+
+In an application, ReBAC usually sits behind a small authorization interface:
+
+```text
+┌──────────────┐
+│ Client       │ terminal app, browser, API consumer
+└──────┬───────┘
+       │ request: actor wants action on object
+       ▼
+┌──────────────┐
+│ HTTP Server  │ parse request, identify actor
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ Domain       │ knows when authorization is required
+│ Service      │
+└──────┬───────┘
+       │ Check(user, relation, object)
+       ▼
+┌──────────────┐
+│ Authorizer   │ ReBAC graph traversal
+└──────┬───────┘
+       │ reads tuples
+       ▼
+┌──────────────┐
+│ Tuple Store  │ relationship facts
+└──────────────┘
+```
+
+In this repo:
+
+```text
+HTTP handler -> DocumentService -> Authorizer -> MemoryTupleStore/OpenFGA
+```
+
+That separation matters. The HTTP layer should not know graph traversal rules.
+The domain service should not know SDK details. The authorizer should answer one
+question: allowed or denied.
+
 ## The graph
 
 Here is the tutorial graph:
@@ -78,6 +119,21 @@ alice -> platform team -> acme workspace -> roadmap document -> can_edit
 ```
 
 That path is what authorization checks evaluate.
+
+The same graph as tuples:
+
+```text
+┌──────────────────┬──────────┬──────────────────────┐
+│ object           │ relation │ user                 │
+├──────────────────┼──────────┼──────────────────────┤
+│ team:platform    │ member   │ user:alice           │
+│ workspace:acme   │ editor   │ team:platform#member │
+│ workspace:acme   │ viewer   │ user:bob             │
+│ document:roadmap │ workspace│ workspace:acme       │
+└──────────────────┴──────────┴──────────────────────┘
+```
+
+Tuples are the data. The model explains how to interpret them.
 
 ## Objects
 
@@ -244,6 +300,30 @@ Result: allowed
 
 This trace is deliberately educational. Real OpenFGA performs the check
 remotely, but the mental model is the same.
+
+Check as a sequence diagram:
+
+```text
+DocumentService        Authorizer          Tuple graph
+      │                    │                   │
+      │ can_edit?          │                   │
+      ├───────────────────►│                   │
+      │                    │ find document     │
+      │                    │ workspace         │
+      │                    ├──────────────────►│
+      │                    │ workspace:acme    │
+      │                    │◄──────────────────┤
+      │                    │ resolve editor    │
+      │                    ├──────────────────►│
+      │                    │ team:platform     │
+      │                    │◄──────────────────┤
+      │                    │ resolve member    │
+      │                    ├──────────────────►│
+      │                    │ user:alice found  │
+      │                    │◄──────────────────┤
+      │ allowed            │                   │
+      │◄───────────────────┤                   │
+```
 
 ## Denial is absence of a path
 

@@ -68,16 +68,20 @@ Read these first if you want this repo to be your TypeScript source of truth.
 | 05 | Testing TypeScript with Vitest | `test/*.test.ts` |
 | 06 | Coding style for maintainable TypeScript | `docs/06-typescript-code-style.md` |
 | 07 | Node ESM, module loading, module patterns, singletons | `package.json`, `tsconfig.json`, `src/main.ts` |
+| 08 | OAuth/OIDC authentication fundamentals | conceptual |
+| 09 | Authorization fundamentals: RBAC, ABAC, ReBAC | conceptual |
 
 ## Track 2: ReBAC with OpenFGA
 
-Read these after Track 1, or in parallel if authorization is your main goal.
+Read these after docs 08, 09, and 10, or in parallel if authorization is your
+main goal.
 
 | Doc | Topic | Code to inspect |
 |-----|-------|-----------------|
-| 10 | ReBAC concepts and relationship graphs | `src/authz/graph-authorizer.ts` |
-| 11 | OpenFGA model DSL | `src/authz/model.ts` |
-| 12 | TypeScript OpenFGA implementation | `src/authz/openfga-client.ts` |
+| 10 | Graph theory needed for ReBAC | conceptual |
+| 11 | ReBAC concepts and relationship graphs | `src/authz/graph-authorizer.ts` |
+| 12 | OpenFGA model DSL | `src/authz/model.ts` |
+| 13 | TypeScript OpenFGA implementation | `src/authz/openfga-client.ts` |
 
 ## Track 3: Docker and local services
 
@@ -136,9 +140,12 @@ Checkpoint: explain why relative ESM imports use `.js` in TypeScript source.
 
 ### Day 6+: ReBAC and OpenFGA
 
-1. Read `10-rebac-concepts.md`.
-2. Read `11-openfga-model.md`.
-3. Run `npm run dev` and inspect the graph trace.
+1. Read `08-oauth-authentication.md`.
+2. Read `09-authorization-fundamentals.md`.
+3. Read `10-graph-theory-for-rebac.md`.
+4. Read `11-rebac-concepts.md`.
+5. Read `12-openfga-model.md`.
+6. Run `npm run dev` and inspect the graph trace.
 
 Checkpoint: draw the path from `user:alice` to `document:roadmap#can_edit`.
 

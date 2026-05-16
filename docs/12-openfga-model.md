@@ -33,6 +33,32 @@ document
 
 Read those as the nouns in the system.
 
+Architecture diagram:
+
+```text
+┌─────────────────────────────────────────────┐
+│ OpenFGA Store                               │
+│                                             │
+│  ┌──────────────┐     ┌──────────────────┐  │
+│  │ Model        │     │ Tuples           │  │
+│  │ schema       │     │ runtime facts    │  │
+│  │ rarely       │     │ change often     │  │
+│  │ changes      │     │                  │  │
+│  └──────┬───────┘     └────────┬─────────┘  │
+│         │                      │            │
+│         └──────────┬───────────┘            │
+│                    ▼                        │
+│              Check evaluation               │
+└─────────────────────────────────────────────┘
+```
+
+Model and tuples are separate on purpose:
+
+```text
+Model:  what relationships can mean
+Tuples: which relationships currently exist
+```
+
 ## Users
 
 ```text
@@ -47,26 +73,25 @@ related to teams, workspaces, and documents.
 ```text
 type team
   relations
-    define member: [user]
-    define admin: [user] or member
+    define admin: [user]
+    define member: [user] or admin
 ```
 
 This says:
 
-- only users can be direct team members
-- users can be direct admins
-- members are also included in admin for this simplified tutorial model
+- only users can be direct team admins
+- users can be direct team members
+- admins are also members
 
-In a production model, you may choose the opposite hierarchy:
+Do not reverse this hierarchy unless the product truly means it.
 
 ```text
-member: [user] or admin
-admin: [user]
+admin: [user] or member
 ```
 
-That would mean admins are members, but members are not admins. The exact shape
-depends on the product rules. The important lesson is that relation definitions
-encode hierarchy.
+That would mean every member is an admin, which is usually too powerful. The
+important lesson is that relation definitions encode hierarchy, and hierarchy
+direction matters.
 
 ## Workspaces
 
@@ -147,6 +172,26 @@ means:
 
 That is graph traversal.
 
+Diagram:
+
+```text
+document:roadmap
+      │
+      │ workspace
+      ▼
+workspace:acme
+      │
+      │ editor
+      ▼
+team:platform#member
+      │
+      │ member
+      ▼
+user:alice
+```
+
+The `from` keyword is what lets document access flow from the parent workspace.
+
 ## Relationship hierarchy
 
 For documents:
@@ -171,6 +216,20 @@ Alice cannot delete the roadmap unless she is also an owner.
 ```
 
 This is the kind of rule you want in the model, not scattered across handlers.
+
+Permission graph:
+
+```text
+owner
+  ├── can_delete
+  └── editor
+        ├── can_edit
+        └── viewer
+              ├── can_read
+              └── can_comment
+```
+
+One owner relationship implies several permissions without writing extra tuples.
 
 ## Model design habit
 

@@ -43,6 +43,36 @@ await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "ed
 
 The implementation behind `Authorizer` can change without rewriting the service.
 
+Architecture:
+
+```text
+┌─────────────────┐
+│ DocumentService │
+│ business rules  │
+└────────┬────────┘
+         │ depends on interface
+         ▼
+┌─────────────────┐
+│ Authorizer      │
+│ check(...)      │
+└───────┬─────────┘
+        │
+        ├─────────────────────┐
+        ▼                     ▼
+┌─────────────────┐   ┌─────────────────┐
+│ GraphAuthorizer │   │ OpenFgaAuthorizer│
+│ local teaching  │   │ SDK adapter      │
+└─────────────────┘   └────────┬────────┘
+                               │
+                               ▼
+                       ┌─────────────────┐
+                       │ OpenFGA Server  │
+                       └─────────────────┘
+```
+
+This is composition through interfaces. The domain service does not change when
+you swap the implementation.
+
 ## Two implementations
 
 This repo has two implementations:
@@ -154,6 +184,29 @@ You then need to:
 
 This repo does not hide those concepts because learning them is part of the
 point.
+
+Local runtime architecture:
+
+```text
+┌──────────────┐       HTTP        ┌──────────────┐
+│ terminal     │ ────────────────► │ app server   │
+│ client       │                   │ :4000        │
+└──────────────┘                   └──────┬───────┘
+                                          │ Authorizer.check
+                                          ▼
+                                  ┌──────────────┐
+                                  │ GraphAuthorizer
+                                  │ or OpenFGA   │
+                                  └──────┬───────┘
+                                         │
+                                         ▼
+                                  ┌──────────────┐
+                                  │ tuples/model │
+                                  └──────────────┘
+```
+
+Today the demo server uses `GraphAuthorizer` so it runs without infrastructure.
+The adapter is ready for the OpenFGA-backed version.
 
 ## TypeScript lesson
 

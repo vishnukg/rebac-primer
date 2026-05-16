@@ -6,8 +6,8 @@ type user
 
 type team
   relations
-    define member: [user]
-    define admin: [user] or member
+    define admin: [user]
+    define member: [user] or admin
 
 type workspace
   relations

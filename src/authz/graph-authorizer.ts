@@ -68,9 +68,9 @@ export class GraphAuthorizer implements Authorizer {
     trace: string[],
     visited: Set<VisitKey>
   ): boolean {
-    if (relation === "admin") {
-      trace.push("team.admin includes team.member");
-      return this.hasRelation(user, object, "member", trace, visited);
+    if (relation === "member") {
+      trace.push("team.member includes team.admin");
+      return this.hasRelation(user, object, "admin", trace, visited);
     }
 
     return false;

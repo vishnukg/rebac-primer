@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { GraphAuthorizer } from "../src/authz/graph-authorizer.js";
 import { MemoryTupleStore } from "../src/authz/memory-store.js";
-import { alice, bob, chandra, roadmap, tutorialTuples } from "../src/testing/fixtures.js";
+import { alice, bob, chandra, platform, roadmap, tutorialTuples } from "../src/testing/fixtures.js";
+import { tuple } from "../src/authz/types.js";
 
 describe("GraphAuthorizer", () => {
   it("given_team_member_workspace_editor_when_checking_document_edit_then_access_is_allowed", async () => {
@@ -49,19 +50,24 @@ describe("GraphAuthorizer", () => {
     expect(result.trace.at(-1)).toBe("Result: denied");
   });
 
-  it("given_team_member_when_checking_team_admin_then_access_is_allowed_by_model_hierarchy", async () => {
+  it("given_team_admin_when_checking_team_membership_then_access_is_allowed_by_model_hierarchy", async () => {
     // Arrange
-    const authorizer = new GraphAuthorizer(new MemoryTupleStore(tutorialTuples()));
+    const authorizer = new GraphAuthorizer(
+      new MemoryTupleStore([
+        ...tutorialTuples(),
+        tuple(platform, "admin", chandra)
+      ])
+    );
 
     // Act
     const result = await authorizer.check({
-      user: alice,
-      relation: "admin",
+      user: chandra,
+      relation: "member",
       object: "team:platform"
     });
 
     // Assert
     expect(result.allowed).toBe(true);
-    expect(result.trace).toContain("team.admin includes team.member");
+    expect(result.trace).toContain("team.member includes team.admin");
   });
 });

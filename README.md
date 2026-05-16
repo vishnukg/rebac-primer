@@ -20,6 +20,13 @@ the concept, the code to inspect, something to try, and a checkpoint question.
 The goal is to keep the material useful without turning it into a dry reference
 manual.
 
+If you are new to authorization, read these before the OpenFGA model:
+
+- [OAuth-based authentication](docs/08-oauth-authentication.md)
+- [Authorization fundamentals](docs/09-authorization-fundamentals.md)
+- [Graph theory for ReBAC](docs/10-graph-theory-for-rebac.md)
+- [ReBAC concepts](docs/11-rebac-concepts.md)
+
 ## Start here
 
 1. Read [docs/00-course-map.md](docs/00-course-map.md).
