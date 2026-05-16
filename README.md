@@ -18,6 +18,7 @@ interfaces, async code, testing, and the core OpenFGA mental model.
 3. Run tests: `npm test`
 4. Run the tutorial demo: `npm run dev`
 5. Read docs in order while jumping into the referenced code.
+6. Keep new code aligned with [docs/06-typescript-code-style.md](docs/06-typescript-code-style.md).
 
 ## Repository map
 

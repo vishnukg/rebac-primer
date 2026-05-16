@@ -5,8 +5,9 @@ import {
   type CheckResult,
   type Relation,
   type RebacObject,
-  type Subject,
   type SubjectSet,
+  isObjectOfType,
+  isSubjectSet,
   parseObject,
   parseSubjectSet
 } from "./types.js";
@@ -122,7 +123,10 @@ export class GraphAuthorizer implements Authorizer {
       const workspaceRelation = relation;
       for (const parent of this.store.findByObjectRelation(object, "workspace")) {
         trace.push(`document.${relation} can inherit workspace.${workspaceRelation} from ${parent.user}`);
-        if (this.hasRelation(user, parent.user as RebacObject<"workspace">, workspaceRelation, trace, visited)) {
+        if (
+          isObjectOfType(parent.user, "workspace") &&
+          this.hasRelation(user, parent.user, workspaceRelation, trace, visited)
+        ) {
           return true;
         }
       }
@@ -163,8 +167,4 @@ export class GraphAuthorizer implements Authorizer {
     trace.push(`Resolve subject set ${subject}: does it contain ${user}?`);
     return this.hasRelation(user, object, relation, trace, visited);
   }
-}
-
-function isSubjectSet(subject: Subject): subject is SubjectSet {
-  return subject.includes("#");
 }

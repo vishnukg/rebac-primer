@@ -1,5 +1,5 @@
 import { document as documentObject } from "../authz/types.js";
-import type { Authorizer } from "../authz/types.js";
+import type { Authorizer, RebacObject, Relation } from "../authz/types.js";
 import {
   type CollaborativeDocument,
   type CreateDocumentInput,
@@ -16,15 +16,7 @@ export class DocumentService {
   ) {}
 
   async create(input: CreateDocumentInput): Promise<CollaborativeDocument> {
-    const decision = await this.authorizer.check({
-      user: input.actor,
-      relation: "editor",
-      object: input.workspace
-    });
-
-    if (!decision.allowed) {
-      throw new ForbiddenError(`${input.actor} cannot create documents in ${input.workspace}`);
-    }
+    await this.requireAllowed(input.actor, "editor", input.workspace, "create documents in");
 
     const created: CollaborativeDocument = {
       id: input.id,
@@ -37,32 +29,16 @@ export class DocumentService {
     return created;
   }
 
-  async read(id: string, actor: `user:${string}`): Promise<CollaborativeDocument> {
+  async read(id: string, actor: RebacObject<"user">): Promise<CollaborativeDocument> {
     const existing = await this.requireDocument(id);
-    const decision = await this.authorizer.check({
-      user: actor,
-      relation: "can_read",
-      object: documentObject(id)
-    });
-
-    if (!decision.allowed) {
-      throw new ForbiddenError(`${actor} cannot read document:${id}`);
-    }
+    await this.requireAllowed(actor, "can_read", documentObject(id), "read");
 
     return existing;
   }
 
   async update(input: UpdateDocumentInput): Promise<CollaborativeDocument> {
     const existing = await this.requireDocument(input.id);
-    const decision = await this.authorizer.check({
-      user: input.actor,
-      relation: "can_edit",
-      object: documentObject(input.id)
-    });
-
-    if (!decision.allowed) {
-      throw new ForbiddenError(`${input.actor} cannot edit document:${input.id}`);
-    }
+    await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "edit");
 
     const updated = { ...existing, body: input.body, updatedBy: input.actor };
     await this.repository.save(updated);
@@ -76,5 +52,18 @@ export class DocumentService {
     }
 
     return existing;
+  }
+
+  private async requireAllowed(
+    actor: RebacObject<"user">,
+    relation: Relation,
+    object: RebacObject,
+    action: string
+  ): Promise<void> {
+    const decision = await this.authorizer.check({ user: actor, relation, object });
+
+    if (!decision.allowed) {
+      throw new ForbiddenError(`${actor} cannot ${action} ${object}`);
+    }
   }
 }

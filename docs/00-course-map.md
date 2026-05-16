@@ -13,6 +13,7 @@ real reason to exist. Each doc points at code and tests you can run.
 | 02 | Objects, unions, template literal types | `src/authz/types.ts` |
 | 03 | Interfaces, dependency injection, async services | `src/domain/service.ts` |
 | 04 | Testing with Vitest | `test/*.test.ts` |
+| 06 | Coding style for simple, maintainable TypeScript | `docs/06-typescript-code-style.md` |
 
 ## Track 2: ReBAC with OpenFGA
 
