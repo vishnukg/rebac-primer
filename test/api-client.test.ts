@@ -48,10 +48,11 @@ describe("RebacApiClient", () => {
       });
     const client = new RebacApiClient("http://server.test", fetcher);
 
-    // Act + Assert
-    await expect(client.updateDocument("roadmap", "bob", "nope")).rejects.toThrow(
-      "user:bob cannot edit document:roadmap"
-    );
+    // Act
+    const updatePromise = client.updateDocument("roadmap", "bob", "nope");
+
+    // Assert
+    await expect(updatePromise).rejects.toThrow("user:bob cannot edit document:roadmap");
   });
 
   it("given_error_response_without_error_field_when_reading_document_then_status_text_is_thrown", async () => {
@@ -64,10 +65,11 @@ describe("RebacApiClient", () => {
       })
     );
 
-    // Act + Assert
-    await expect(client.readDocument("roadmap", "alice")).rejects.toThrow(
-      "Internal Server Error"
-    );
+    // Act
+    const readPromise = client.readDocument("roadmap", "alice");
+
+    // Assert
+    await expect(readPromise).rejects.toThrow("Internal Server Error");
   });
 
   it("given_success_response_with_invalid_document_body_when_reading_document_then_validation_error_is_thrown", async () => {
@@ -79,9 +81,10 @@ describe("RebacApiClient", () => {
       })
     );
 
-    // Act + Assert
-    await expect(client.readDocument("roadmap", "alice")).rejects.toThrow(
-      "Response body did not contain a document"
-    );
+    // Act
+    const readPromise = client.readDocument("roadmap", "alice");
+
+    // Assert
+    await expect(readPromise).rejects.toThrow("Response body did not contain a document");
   });
 });

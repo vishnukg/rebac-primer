@@ -3,11 +3,12 @@ import { createServices } from "../src/app/create-services.js";
 
 describe("createServices", () => {
   it("given_default_composition_when_services_are_created_then_tutorial_document_and_authorizer_are_ready", async () => {
-    // Arrange + Act
-    const services = await createServices();
+    // Arrange
+    const roadmapId = "roadmap";
 
     // Act
-    const document = await services.documents.read("roadmap", "user:bob");
+    const services = await createServices();
+    const document = await services.documents.read(roadmapId, "user:bob");
     const decision = await services.authorizer.check({
       user: "user:alice",
       relation: "can_edit",

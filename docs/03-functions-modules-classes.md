@@ -56,7 +56,10 @@ Each folder has a job:
 
 ```text
 src/authz    authorization model, tuple vocabulary, authorizer implementations
+src/app      composition roots that assemble concrete object graphs
+src/client   terminal client and HTTP API client adapters
 src/domain   document domain model and service logic
+src/http     HTTP request/response adapter code
 src/testing  shared fixtures for tests and demos
 ```
 
@@ -306,7 +309,9 @@ Concrete examples:
 - `GraphAuthorizer` implements `Authorizer`.
 - `OpenFgaAuthorizer` implements `Authorizer`.
 - `InMemoryDocumentRepository` implements `DocumentRepository`.
-- `createServices()` wires concrete implementations together.
+- `createServices()` wires the document service graph together.
+- `createDemoApp()`, `createServerApp()`, and `createClientApp()` are
+  composition roots for executable entrypoints.
 - HTTP handlers depend on `DocumentWorkflow`, not `DocumentService` internals.
 
 That separation keeps code testable:
@@ -324,6 +329,49 @@ The rule is simple:
 High-level policy should not import low-level infrastructure.
 The composition root is where concrete choices are made.
 ```
+
+## App entrypoints and composition roots
+
+An app entrypoint is the file Node runs directly:
+
+```text
+src/main.ts
+src/server.ts
+src/client/tui.ts
+```
+
+These files should be boring. They should start the app, print output, listen on
+a port, or close a terminal. They should not contain a pile of `new` calls.
+
+A composition root is the small module that builds the object graph for an
+entrypoint:
+
+```text
+src/app/create-demo.ts    -> demo authorizer, actors, document
+src/app/create-server.ts  -> service graph plus HTTP server
+src/app/create-client.ts  -> API client plus terminal client
+src/app/create-services.ts -> reusable domain service graph
+```
+
+The shape is:
+
+```ts
+const app = await createServerApp();
+
+app.server.listen(app.port);
+```
+
+The entrypoint performs the action. The composition root chooses concrete
+implementations. The domain code still depends on interfaces.
+
+This gives you three practical wins:
+
+- startup wiring is easy to find
+- business code avoids infrastructure imports
+- tests can exercise behavior with fresh object graphs
+
+Think of the composition root as the cast list for the program. It says which
+actors are playing which interface roles in this run.
 
 ## Private methods can improve reading flow
 

@@ -296,7 +296,11 @@ This is fine for an application entrypoint:
 
 ```ts
 // src/main.ts
-const authorizer = new GraphAuthorizer(new MemoryTupleStore(tutorialTuples()));
+const app = createDemoApp();
+
+for (const actor of app.actors) {
+  // print the demo authorization result
+}
 ```
 
 This would be a poor surprise inside `src/authz/types.ts`:
@@ -309,8 +313,21 @@ Rule of thumb:
 
 ```text
 library modules export capabilities
+composition roots wire dependencies
 entrypoints perform actions
 ```
+
+The repo keeps the wiring in `src/app/*` composition roots. That gives each
+entrypoint a clear job:
+
+```text
+src/main.ts       -> create demo app, print demo checks
+src/server.ts     -> create server app, listen on the configured port
+src/client/tui.ts -> create client app, run it, close the terminal
+```
+
+That keeps imports predictable. Importing a domain module does not start a
+server. Running an entrypoint does.
 
 ## Module caching and singletons
 
@@ -406,6 +423,35 @@ Cons:
 
 For learning, explicit composition is best. You see the object graph being
 created, and tests stay independent.
+
+## Composition roots
+
+A composition root is the place where an application chooses concrete
+implementations for its interfaces.
+
+In this repo:
+
+```text
+createServices()   -> MemoryTupleStore, GraphAuthorizer, repository, service
+createDemoApp()    -> demo authorizer and demo actors
+createServerApp()  -> domain services plus HTTP server
+createClientApp()  -> HTTP API client plus terminal client
+```
+
+Notice the direction:
+
+```text
+DocumentService depends on Authorizer
+GraphAuthorizer implements Authorizer
+createServices chooses GraphAuthorizer
+```
+
+The service does not know which authorizer was chosen. That is the point. The
+composition root owns the decision, and the rest of the app talks through
+interfaces.
+
+This pattern also avoids accidental singletons. Instead of exporting a global
+`DocumentService`, tests and entrypoints ask a factory to create a fresh graph.
 
 ## Singleton pattern 4: dependency container
 

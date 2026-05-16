@@ -37,16 +37,17 @@ describe("DocumentService", () => {
       new GraphAuthorizer(store)
     );
 
-    // Act + Assert
-    await expect(
-      service.create({
-        id: "incident-plan",
-        title: "Incident Plan",
-        body: "Draft",
-        workspace: acme,
-        actor: bob
-      })
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    // Act
+    const createPromise = service.create({
+      id: "incident-plan",
+      title: "Incident Plan",
+      body: "Draft",
+      workspace: acme,
+      actor: bob
+    });
+
+    // Assert
+    await expect(createPromise).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("given_document_owner_when_updating_document_then_content_is_saved", async () => {
@@ -95,8 +96,11 @@ describe("DocumentService", () => {
       actor: alice
     });
 
-    // Act + Assert
-    await expect(service.read("private-plan", chandra)).rejects.toBeInstanceOf(ForbiddenError);
+    // Act
+    const readPromise = service.read("private-plan", chandra);
+
+    // Assert
+    await expect(readPromise).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("given_missing_document_when_updating_then_not_found_error_is_thrown", async () => {
@@ -107,13 +111,14 @@ describe("DocumentService", () => {
       new GraphAuthorizer(store)
     );
 
-    // Act + Assert
-    await expect(
-      service.update({
-        id: "missing",
-        body: "v2",
-        actor: alice
-      })
-    ).rejects.toBeInstanceOf(DocumentNotFoundError);
+    // Act
+    const updatePromise = service.update({
+      id: "missing",
+      body: "v2",
+      actor: alice
+    });
+
+    // Assert
+    await expect(updatePromise).rejects.toBeInstanceOf(DocumentNotFoundError);
   });
 });

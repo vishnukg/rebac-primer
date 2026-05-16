@@ -13,10 +13,15 @@ import {
 
 describe("typed OpenFGA helpers", () => {
   it("given_domain_ids_when_building_objects_and_subject_sets_then_openfga_strings_are_consistent", () => {
-    // Arrange + Act
-    const alice = user("alice");
-    const roadmap = document("roadmap");
-    const platformMembers = subjectSet(team("platform"), "member");
+    // Arrange
+    const userId = "alice";
+    const documentId = "roadmap";
+    const teamId = "platform";
+
+    // Act
+    const alice = user(userId);
+    const roadmap = document(documentId);
+    const platformMembers = subjectSet(team(teamId), "member");
 
     // Assert
     expect(alice).toBe("user:alice");
@@ -51,9 +56,13 @@ describe("typed OpenFGA helpers", () => {
     const invalidObjectId = "not-an-object";
     const invalidSubjectSet = "workspace:acme#viewer";
 
-    // Act + Assert
-    expect(() => parseObject(invalidObjectId)).toThrow("Invalid OpenFGA object id");
-    expect(() => parseSubjectSet(invalidSubjectSet)).toThrow("Invalid subject set");
+    // Act
+    const parseObjectAction = () => parseObject(invalidObjectId);
+    const parseSubjectSetAction = () => parseSubjectSet(invalidSubjectSet);
+
+    // Assert
+    expect(parseObjectAction).toThrow("Invalid OpenFGA object id");
+    expect(parseSubjectSetAction).toThrow("Invalid subject set");
   });
 });
 

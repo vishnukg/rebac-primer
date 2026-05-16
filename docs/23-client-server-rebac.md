@@ -111,6 +111,44 @@ uses the domain service. The domain service uses the authorizer.
 client -> HTTP server -> DocumentService -> Authorizer -> relationship graph
 ```
 
+## Composition roots in this demo
+
+The executable files stay intentionally thin:
+
+```text
+src/server.ts     -> createServerApp(), then listen()
+src/client/tui.ts -> createClientApp(), then run()
+```
+
+The object graphs are assembled in `src/app`:
+
+```text
+createServerApp
+  -> createServices
+    -> MemoryTupleStore
+    -> GraphAuthorizer
+    -> InMemoryDocumentRepository
+    -> DocumentService
+  -> createHttpServer
+
+createClientApp
+  -> RebacApiClient
+  -> Node readline terminal
+  -> TerminalClient
+```
+
+That split matters because ReBAC code is easier to reason about when business
+rules do not create their own infrastructure. The document service asks an
+`Authorizer` interface for a decision; the composition root decides that the
+teaching implementation is `GraphAuthorizer`.
+
+```text
+entrypoint -> composition root -> interfaces + concrete adapters
+                          |
+                          v
+                 domain service uses interfaces
+```
+
 ## Why this is only "TUI-like"
 
 The client uses Node's built-in `readline/promises`. It is an interactive

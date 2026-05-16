@@ -29,8 +29,11 @@ describe("JSON HTTP helpers", () => {
     // Arrange
     const request = Readable.from([JSON.stringify(["not", "object"])]);
 
-    // Act + Assert
-    await expect(readJson(request)).rejects.toThrow("Request body must be a JSON object");
+    // Act
+    const readPromise = readJson(request);
+
+    // Assert
+    await expect(readPromise).rejects.toThrow("Request body must be a JSON object");
   });
 
   it("given_unknown_values_when_checking_json_object_then_only_plain_objects_match", () => {
