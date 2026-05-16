@@ -22,49 +22,52 @@ Docker or directly with npm.
 
 ## Recommended local workflows
 
-### Workflow A: app on host, OpenFGA in Docker
+### Workflow A: everything through Make
 
-This is usually best while learning TypeScript because rebuilds are fast.
+This is the default workflow for this repo.
 
-Start OpenFGA:
-
-```bash
-docker compose -f deployments/docker-compose.yml up openfga
-```
-
-Run the app locally:
+Build and test without local Node:
 
 ```bash
-npm run server
+make check
 ```
 
-Run the client locally in another terminal:
+Run the app container:
 
 ```bash
-npm run client
+make server
 ```
 
-### Workflow B: app and OpenFGA in Docker
+Run the client in another terminal:
 
-Use this when you want to test the container path.
+```bash
+make client
+```
+
+### Workflow B: OpenFGA only
+
+Start OpenFGA without the app container:
+
+```bash
+make openfga-up
+```
+
+Stop it:
+
+```bash
+make openfga-down
+```
+
+### Workflow C: raw Compose
+
+You can still use Compose directly:
 
 ```bash
 docker compose -f deployments/docker-compose.yml --profile app up --build
 ```
 
-Then run the client from your host:
-
-```bash
-npm run client
-```
-
-The client talks to:
-
-```text
-http://127.0.0.1:4000
-```
-
-by default.
+But prefer `make` for day-to-day work so local and CI command shapes stay
+consistent.
 
 ## What the current app uses
 
@@ -86,6 +89,16 @@ interface Authorizer {
 ```
 
 ## Useful Compose commands
+
+Prefer the Make targets:
+
+```bash
+make compose-config
+make server
+make server-down
+```
+
+Raw Compose equivalents:
 
 Start services:
 

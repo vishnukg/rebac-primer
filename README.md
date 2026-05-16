@@ -53,6 +53,27 @@ server when you are ready.
 
 ## Commands
 
+This repo follows the 3 Musketeers workflow:
+
+```text
+make -> docker compose -> containerized Node tools
+```
+
+Use these targets when Docker is running:
+
+```bash
+make deps
+make build
+make test
+make coverage
+make check
+make server
+make client
+```
+
+The npm scripts still exist because they are useful inside the container and for
+quick local debugging, but the Makefile is the project interface.
+
 ```bash
 npm install
 npm test
@@ -74,6 +95,6 @@ Then use `src/authz/openfga-client.ts` as the production adapter for the same
 For the client/server demo, run:
 
 ```bash
-npm run server
-npm run client
+make server
+make client
 ```

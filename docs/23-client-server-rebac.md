@@ -24,7 +24,7 @@ This demo makes that boundary visible.
 ## Run the server
 
 ```bash
-npm run server
+make server
 ```
 
 The server listens on:
@@ -44,7 +44,7 @@ curl http://127.0.0.1:4000/health
 In another terminal:
 
 ```bash
-npm run client
+make client
 ```
 
 The client is a simple interactive terminal UI. It lets you:
@@ -134,13 +134,13 @@ That is why the default test suite focuses on domain and graph behavior.
 You can still run the server normally on your machine:
 
 ```bash
-npm run server
+make server
 ```
 
 and exercise it with:
 
 ```bash
-npm run client
+make client
 ```
 
 ## Checkpoint

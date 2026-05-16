@@ -6,6 +6,7 @@ For this repo, Docker has two jobs:
 
 - run supporting services such as OpenFGA
 - run the TypeScript ReBAC server in a repeatable local environment
+- run build/test tooling so local Node is optional
 
 ## Scene
 
@@ -46,6 +47,56 @@ CMD ["node", "dist/src/server.js"]
 
 That is the production-shaped path. `tsx` is useful during development, but a
 container should usually run built output.
+
+## 3 Musketeers workflow
+
+This repo follows the 3 Musketeers pattern:
+
+```text
+Makefile       -> developer task interface
+Docker Compose -> service and tool orchestration
+Docker         -> repeatable execution environment
+```
+
+The point is simple: a developer and CI should run the same command shape.
+
+```bash
+make test
+```
+
+does not call local `npm test`. It runs:
+
+```text
+docker compose run --rm tools npm test
+```
+
+That means you do not need local Node installed for normal project work. You need
+Docker, Compose, and Make.
+
+## Tool container
+
+The `tools` Compose service uses the `deps` stage of the Dockerfile:
+
+```yaml
+tools:
+  build:
+    target: deps
+  volumes:
+    - ..:/workspace
+    - node_modules:/workspace/node_modules
+```
+
+The source code is bind-mounted into `/workspace`. The `node_modules` directory
+is stored in a Docker volume so dependency installs stay inside Docker and do
+not pollute your host machine.
+
+Use:
+
+```bash
+make deps
+```
+
+to refresh dependencies in that volume.
 
 ## Build context
 
@@ -122,22 +173,38 @@ Keep code and images the same.
 
 ## Commands
 
+Run the normal project lifecycle:
+
+```bash
+make deps
+make build
+make test
+make coverage
+make check
+```
+
+Open a shell in the tool container:
+
+```bash
+make shell
+```
+
 Build the app image:
 
 ```bash
-docker compose -f deployments/docker-compose.yml build app
+make server-build
 ```
 
 Run the app profile:
 
 ```bash
-docker compose -f deployments/docker-compose.yml --profile app up
+make server
 ```
 
 Stop services:
 
 ```bash
-docker compose -f deployments/docker-compose.yml down
+make server-down
 ```
 
 ## What to remember

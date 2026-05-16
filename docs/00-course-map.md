@@ -165,6 +165,18 @@ npm run client
 npm run coverage
 ```
 
+Docker-backed Make targets:
+
+```bash
+make deps
+make build
+make test
+make coverage
+make check
+make server
+make client
+```
+
 ## How to study this repo
 
 Do not read passively. TypeScript becomes useful when you make the compiler do

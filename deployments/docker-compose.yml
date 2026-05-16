@@ -1,4 +1,18 @@
 services:
+  tools:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      target: deps
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+      - node_modules:/workspace/node_modules
+    environment:
+      REBAC_API_URL: "http://app:4000"
+    profiles:
+      - tools
+
   app:
     build:
       context: ..
@@ -20,3 +34,6 @@ services:
       - "8080:8080"
       - "8081:8081"
       - "3000:3000"
+
+volumes:
+  node_modules:
