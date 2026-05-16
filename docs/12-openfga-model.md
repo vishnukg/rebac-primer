@@ -77,6 +77,12 @@ type team
     define member: [user] or admin
 ```
 
+The square brackets are **type restrictions**. They declare which subject types
+can appear as direct values in a tuple for this relation.
+
+`[user]` means only a `user:someone` value is valid. You cannot write a
+`team:platformTeam` directly as a team admin — the model rejects it.
+
 This says:
 
 - only users can be direct team admins
@@ -118,8 +124,13 @@ The type restrictions matter:
 [user, team#member]
 ```
 
-This says you can write direct users or team member subject sets as workspace
-editors.
+This says two kinds of subjects are valid as direct workspace editors:
+
+- a `user:someone` literal
+- a `team:someTeam#member` subject set (everyone who is a member of that team)
+
+The `team#member` form is what makes one tuple grant access to an entire team.
+Without it, you would have to write one tuple per user.
 
 ## Documents
 

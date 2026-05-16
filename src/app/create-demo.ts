@@ -1,5 +1,5 @@
 import { GraphAuthorizer } from "../authz/graph-authorizer.js";
-import { MemoryTupleStore } from "../authz/memory-store.js";
+import { InMemoryTupleStore } from "../authz/memory-store.js";
 import type { Authorizer, RebacObject } from "../authz/types.js";
 import {
   outsideCollaborator,
@@ -17,7 +17,7 @@ export type DemoApp = Readonly<{
 
 export function createDemoApp(): DemoApp {
   return {
-    authorizer: new GraphAuthorizer(new MemoryTupleStore(seedRelationshipTuples())),
+    authorizer: new GraphAuthorizer(new InMemoryTupleStore(seedRelationshipTuples())),
     actors: [workspaceEditor, workspaceViewer, outsideCollaborator],
     document: roadmapDocument
   };

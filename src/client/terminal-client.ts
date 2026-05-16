@@ -15,9 +15,10 @@ export class TerminalClient {
 
   async run(): Promise<void> {
     this.config.write("TS ReBAC client");
-    this.config.write(
-      "Actors: user:workspaceEditor can edit, user:workspaceViewer can read, user:outsideCollaborator is denied by default."
-    );
+    this.config.write("Enter an actor id when prompted. Available actors:");
+    this.config.write("  workspaceEditor      — can read and edit (workspace editor via team membership)");
+    this.config.write("  workspaceViewer      — can read only");
+    this.config.write("  outsideCollaborator  — denied (no path through the graph)");
 
     const healthy = await this.config.client.health();
     if (!healthy) {
@@ -45,17 +46,25 @@ export class TerminalClient {
   }
 
   private async readRoadmapDocument(): Promise<void> {
-    const actorId = await this.config.terminal.question("Actor id: ");
-    const document = await this.config.client.readDocument("roadmapDocument", actorId);
-    this.config.write(`\n${document.title}`);
-    this.config.write(document.body);
-    this.config.write(`updated by ${document.updatedBy}`);
+    try {
+      const actorId = await this.config.terminal.question("Actor id: ");
+      const document = await this.config.client.readDocument("roadmapDocument", actorId);
+      this.config.write(`\n${document.title}`);
+      this.config.write(document.body);
+      this.config.write(`updated by ${document.updatedBy}`);
+    } catch (error) {
+      this.config.write(`Denied: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
   }
 
   private async updateRoadmapDocument(): Promise<void> {
-    const actorId = await this.config.terminal.question("Actor id: ");
-    const body = await this.config.terminal.question("New body: ");
-    const document = await this.config.client.updateDocument("roadmapDocument", actorId, body);
-    this.config.write(`Updated ${document.id}; updated by ${document.updatedBy}`);
+    try {
+      const actorId = await this.config.terminal.question("Actor id: ");
+      const body = await this.config.terminal.question("New body: ");
+      const document = await this.config.client.updateDocument("roadmapDocument", actorId, body);
+      this.config.write(`Updated ${document.id}; updated by ${document.updatedBy}`);
+    } catch (error) {
+      this.config.write(`Denied: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
   }
 }

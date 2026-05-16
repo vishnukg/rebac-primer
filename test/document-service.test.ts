@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GraphAuthorizer } from "../src/authz/graph-authorizer.js";
-import { MemoryTupleStore } from "../src/authz/memory-store.js";
+import { InMemoryTupleStore } from "../src/authz/memory-store.js";
 import { document, tuple } from "../src/authz/types.js";
 import { DocumentNotFoundError, ForbiddenError } from "../src/domain/document.js";
 import { InMemoryDocumentRepository } from "../src/domain/repository.js";
@@ -8,7 +8,6 @@ import { DocumentService } from "../src/domain/service.js";
 import {
   outsideCollaborator,
   productWorkspace,
-  roadmapDocument,
   seedRelationshipTuples,
   workspaceEditor,
   workspaceViewer
@@ -17,7 +16,7 @@ import {
 describe("DocumentService", () => {
   it("given_workspace_editor_when_creating_document_then_document_is_created", async () => {
     // Arrange
-    const store = new MemoryTupleStore(seedRelationshipTuples());
+    const store = new InMemoryTupleStore(seedRelationshipTuples());
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
       new GraphAuthorizer(store)
@@ -38,7 +37,7 @@ describe("DocumentService", () => {
 
   it("given_workspace_viewer_when_creating_document_then_forbidden_error_is_thrown", async () => {
     // Arrange
-    const store = new MemoryTupleStore(seedRelationshipTuples());
+    const store = new InMemoryTupleStore(seedRelationshipTuples());
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
       new GraphAuthorizer(store)
@@ -59,7 +58,7 @@ describe("DocumentService", () => {
 
   it("given_document_owner_when_updating_document_then_content_is_saved", async () => {
     // Arrange
-    const store = new MemoryTupleStore([
+    const store = new InMemoryTupleStore([
       ...seedRelationshipTuples(),
       tuple(document("roadmapDocument"), "owner", outsideCollaborator)
     ]);
@@ -85,12 +84,11 @@ describe("DocumentService", () => {
     // Assert
     expect(updated.body).toBe("v2");
     expect(updated.updatedBy).toBe(outsideCollaborator);
-    expect(roadmapDocument).toBe("document:roadmapDocument");
   });
 
   it("given_actor_without_read_path_when_reading_document_then_forbidden_error_is_thrown", async () => {
     // Arrange
-    const store = new MemoryTupleStore(seedRelationshipTuples());
+    const store = new InMemoryTupleStore(seedRelationshipTuples());
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
       new GraphAuthorizer(store)
@@ -112,7 +110,7 @@ describe("DocumentService", () => {
 
   it("given_missing_document_when_updating_then_not_found_error_is_thrown", async () => {
     // Arrange
-    const store = new MemoryTupleStore(seedRelationshipTuples());
+    const store = new InMemoryTupleStore(seedRelationshipTuples());
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
       new GraphAuthorizer(store)

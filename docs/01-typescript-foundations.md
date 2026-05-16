@@ -183,7 +183,7 @@ Every `.ts` file in this repo is an ES module because `package.json` includes:
 That is why imports include `.js`:
 
 ```ts
-import { MemoryTupleStore } from "./memory-store.js";
+import { InMemoryTupleStore } from "./memory-store.js";
 ```
 
 This looks strange at first. The source file is `.ts`, but the emitted runtime

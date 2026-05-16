@@ -79,7 +79,7 @@ Since TypeScript compiles `.ts` to `.js`, the emitted code runs as ESM.
 This repo uses imports like:
 
 ```ts
-import { MemoryTupleStore } from "./memory-store.js";
+import { InMemoryTupleStore } from "./memory-store.js";
 ```
 
 The source file is `memory-store.ts`, so why not import `./memory-store.ts`?
@@ -271,7 +271,7 @@ export * from "./graph-authorizer.js";
 Then callers import from one place:
 
 ```ts
-import { GraphAuthorizer, MemoryTupleStore } from "../authz/index.js";
+import { GraphAuthorizer, InMemoryTupleStore } from "../authz/index.js";
 ```
 
 Barrels can be useful in libraries. They can also hide dependencies and create
@@ -337,9 +337,9 @@ That means this module creates one shared store per process:
 
 ```ts
 // singleton-store.ts
-import { MemoryTupleStore } from "./memory-store.js";
+import { InMemoryTupleStore } from "./memory-store.js";
 
-export const tupleStore = new MemoryTupleStore();
+export const tupleStore = new InMemoryTupleStore();
 ```
 
 Every importer gets the same `tupleStore` instance.
@@ -353,7 +353,7 @@ That is the simplest singleton pattern in Node ESM.
 ## Singleton pattern 1: exported instance
 
 ```ts
-export const authorizer = new GraphAuthorizer(new MemoryTupleStore());
+export const authorizer = new GraphAuthorizer(new InMemoryTupleStore());
 ```
 
 Pros:
@@ -380,7 +380,7 @@ Avoid it for tutorial domain state.
 let authorizer: GraphAuthorizer | undefined;
 
 export function getAuthorizer(): GraphAuthorizer {
-  authorizer ??= new GraphAuthorizer(new MemoryTupleStore());
+  authorizer ??= new GraphAuthorizer(new InMemoryTupleStore());
   return authorizer;
 }
 ```
@@ -404,7 +404,7 @@ the default for everything.
 This repo usually prefers explicit composition:
 
 ```ts
-const store = new MemoryTupleStore(seedRelationshipTuples());
+const store = new InMemoryTupleStore(seedRelationshipTuples());
 const authorizer = new GraphAuthorizer(store);
 const repository = new InMemoryDocumentRepository();
 const service = new DocumentService(repository, authorizer);
@@ -432,7 +432,7 @@ implementations for its interfaces.
 In this repo:
 
 ```text
-createServices()   -> MemoryTupleStore, GraphAuthorizer, repository, service
+createServices()   -> InMemoryTupleStore, GraphAuthorizer, repository, service
 createDemoApp()    -> demo authorizer and demo actors
 createServerApp()  -> domain services plus HTTP server
 createClientApp()  -> HTTP API client plus terminal client
@@ -464,7 +464,7 @@ export type AppServices = {
 };
 
 export function createServices(): AppServices {
-  const store = new MemoryTupleStore(seedRelationshipTuples());
+  const store = new InMemoryTupleStore(seedRelationshipTuples());
   const authorizer = new GraphAuthorizer(store);
   const repository = new InMemoryDocumentRepository();
 
@@ -590,7 +590,7 @@ Create a small composition module:
 ```ts
 // src/app/create-services.ts
 export function createServices() {
-  const store = new MemoryTupleStore(seedRelationshipTuples());
+  const store = new InMemoryTupleStore(seedRelationshipTuples());
   const authorizer = new GraphAuthorizer(store);
   const repository = new InMemoryDocumentRepository();
 

@@ -52,7 +52,7 @@ import { describe, expect, it } from "vitest";
 describe("GraphAuthorizer", () => {
   it("given_team_member_workspace_editor_when_checking_document_edit_then_access_is_allowed", async () => {
     // Arrange
-    const authorizer = new GraphAuthorizer(new MemoryTupleStore(seedRelationshipTuples()));
+    const authorizer = new GraphAuthorizer(new InMemoryTupleStore(seedRelationshipTuples()));
 
     // Act
     const result = await authorizer.check({
@@ -107,7 +107,7 @@ Example:
 
 ```ts
 // Arrange
-const authorizer = new GraphAuthorizer(new MemoryTupleStore(seedRelationshipTuples()));
+const authorizer = new GraphAuthorizer(new InMemoryTupleStore(seedRelationshipTuples()));
 
 // Act
 const result = await authorizer.check({
@@ -159,7 +159,7 @@ Vitest works naturally with `async` tests:
 ```ts
 it("given_workspace_viewer_when_creating_document_then_forbidden_error_is_thrown", async () => {
   // Arrange
-  const store = new MemoryTupleStore(seedRelationshipTuples());
+  const store = new InMemoryTupleStore(seedRelationshipTuples());
   const service = new DocumentService(
     new InMemoryDocumentRepository(),
     new GraphAuthorizer(store)

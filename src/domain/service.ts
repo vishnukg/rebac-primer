@@ -9,13 +9,13 @@ import {
 } from "./document.js";
 import type { DocumentRepository } from "./repository.js";
 
-export interface DocumentWorkflow {
+export interface DocumentOperations {
   create(input: CreateDocumentInput): Promise<CollaborativeDocument>;
   read(id: string, actor: RebacObject<"user">): Promise<CollaborativeDocument>;
   update(input: UpdateDocumentInput): Promise<CollaborativeDocument>;
 }
 
-export class DocumentService implements DocumentWorkflow {
+export class DocumentService implements DocumentOperations {
   constructor(
     private readonly repository: DocumentRepository,
     private readonly authorizer: Authorizer

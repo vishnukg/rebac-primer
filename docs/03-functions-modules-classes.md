@@ -121,10 +121,10 @@ const service = new DocumentService(
 
 ## Classes are useful when they own state
 
-`MemoryTupleStore` is a class because it owns a private map of tuples:
+`InMemoryTupleStore` is a class because it owns a private map of tuples:
 
 ```ts
-export class MemoryTupleStore {
+export class InMemoryTupleStore {
   private readonly tuples = new Map<string, TupleKey>();
 }
 ```
@@ -246,7 +246,7 @@ The maintainability question is not "class or function?" The question is
 This repo leans object-oriented for application structure:
 
 - `DocumentService` coordinates domain actions.
-- `MemoryTupleStore` owns mutable tuple state.
+- `InMemoryTupleStore` owns mutable tuple state.
 - `GraphAuthorizer` owns graph traversal behavior over a store.
 - `OpenFgaAuthorizer` adapts the OpenFGA SDK behind an interface.
 - `InMemoryDocumentRepository` owns document persistence state.
@@ -312,12 +312,12 @@ Concrete examples:
 - `createServices()` wires the document service graph together.
 - `createDemoApp()`, `createServerApp()`, and `createClientApp()` are
   composition roots for executable entrypoints.
-- HTTP handlers depend on `DocumentWorkflow`, not `DocumentService` internals.
+- HTTP handlers depend on `DocumentOperations`, not `DocumentService` internals.
 
 That separation keeps code testable:
 
 ```text
-HTTP handler test -> uses DocumentWorkflow
+HTTP handler test -> uses DocumentOperations
 service test      -> uses Authorizer interface
 authorizer test   -> uses TupleReader interface
 SDK adapter test  -> mocks SDK boundary

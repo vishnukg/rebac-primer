@@ -1,10 +1,10 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
-import type { DocumentWorkflow } from "../domain/service.js";
+import type { DocumentOperations } from "../domain/service.js";
 import { handleHttpRequest } from "./handler.js";
 import { readJson, writeJson } from "./json.js";
 
 export type HttpServerConfig = Readonly<{
-  documents: DocumentWorkflow;
+  documents: DocumentOperations;
 }>;
 
 export function createHttpServer(config: HttpServerConfig): Server {

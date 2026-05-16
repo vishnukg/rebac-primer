@@ -92,6 +92,12 @@ main goal.
 | 22 | Docker Compose local services | `deployments/docker-compose.yml` |
 | 23 | Client/server ReBAC demo with terminal client | `src/server.ts`, `src/client/tui.ts` |
 
+## Track 4: Going to production
+
+| Doc | Topic | Code to inspect |
+|-----|-------|-----------------|
+| 30 | Production readiness: what this repo does not cover | conceptual |
+
 ## Suggested pace
 
 ### Day 1: Make TypeScript feel less mysterious
@@ -140,12 +146,13 @@ Checkpoint: explain why relative ESM imports use `.js` in TypeScript source.
 
 ### Day 6+: ReBAC and OpenFGA
 
-1. Read `08-oauth-authentication.md`.
-2. Read `09-authorization-fundamentals.md`.
-3. Read `10-graph-theory-for-rebac.md`.
-4. Read `11-rebac-concepts.md`.
-5. Read `12-openfga-model.md`.
-6. Run `npm run dev` and inspect the graph trace.
+1. Run `npm run dev` and read the authorization trace output.
+2. Read `08-oauth-authentication.md`.
+3. Read `09-authorization-fundamentals.md`.
+4. Read `10-graph-theory-for-rebac.md`.
+5. Read `11-rebac-concepts.md`.
+6. Read `12-openfga-model.md`.
+7. Run `npm run dev` again and trace each step against the model.
 
 Checkpoint: draw the path from `user:workspaceEditor` to `document:roadmapDocument#can_edit`.
 
@@ -159,6 +166,15 @@ Checkpoint: draw the path from `user:workspaceEditor` to `document:roadmapDocume
 
 Checkpoint: explain what changes when the app runs on your host versus inside
 Docker Compose.
+
+### Day 8+: Production readiness
+
+1. Read `30-production-readiness.md`.
+2. For each gap listed, write one sentence describing where in this repo the
+   production concern would be handled.
+
+Checkpoint: explain why the `Authorizer` interface makes it straightforward to
+swap `GraphAuthorizer` for a real OpenFGA client in a production deployment.
 
 ## Repo commands
 

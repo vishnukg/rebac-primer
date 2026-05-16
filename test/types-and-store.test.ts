@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MemoryTupleStore } from "../src/authz/memory-store.js";
+import { InMemoryTupleStore } from "../src/authz/memory-store.js";
 import {
   document,
   parseObject,
@@ -66,11 +66,11 @@ describe("typed OpenFGA helpers", () => {
   });
 });
 
-describe("MemoryTupleStore", () => {
+describe("InMemoryTupleStore", () => {
   it("given_tuple_store_when_writing_finding_and_deleting_tuple_then_store_reflects_changes", () => {
     // Arrange
     const workspaceTuple = tuple(document("roadmapDocument"), "workspace", workspace("productWorkspace"));
-    const store = new MemoryTupleStore([workspaceTuple]);
+    const store = new InMemoryTupleStore([workspaceTuple]);
 
     // Act
     const existsBeforeDelete = store.has(document("roadmapDocument"), "workspace", workspace("productWorkspace"));

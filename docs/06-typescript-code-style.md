@@ -113,7 +113,7 @@ Use names that match the domain:
 - `SubjectSet`
 - `Authorizer`
 - `DocumentService`
-- `MemoryTupleStore`
+- `InMemoryTupleStore`
 
 Avoid names that describe implementation mechanics without domain meaning:
 

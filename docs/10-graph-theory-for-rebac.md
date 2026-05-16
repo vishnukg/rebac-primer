@@ -45,9 +45,21 @@ document:roadmapDocument
 Diagram:
 
 ```text
-┌────────────┐   ┌───────────────┐   ┌────────────────┐   ┌──────────────────┐
-│ user:workspaceEditor │   │ team:platformTeam │   │ workspace:productWorkspace │   │ document:roadmapDocument │
-└────────────┘   └───────────────┘   └────────────────┘   └──────────────────┘
+┌──────────────────────┐
+│ user:workspaceEditor │
+└──────────────────────┘
+
+┌───────────────────┐
+│ team:platformTeam │
+└───────────────────┘
+
+┌────────────────────────────┐
+│ workspace:productWorkspace │
+└────────────────────────────┘
+
+┌──────────────────────────┐
+│ document:roadmapDocument │
+└──────────────────────────┘
 ```
 
 Nodes are the nouns.
@@ -135,22 +147,31 @@ The workspace editor's edit path:
 
 ```text
 user:workspaceEditor
-  ──member──► team:platformTeam
-  ──editor──► workspace:productWorkspace
-  ◄─workspace── document:roadmapDocument
-  ──editor/can_edit──► allowed
+      │ member
+      ▼
+team:platformTeam
+      │ editor (team:platformTeam#member)
+      ▼
+workspace:productWorkspace
+      ▲ workspace
+      │
+document:roadmapDocument ──► can_edit ✓
 ```
 
-The drawing mixes intuitive direction with OpenFGA's object-centric relations.
-The important point is the chain of facts:
+Reading top to bottom:
+
+- The workspace editor is a member of the platform team.
+- Platform team members are editors of the product workspace.
+- The roadmap document declares it belongs to that workspace.
+- Document editor access is inherited from the workspace, so `can_edit` is granted.
+
+The `workspace` arrow points upward because the tuple is stored on the document:
 
 ```text
-The workspace editor is in team.
-Team edits workspace.
-Document belongs to workspace.
-Workspace editor implies document editor.
-Document editor implies can_edit.
+(document:roadmapDocument, workspace, workspace:productWorkspace)
 ```
+
+"The roadmap document's workspace is the product workspace."
 
 Authorization succeeds when the model can prove a valid path.
 
@@ -232,6 +253,35 @@ who has what                what implies what
 ```
 
 If tuples are data, the model is logic.
+
+## The complete tutorial graph
+
+Here is all four nodes and their edges in one diagram:
+
+```text
+user:workspaceEditor        user:workspaceViewer
+       │                            │
+       │ member                     │ viewer
+       ▼                            │
+team:platformTeam                   │
+       │ editor                     │
+       │ (team:platformTeam#member) │
+       └────────────────┐           │
+                        ▼           ▼
+               workspace:productWorkspace
+                        ▲
+                        │ workspace
+                        │
+               document:roadmapDocument
+```
+
+Three things to notice:
+
+- The workspace editor reaches the workspace through the platform team, not directly.
+- The workspace viewer has a direct viewer edge to the workspace.
+- The outside collaborator has no node in this graph — no path, no access.
+
+Keep this diagram in mind. Every check in this repo is a reachability question against it.
 
 ## Subject sets as graph shortcuts
 

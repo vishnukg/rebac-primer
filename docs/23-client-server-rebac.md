@@ -125,14 +125,14 @@ The object graphs are assembled in `src/app`:
 ```text
 createServerApp
   -> createServices
-    -> MemoryTupleStore
+    -> InMemoryTupleStore
     -> GraphAuthorizer
     -> InMemoryDocumentRepository
     -> DocumentService
   -> createHttpServer
 
 createClientApp
-  -> RebacApiClient
+  -> HttpDocumentsClient
   -> Node readline terminal
   -> TerminalClient
 ```

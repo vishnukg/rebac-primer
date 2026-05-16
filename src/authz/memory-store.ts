@@ -14,7 +14,7 @@ export interface TupleStore extends TupleReader, TupleWriter {
   all(): readonly TupleKey[];
 }
 
-export class MemoryTupleStore implements TupleStore {
+export class InMemoryTupleStore implements TupleStore {
   private readonly tuples = new Map<string, TupleKey>();
 
   constructor(seed: readonly TupleKey[] = []) {

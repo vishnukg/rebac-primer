@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GraphAuthorizer } from "../src/authz/graph-authorizer.js";
-import { MemoryTupleStore } from "../src/authz/memory-store.js";
+import { InMemoryTupleStore } from "../src/authz/memory-store.js";
 import { tuple } from "../src/authz/types.js";
 import {
   outsideCollaborator,
@@ -14,7 +14,7 @@ import {
 describe("GraphAuthorizer", () => {
   it("given_team_member_workspace_editor_when_checking_document_edit_then_access_is_allowed", async () => {
     // Arrange
-    const authorizer = new GraphAuthorizer(new MemoryTupleStore(seedRelationshipTuples()));
+    const authorizer = new GraphAuthorizer(new InMemoryTupleStore(seedRelationshipTuples()));
 
     // Act
     const result = await authorizer.check({
@@ -30,7 +30,7 @@ describe("GraphAuthorizer", () => {
 
   it("given_workspace_viewer_when_checking_document_permissions_then_read_is_allowed_and_edit_is_denied", async () => {
     // Arrange
-    const authorizer = new GraphAuthorizer(new MemoryTupleStore(seedRelationshipTuples()));
+    const authorizer = new GraphAuthorizer(new InMemoryTupleStore(seedRelationshipTuples()));
 
     // Act
     const readResult = await authorizer.check({
@@ -51,7 +51,7 @@ describe("GraphAuthorizer", () => {
 
   it("given_actor_without_relationship_path_when_checking_read_then_access_is_denied", async () => {
     // Arrange
-    const authorizer = new GraphAuthorizer(new MemoryTupleStore(seedRelationshipTuples()));
+    const authorizer = new GraphAuthorizer(new InMemoryTupleStore(seedRelationshipTuples()));
 
     // Act
     const result = await authorizer.check({
@@ -68,7 +68,7 @@ describe("GraphAuthorizer", () => {
   it("given_team_admin_when_checking_team_membership_then_access_is_allowed_by_model_hierarchy", async () => {
     // Arrange
     const authorizer = new GraphAuthorizer(
-      new MemoryTupleStore([
+      new InMemoryTupleStore([
         ...seedRelationshipTuples(),
         tuple(platformTeam, "admin", outsideCollaborator)
       ])
@@ -78,7 +78,7 @@ describe("GraphAuthorizer", () => {
     const result = await authorizer.check({
       user: outsideCollaborator,
       relation: "member",
-      object: "team:platformTeam"
+      object: platformTeam
     });
 
     // Assert

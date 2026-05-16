@@ -85,7 +85,7 @@ In an application, ReBAC usually sits behind a small authorization interface:
 In this repo:
 
 ```text
-HTTP handler -> DocumentService -> Authorizer -> MemoryTupleStore/OpenFGA
+HTTP handler -> DocumentService -> Authorizer -> InMemoryTupleStore/OpenFGA
 ```
 
 That separation matters. The HTTP layer should not know graph traversal rules.
@@ -123,14 +123,14 @@ That path is what authorization checks evaluate.
 The same graph as tuples:
 
 ```text
-┌──────────────────┬──────────┬──────────────────────┐
-│ object           │ relation │ user                 │
-├──────────────────┼──────────┼──────────────────────┤
-│ team:platformTeam    │ member   │ user:workspaceEditor           │
-│ workspace:productWorkspace   │ editor   │ team:platformTeam#member │
-│ workspace:productWorkspace   │ viewer   │ user:workspaceViewer             │
-│ document:roadmapDocument │ workspace│ workspace:productWorkspace       │
-└──────────────────┴──────────┴──────────────────────┘
+┌────────────────────────────┬───────────┬────────────────────────────┐
+│ object                     │ relation  │ user                       │
+├────────────────────────────┼───────────┼────────────────────────────┤
+│ team:platformTeam          │ member    │ user:workspaceEditor        │
+│ workspace:productWorkspace │ editor    │ team:platformTeam#member    │
+│ workspace:productWorkspace │ viewer    │ user:workspaceViewer        │
+│ document:roadmapDocument   │ workspace │ workspace:productWorkspace  │
+└────────────────────────────┴───────────┴────────────────────────────┘
 ```
 
 Tuples are the data. The model explains how to interpret them.
@@ -305,24 +305,20 @@ Check as a sequence diagram:
 
 ```text
 DocumentService        Authorizer          Tuple graph
-      │                    │                   │
-      │ can_edit?          │                   │
-      ├───────────────────►│                   │
-      │                    │ find document     │
-      │                    │ workspace         │
-      │                    ├──────────────────►│
-      │                    │ workspace:productWorkspace    │
-      │                    │◄──────────────────┤
-      │                    │ resolve editor    │
-      │                    ├──────────────────►│
-      │                    │ team:platformTeam     │
-      │                    │◄──────────────────┤
-      │                    │ resolve member    │
-      │                    ├──────────────────►│
-      │                    │ user:workspaceEditor found  │
-      │                    │◄──────────────────┤
-      │ allowed            │                   │
-      │◄───────────────────┤                   │
+      │                    │                    │
+      │ can_edit?          │                    │
+      ├───────────────────►│                    │
+      │                    │ find workspace     │
+      │                    ├───────────────────►│
+      │                    │◄───────────────────┤ workspace:productWorkspace
+      │                    │ resolve editor     │
+      │                    ├───────────────────►│
+      │                    │◄───────────────────┤ team:platformTeam#member
+      │                    │ resolve member     │
+      │                    ├───────────────────►│
+      │                    │◄───────────────────┤ user:workspaceEditor ✓
+      │ allowed            │                    │
+      │◄───────────────────┤                    │
 ```
 
 ## Denial is absence of a path

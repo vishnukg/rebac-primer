@@ -1,6 +1,6 @@
 import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "node:readline/promises";
-import { RebacApiClient } from "../client/api-client.js";
+import { HttpDocumentsClient } from "../client/api-client.js";
 import { TerminalClient } from "../client/terminal-client.js";
 
 export type ClientApp = Readonly<{
@@ -10,7 +10,7 @@ export type ClientApp = Readonly<{
 
 export function createClientApp(env: NodeJS.ProcessEnv = process.env): ClientApp {
   const terminal = createInterface({ input, output });
-  const client = new RebacApiClient(env.REBAC_API_URL ?? "http://127.0.0.1:4000");
+  const client = new HttpDocumentsClient(env.REBAC_API_URL ?? "http://127.0.0.1:4000");
   const terminalClient = new TerminalClient({
     client,
     terminal,

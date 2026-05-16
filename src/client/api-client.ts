@@ -9,7 +9,7 @@ export interface DocumentsClient {
 
 export type Fetcher = (input: URL, init?: RequestInit) => Promise<Response>;
 
-export class RebacApiClient implements DocumentsClient {
+export class HttpDocumentsClient implements DocumentsClient {
   constructor(
     private readonly baseUrl: string,
     private readonly fetcher: Fetcher = fetch

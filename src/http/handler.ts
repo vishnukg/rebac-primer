@@ -1,6 +1,6 @@
 import { user, workspace } from "../authz/types.js";
 import { DocumentNotFoundError, ForbiddenError } from "../domain/document.js";
-import type { DocumentWorkflow } from "../domain/service.js";
+import type { DocumentOperations } from "../domain/service.js";
 import { isJsonObject, stringField, type JsonObject } from "./json.js";
 
 export type HttpRequest = Readonly<{
@@ -16,7 +16,7 @@ export type HttpResponse = Readonly<{
 }>;
 
 export type HttpHandlerConfig = Readonly<{
-  documents: DocumentWorkflow;
+  documents: DocumentOperations;
 }>;
 
 export async function handleHttpRequest(
@@ -31,7 +31,7 @@ export async function handleHttpRequest(
 }
 
 async function routeRequest(
-  documents: DocumentWorkflow,
+  documents: DocumentOperations,
   request: HttpRequest
 ): Promise<HttpResponse> {
   if (request.method === "GET" && request.path === "/health") {

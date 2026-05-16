@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { RebacApiClient, type Fetcher } from "../src/client/api-client.js";
+import { HttpDocumentsClient, type Fetcher } from "../src/client/api-client.js";
 
-describe("RebacApiClient", () => {
+describe("HttpDocumentsClient", () => {
   it("given_healthy_server_when_checking_health_then_true_is_returned", async () => {
     // Arrange
-    const client = new RebacApiClient("http://server.test", async (url) => {
+    const client = new HttpDocumentsClient("http://server.test", async (url) => {
       expect(url.toString()).toBe("http://server.test/health");
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -30,7 +30,7 @@ describe("RebacApiClient", () => {
         headers: { "content-type": "application/json" }
       });
     };
-    const client = new RebacApiClient("http://server.test", fetcher);
+    const client = new HttpDocumentsClient("http://server.test", fetcher);
 
     // Act
     const document = await client.readDocument("roadmapDocument", "workspaceEditor");
@@ -46,7 +46,7 @@ describe("RebacApiClient", () => {
         status: 403,
         headers: { "content-type": "application/json" }
       });
-    const client = new RebacApiClient("http://server.test", fetcher);
+    const client = new HttpDocumentsClient("http://server.test", fetcher);
 
     // Act
     const updatePromise = client.updateDocument("roadmapDocument", "workspaceViewer", "nope");
@@ -57,7 +57,7 @@ describe("RebacApiClient", () => {
 
   it("given_error_response_without_error_field_when_reading_document_then_status_text_is_thrown", async () => {
     // Arrange
-    const client = new RebacApiClient("http://server.test", async () =>
+    const client = new HttpDocumentsClient("http://server.test", async () =>
       new Response(JSON.stringify({ message: "nope" }), {
         status: 500,
         statusText: "Internal Server Error",
@@ -74,7 +74,7 @@ describe("RebacApiClient", () => {
 
   it("given_success_response_with_invalid_document_body_when_reading_document_then_validation_error_is_thrown", async () => {
     // Arrange
-    const client = new RebacApiClient("http://server.test", async () =>
+    const client = new HttpDocumentsClient("http://server.test", async () =>
       new Response(JSON.stringify({ document: { id: "roadmapDocument" } }), {
         status: 200,
         headers: { "content-type": "application/json" }
