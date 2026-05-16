@@ -1,6 +1,20 @@
 import type { Relation, RebacObject, Subject, TupleKey } from "./types.js";
 
-export class MemoryTupleStore {
+export interface TupleReader {
+  has(object: RebacObject, relation: Relation, user: Subject): boolean;
+  findByObjectRelation(object: RebacObject, relation: Relation): readonly TupleKey[];
+}
+
+export interface TupleWriter {
+  write(tupleKey: TupleKey): void;
+  delete(tupleKey: TupleKey): void;
+}
+
+export interface TupleStore extends TupleReader, TupleWriter {
+  all(): readonly TupleKey[];
+}
+
+export class MemoryTupleStore implements TupleStore {
   private readonly tuples = new Map<string, TupleKey>();
 
   constructor(seed: readonly TupleKey[] = []) {

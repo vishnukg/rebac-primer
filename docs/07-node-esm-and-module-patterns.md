@@ -13,6 +13,15 @@ They answer practical questions:
 
 This doc gives you the working mental model.
 
+## Scene
+
+The app works in tests, but Node refuses to load a file because an import path is
+wrong. Or a singleton leaks state between tests. Or importing a module starts a
+server by accident. Module systems feel boring until they break your day.
+
+This chapter helps you predict what Node will load, when it will run, and what
+state will be shared.
+
 ## What a module is
 
 A module is a file with its own scope.
@@ -555,3 +564,16 @@ After that, ask:
 - Can tests still create fresh services?
 
 The right answer is the one that keeps dependencies visible.
+
+## Checkpoint
+
+Explain this rule:
+
+```text
+library modules export capabilities
+entrypoints perform actions
+```
+
+Good answer: importing `types.ts` should define helpers, not start servers or
+open network connections. `server.ts` is allowed to perform actions because it is
+an entrypoint.

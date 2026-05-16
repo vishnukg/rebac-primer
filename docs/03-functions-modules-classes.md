@@ -3,6 +3,12 @@
 TypeScript does not require a heavy object-oriented style. Good TypeScript often
 looks like clear JavaScript with better boundaries.
 
+## Scene
+
+You are deciding where behavior belongs. Should everything be a class? Should
+everything be a pure function? This repo chooses a middle path: object-oriented
+boundaries for services and adapters, simple functions for small value work.
+
 This repo uses:
 
 - functions for small transformations and constructors
@@ -284,6 +290,41 @@ class GraphAuthorizer implements Authorizer {}
 That is object-oriented enough to give you polymorphism and encapsulation,
 without creating a deep class hierarchy.
 
+## Clean composition model
+
+The dependency direction in this repo is:
+
+```text
+domain service -> interfaces
+infrastructure -> implements interfaces
+entrypoints    -> compose concrete objects
+```
+
+Concrete examples:
+
+- `DocumentService` depends on `DocumentRepository` and `Authorizer`.
+- `GraphAuthorizer` implements `Authorizer`.
+- `OpenFgaAuthorizer` implements `Authorizer`.
+- `InMemoryDocumentRepository` implements `DocumentRepository`.
+- `createServices()` wires concrete implementations together.
+- HTTP handlers depend on `DocumentWorkflow`, not `DocumentService` internals.
+
+That separation keeps code testable:
+
+```text
+HTTP handler test -> uses DocumentWorkflow
+service test      -> uses Authorizer interface
+authorizer test   -> uses TupleReader interface
+SDK adapter test  -> mocks SDK boundary
+```
+
+The rule is simple:
+
+```text
+High-level policy should not import low-level infrastructure.
+The composition root is where concrete choices are made.
+```
+
 ## Private methods can improve reading flow
 
 `DocumentService` exposes public business actions:
@@ -332,3 +373,16 @@ Requirements:
 
 Keep the shape consistent with `read` and `update`. The goal is not novelty; the
 goal is making the new behavior feel like it belongs.
+
+## Checkpoint
+
+Explain this design in one sentence:
+
+```text
+DocumentService has an Authorizer.
+OpenFgaAuthorizer implements Authorizer.
+DocumentService does not import OpenFgaAuthorizer.
+```
+
+Good answer: the service depends on behavior, not infrastructure, so it stays
+testable and easy to swap from the teaching graph to real OpenFGA.

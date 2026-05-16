@@ -5,6 +5,12 @@ This repo values simplicity, readability, and maintainability over cleverness.
 Style is not decoration. It is how future readers decide whether code is safe to
 change.
 
+## Scene
+
+Imagine opening this repo six months from now. You remember the idea, but not
+the details. Good style is what lets you safely make the next change without
+relearning the whole system.
+
 ## The house style in one page
 
 - Keep modules small and named after the domain concept they own.
@@ -273,3 +279,13 @@ Before committing a change, ask:
 - Can I explain the authorization path in plain English?
 - Does `npm run build` pass?
 - Does `npm test` pass?
+
+## Checkpoint
+
+Before adding an abstraction, ask:
+
+```text
+Does this make the ReBAC rule easier to see?
+```
+
+If the answer is no, keep the code boring.

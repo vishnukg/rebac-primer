@@ -3,6 +3,12 @@
 Tests are where TypeScript code stops being a pile of plausible types and starts
 proving behavior.
 
+## Scene
+
+Alice, Bob, and Chandra are your test audience. Alice should edit. Bob should
+read but fail to edit. Chandra should be denied. If the tests can prove those
+three stories, they are doing more than checking lines of code.
+
 This repo uses Vitest because it is fast, TypeScript-friendly, and familiar if
 you have seen Jest-style tests.
 
@@ -31,6 +37,9 @@ This repo uses four styles:
 | `test/model.test.ts` | model text contains required relationships |
 | `test/graph-authorizer.test.ts` | ReBAC traversal behavior |
 | `test/document-service.test.ts` | business actions enforce authorization |
+| `test/http-handler.test.ts` | HTTP mapping without opening sockets |
+| `test/api-client.test.ts` | client behavior with an injected fetcher |
+| `test/openfga-client.test.ts` | SDK adapter behavior at the infrastructure boundary |
 
 The tests double as executable documentation.
 
@@ -40,15 +49,18 @@ The tests double as executable documentation.
 import { describe, expect, it } from "vitest";
 
 describe("GraphAuthorizer", () => {
-  it("allows a team member to edit a document through workspace inheritance", async () => {
+  it("given_team_member_workspace_editor_when_checking_document_edit_then_access_is_allowed", async () => {
+    // Arrange
     const authorizer = new GraphAuthorizer(new MemoryTupleStore(tutorialTuples()));
 
+    // Act
     const result = await authorizer.check({
       user: alice,
       relation: "can_edit",
       object: roadmap
     });
 
+    // Assert
     expect(result.allowed).toBe(true);
   });
 });
@@ -58,6 +70,27 @@ Read the outer `describe` as the subject under test. Read `it` as a behavior
 sentence.
 
 Good test names are not cute. They say what behavior matters.
+
+## Test naming convention
+
+Every unit test should use this name shape:
+
+```text
+given_<starting_state>_when_<action>_then_<expected_result>
+```
+
+Examples:
+
+```ts
+it("given_workspace_viewer_when_checking_document_permissions_then_read_is_allowed_and_edit_is_denied", async () => {});
+```
+
+```ts
+it("given_missing_document_when_updating_then_not_found_error_is_thrown", async () => {});
+```
+
+This convention is intentionally a little verbose. It makes test output read
+like a behavior list.
 
 ## Arrange, act, assert
 
@@ -72,14 +105,17 @@ assert: check the observable result
 Example:
 
 ```ts
+// Arrange
 const authorizer = new GraphAuthorizer(new MemoryTupleStore(tutorialTuples()));
 
+// Act
 const result = await authorizer.check({
   user: bob,
   relation: "can_edit",
   object: roadmap
 });
 
+// Assert
 expect(result.allowed).toBe(false);
 ```
 
@@ -91,14 +127,44 @@ This is small, but it tells a story:
 
 That is more valuable than a test that asserts an internal method was called.
 
+## No shared test helper methods
+
+Tests in this repo should keep setup inside the test body.
+
+Avoid local helpers like:
+
+```ts
+function serviceWithTuples() {}
+```
+
+The repetition is acceptable because this is a teaching repo. A reader should
+see the whole setup, action, and assertion without jumping around the file.
+
+Production fixtures such as `tutorialTuples()` are allowed because they are part
+of the lesson data, not a hidden test helper.
+
+The current convention is also enforced by review:
+
+- test names use `given_when_then`
+- tests use visible Arrange / Act / Assert sections
+- test files do not define local setup helper functions
+- socket and TUI entrypoints are excluded from coverage; their core logic is
+  tested behind interfaces
+
 ## Testing async code
 
 Vitest works naturally with `async` tests:
 
 ```ts
-it("rejects creates when the actor has no workspace editor path", async () => {
-  const service = serviceWithTuples(tutorialTuples());
+it("given_workspace_viewer_when_creating_document_then_forbidden_error_is_thrown", async () => {
+  // Arrange
+  const store = new MemoryTupleStore(tutorialTuples());
+  const service = new DocumentService(
+    new InMemoryDocumentRepository(),
+    new GraphAuthorizer(store)
+  );
 
+  // Act + Assert
   await expect(
     service.create({
       id: "incident-plan",
@@ -208,3 +274,20 @@ Then run:
 ```bash
 npm test
 ```
+
+## Checkpoint
+
+Why is this a better authorization assertion:
+
+```ts
+expect(result.allowed).toBe(false);
+```
+
+than this:
+
+```ts
+expect(authorizer.check).toHaveBeenCalled();
+```
+
+Good answer: the first checks the rule. The second only checks that a method was
+called.

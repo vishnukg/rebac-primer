@@ -9,6 +9,19 @@ are found while you are still editing.
 This matters for authorization code. A typo like `can_edti` should not wait
 until production traffic proves it is wrong.
 
+## Scene
+
+You have inherited a permission system. The code "works" until somebody ships a
+misspelled relation and a real user gets denied. Your first job is to make those
+mistakes loud while you are still editing.
+
+By the end of this chapter, you should be able to answer:
+
+- what TypeScript checks
+- what still happens at runtime
+- why `strict` mode is worth the friction
+- how a tiny typo becomes a compiler error instead of a production incident
+
 ## The mental model
 
 Think of TypeScript as three layers:
@@ -208,3 +221,15 @@ that the program does what the domain requires.
 
 The point is not the typo. The point is that the type system understands your
 authorization vocabulary.
+
+## Checkpoint
+
+Answer this without looking back:
+
+```text
+If TypeScript types disappear at runtime, why are they still useful for ReBAC?
+```
+
+Good answer: because they make the authorization vocabulary explicit while
+writing code, so invalid relation names and confused object shapes are caught
+before the app runs.

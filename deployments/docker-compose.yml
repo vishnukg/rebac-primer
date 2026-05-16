@@ -1,4 +1,15 @@
 services:
+  app:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    environment:
+      PORT: "4000"
+    ports:
+      - "4000:4000"
+    profiles:
+      - app
+
   openfga:
     image: openfga/openfga:latest
     command: run

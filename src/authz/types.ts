@@ -77,7 +77,7 @@ export function parseObject(value: string): { type: ObjectType; id: string } {
   return { type, id: idParts.join(":") };
 }
 
-export function parseSubjectSet(value: SubjectSet): {
+export function parseSubjectSet(value: string): {
   object: RebacObject<"team">;
   relation: TeamRelation;
 } {

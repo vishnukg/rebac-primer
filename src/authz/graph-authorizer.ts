@@ -1,4 +1,4 @@
-import { MemoryTupleStore } from "./memory-store.js";
+import type { TupleReader } from "./memory-store.js";
 import {
   type Authorizer,
   type CheckRequest,
@@ -15,7 +15,7 @@ import {
 type VisitKey = `${RebacObject}#${Relation}`;
 
 export class GraphAuthorizer implements Authorizer {
-  constructor(private readonly store: MemoryTupleStore) {}
+  constructor(private readonly store: TupleReader) {}
 
   async check(request: CheckRequest): Promise<CheckResult> {
     const trace: string[] = [

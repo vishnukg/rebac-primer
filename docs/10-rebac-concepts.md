@@ -22,6 +22,15 @@ Can Alice edit this specific document?
 
 That is where relationship-based access control becomes useful.
 
+## Scene
+
+You are building collaborative docs. A global `editor` role is too blunt. Alice
+should edit the Acme roadmap because she is on the platform team. Bob should
+read it but fail to edit it. Chandra should get nothing unless the graph gives
+her a path.
+
+ReBAC is how you model that without creating a new role for every document.
+
 ## The ReBAC idea
 
 ReBAC stores authorization as relationships between things.
@@ -274,3 +283,14 @@ tuple(acme, "editor", bob)
 ```
 
 Predict the new result before running the demo again.
+
+## Checkpoint
+
+Explain why this one tuple is powerful:
+
+```text
+workspace:acme editor team:platform#member
+```
+
+Good answer: it grants workspace editor access to the set of current and future
+platform team members, without writing one tuple per user per document.

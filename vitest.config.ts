@@ -6,7 +6,12 @@ export default defineConfig({
     coverage: {
       reporter: ["text", "html"],
       include: ["src/**/*.ts"],
-      exclude: ["src/main.ts"]
+      exclude: [
+        "src/main.ts",
+        "src/server.ts",
+        "src/client/tui.ts",
+        "src/http/server.ts"
+      ]
     }
   }
 });

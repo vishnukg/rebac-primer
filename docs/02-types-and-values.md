@@ -14,6 +14,14 @@ vocabulary for ReBAC:
 
 Open `src/authz/types.ts` while reading.
 
+## Scene
+
+The authorization model has a vocabulary: users, teams, workspaces, documents,
+relations, tuples, checks. If the code treats all of that as `string`, the
+compiler cannot help you.
+
+This chapter turns that vocabulary into types.
+
 ## Primitive types are only the start
 
 JavaScript gives you runtime primitives:
@@ -246,3 +254,15 @@ Then:
 
 This exercise teaches the best part of TypeScript: when the vocabulary changes,
 the compiler helps you find the edges of the change.
+
+## Checkpoint
+
+Look at this type:
+
+```ts
+export type RebacObject<TType extends ObjectType = ObjectType> =
+  `${TType}:${string}`;
+```
+
+Explain why `RebacObject<"user">` is more useful than `string` when writing an
+authorization check.

@@ -12,6 +12,12 @@ This separation is one of the best ideas in OpenFGA.
 
 Your model should change rarely. Your tuples change constantly.
 
+## Scene
+
+The product rule sounds simple: workspace editors can edit workspace documents.
+The model is where that sentence becomes executable. If the model is clear, the
+application code can stay boring.
+
 ## The model in this repo
 
 Open `src/authz/model.ts`.
@@ -238,3 +244,14 @@ Then mirror that in TypeScript:
 
 This exercise forces the OpenFGA model and TypeScript vocabulary to stay in
 sync.
+
+## Checkpoint
+
+Read this line out loud:
+
+```text
+define editor: [user] or workspace#editor from workspace or owner
+```
+
+If you can explain it as a graph path, you understand the model. If you cannot,
+do not add more permissions yet.

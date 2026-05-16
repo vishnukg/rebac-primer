@@ -13,6 +13,12 @@ export interface Authorizer {
 That one interface is the boundary between business logic and authorization
 infrastructure.
 
+## Scene
+
+The service needs one answer: allowed or denied. OpenFGA has stores, model ids,
+SDK request shapes, network errors, and tuple writes. The adapter keeps those
+details from spilling into the domain.
+
 ## Why the interface matters
 
 `DocumentService` should not know about:
@@ -173,3 +179,9 @@ Guidelines:
 2. map from repo tuple shape to SDK tuple shape inside the adapter
 3. do not expose SDK-specific types in `DocumentService`
 4. add a focused unit test around the tuple mapping if you introduce a helper
+
+## Checkpoint
+
+Why does `DocumentService` depend on `Authorizer` instead of `OpenFgaClient`?
+
+Good answer: the service owns business rules; the adapter owns SDK details.

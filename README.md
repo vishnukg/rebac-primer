@@ -15,6 +15,11 @@ The docs are designed to be read as a TypeScript primer, not as thin notes
 beside the code. Start with the course map and work through the TypeScript track
 before going deep on ReBAC.
 
+The tutorial style is deliberately hands-on: each chapter gives you a scene,
+the concept, the code to inspect, something to try, and a checkpoint question.
+The goal is to keep the material useful without turning it into a dry reference
+manual.
+
 ## Start here
 
 1. Read [docs/00-course-map.md](docs/00-course-map.md).
@@ -32,6 +37,8 @@ before going deep on ReBAC.
 - `src/authz/memory-store.ts`: in-memory tuple graph used by unit tests
 - `src/authz/graph-authorizer.ts`: small evaluator that explains graph traversal
 - `src/authz/openfga-client.ts`: real OpenFGA SDK adapter
+- `src/server.ts`: small HTTP server for client/server ReBAC practice
+- `src/client/tui.ts`: interactive terminal client
 - `test`: Vitest tests that double as executable lessons
 - `docs`: ordered course notes for TypeScript and ReBAC
 - `deployments`: local OpenFGA docker-compose setup
@@ -51,6 +58,8 @@ npm install
 npm test
 npm run build
 npm run dev
+npm run server
+npm run client
 ```
 
 To start OpenFGA locally:
@@ -61,3 +70,10 @@ docker compose -f deployments/docker-compose.yml up -d
 
 Then use `src/authz/openfga-client.ts` as the production adapter for the same
 `Authorizer` interface used in the tests.
+
+For the client/server demo, run:
+
+```bash
+npm run server
+npm run client
+```
