@@ -1,4 +1,4 @@
-# TypeScript ReBAC Primer: learn TypeScript by building OpenFGA authorization
+# TS ReBAC Primer: learn TypeScript by building OpenFGA authorization
 
 This repository is a TypeScript course for programmers who want to learn two
 things together:
@@ -7,9 +7,13 @@ things together:
 - relationship-based access control (ReBAC) with OpenFGA
 
 The project domain is a collaborative document workspace. Workspaces contain
-documents, teams belong to workspaces, and users inherit permissions through a
+documents, teams get workspace access, and users inherit permissions through a
 relationship graph. That small domain is enough to teach TypeScript types,
 interfaces, async code, testing, and the core OpenFGA mental model.
+
+The docs are designed to be read as a TypeScript primer, not as thin notes
+beside the code. Start with the course map and work through the TypeScript track
+before going deep on ReBAC.
 
 ## Start here
 
@@ -29,7 +33,7 @@ interfaces, async code, testing, and the core OpenFGA mental model.
 - `src/authz/graph-authorizer.ts`: small evaluator that explains graph traversal
 - `src/authz/openfga-client.ts`: real OpenFGA SDK adapter
 - `test`: Vitest tests that double as executable lessons
-- `docs`: ordered course notes
+- `docs`: ordered course notes for TypeScript and ReBAC
 - `deployments`: local OpenFGA docker-compose setup
 - `practice/collab-docs-lite`: capstone exercise
 

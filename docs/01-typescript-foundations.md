@@ -1,22 +1,210 @@
 # TypeScript foundations
 
-TypeScript adds static checks to JavaScript. This repo uses strict mode because
-authorization code is security-sensitive and should reject vague data shapes.
+TypeScript is JavaScript with a type system and a compiler.
 
-Start with `src/authz/types.ts`.
+That sounds small, but it changes how you work. In plain JavaScript, many
+mistakes are found only when code runs. In TypeScript, a lot of those mistakes
+are found while you are still editing.
 
-Key ideas:
+This matters for authorization code. A typo like `can_edti` should not wait
+until production traffic proves it is wrong.
 
-- `type` aliases name domain concepts such as `TupleKey` and `CheckRequest`.
-- string literal unions restrict values to known relations such as `can_edit`.
-- template literal types model OpenFGA ids like `user:alice` and `document:roadmap`.
-- functions like `user("alice")` keep object-id construction consistent.
+## The mental model
 
-Example:
+Think of TypeScript as three layers:
 
-```ts
-const alice = user("alice");        // type: RebacObject<"user">
-const roadmap = document("roadmap"); // type: RebacObject<"document">
+```text
+your .ts files
+  -> TypeScript compiler checks the code
+  -> JavaScript runs in Node or the browser
 ```
 
-The compiler now helps catch confused object types before tests run.
+Types do not exist at runtime. They are design-time guardrails.
+
+This compiles:
+
+```ts
+const userId: string = "alice";
+```
+
+At runtime, Node only sees JavaScript:
+
+```js
+const userId = "alice";
+```
+
+So TypeScript is not a runtime permission system. It cannot stop an attacker by
+itself. Its job is to make your program harder to write incorrectly.
+
+## Why this repo uses strict TypeScript
+
+Open `tsconfig.json`.
+
+The important options are:
+
+```json
+{
+  "strict": true,
+  "noImplicitReturns": true,
+  "noUncheckedIndexedAccess": true,
+  "exactOptionalPropertyTypes": true,
+  "noUnusedLocals": true,
+  "noUnusedParameters": true
+}
+```
+
+These settings are not ceremony. They support maintainability:
+
+- `strict` turns on the type checks that make TypeScript worth using.
+- `noImplicitReturns` catches functions that accidentally forget a branch.
+- `noUncheckedIndexedAccess` reminds you that array/map lookups can miss.
+- `exactOptionalPropertyTypes` makes optional fields behave honestly.
+- `noUnusedLocals` and `noUnusedParameters` keep dead code out of lessons.
+
+When code is educational, unused code is extra harmful. Learners assume every
+line matters.
+
+## Values vs types
+
+JavaScript has values:
+
+```ts
+const relation = "can_edit";
+```
+
+TypeScript can infer a type for that value:
+
+```ts
+// relation is the literal type "can_edit"
+const relation = "can_edit";
+```
+
+But with `let`, TypeScript widens the type because the value can change:
+
+```ts
+let relation = "can_edit";
+// relation is string
+```
+
+That difference matters. The authorization model has a closed vocabulary. We
+want `can_edit`, `can_read`, and `can_delete`, not any random string.
+
+## Your first useful type
+
+Open `src/authz/types.ts`.
+
+```ts
+export type DocumentRelation =
+  | "workspace"
+  | "owner"
+  | "editor"
+  | "viewer"
+  | "can_read"
+  | "can_comment"
+  | "can_edit"
+  | "can_delete";
+```
+
+This is a union type. It says a document relation must be one of these exact
+strings.
+
+That gives you a better failure mode:
+
+```ts
+const relation: DocumentRelation = "can_edti";
+```
+
+The compiler rejects it before the code runs.
+
+## TypeScript should encode domain language
+
+Weak version:
+
+```ts
+type Tuple = {
+  object: string;
+  relation: string;
+  user: string;
+};
+```
+
+This is technically typed, but it does not teach the compiler anything useful.
+Everything important is still "just a string."
+
+Better version from this repo:
+
+```ts
+export type TupleKey = Readonly<{
+  user: Subject;
+  relation: Relation;
+  object: RebacObject;
+}>;
+```
+
+Now the code says what the fields mean. A future reader does not need to guess.
+
+## `Readonly` and intent
+
+Tuples are facts. Once created, the clean mental model is that they do not
+change. If a relationship changes, write or delete a tuple.
+
+That is why `TupleKey` is `Readonly`.
+
+```ts
+const owner = tuple(document("roadmap"), "owner", user("alice"));
+owner.relation = "viewer"; // compiler error
+```
+
+Immutability keeps examples honest. It also makes tests easier to reason about.
+
+## Modules
+
+Every `.ts` file in this repo is an ES module because `package.json` includes:
+
+```json
+{
+  "type": "module"
+}
+```
+
+That is why imports include `.js`:
+
+```ts
+import { MemoryTupleStore } from "./memory-store.js";
+```
+
+This looks strange at first. The source file is `.ts`, but the emitted runtime
+file is `.js`, so Node-style ESM imports use the runtime extension.
+
+## Build vs test
+
+Run:
+
+```bash
+npm run build
+```
+
+This runs the TypeScript compiler. It checks types and writes JavaScript to
+`dist`.
+
+Run:
+
+```bash
+npm test
+```
+
+This runs Vitest. It checks behavior.
+
+You need both. Types prove that the code is structurally coherent. Tests prove
+that the program does what the domain requires.
+
+## Exercise
+
+1. Open `src/testing/fixtures.ts`.
+2. Change `"editor"` to `"edtor"` in one tuple.
+3. Run `npm run build`.
+4. Read the compiler error.
+5. Restore the code.
+
+The point is not the typo. The point is that the type system understands your
+authorization vocabulary.
