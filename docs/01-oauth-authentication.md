@@ -61,7 +61,25 @@ servers.
 The Authorization Server is also called an **Identity Provider (IdP)** when it
 does OIDC (which it almost always does today).
 
-## The flow: what actually happens
+## OAuth flows
+
+Different app shapes have different security constraints, so OAuth defines
+several flows. A browser app can redirect the user. A background service has no
+user at all. A CLI running on a TV cannot open a browser. Each flow is the right
+tool for one of those shapes.
+
+The three flows worth knowing:
+
+```text
+Authorization Code + PKCE  →  any app where a user logs in
+Client Credentials         →  machine-to-machine, no user present
+Device Authorization       →  CLIs and devices that cannot open a browser
+```
+
+## Flow 1: Authorization Code + PKCE
+
+**Use when:** a user needs to log in — browser apps, server apps, mobile apps,
+desktop apps.
 
 Here is a typical login, step by step:
 
@@ -215,6 +233,101 @@ Client                           Authorization Server
   │◄──────────────────────────────────────┤
 ```
 
+## Flow 2: Client Credentials
+
+**Use when:** a service needs to call another service and there is no user
+involved — background jobs, billing workers, microservice calls.
+
+Instead of redirecting a browser, the service authenticates directly with its
+own credentials:
+
+```text
+Service A                        Authorization Server
+   │                                      │
+   │  client_id + client_secret           │
+   ├─────────────────────────────────────►│
+   │                                      │  verify credentials
+   │  access token                        │
+   │◄─────────────────────────────────────┤
+   │                                      │
+   │  call API with access token          │
+   ├─────────────────────────────────────► Resource Server (API)
+```
+
+In plain English:
+
+1. Service A sends its client ID and secret directly to the Authorization Server
+2. Authorization Server verifies them and returns an access token
+3. Service A uses that token to call the API
+
+No browser. No user. No redirect. No ID token — there is no user to identify.
+
+The access token proves "Service A is authorized to call this API." The API can
+still make authorization decisions about what the service is allowed to do.
+
+ReBAC can model service identities just like user identities:
+
+```text
+user:service-billing-worker  →  can_read on document:invoiceTemplate
+```
+
+The `user:` prefix does not mean it has to be a human. It is just a subject in
+your authorization model.
+
+## Flow 3: Device Authorization
+
+**Use when:** the app cannot open a browser — CLIs, smart TVs, IoT devices,
+game consoles.
+
+The problem these devices share: they can display text but cannot redirect the
+user's browser to the IdP. The Device Authorization flow solves this by
+splitting authentication across two devices.
+
+```text
+CLI / Device             Authorization Server          User's browser
+      │                          │                            │
+      │  1. request device code  │                            │
+      ├─────────────────────────►│                            │
+      │  2. device_code          │                            │
+      │     user_code: ABCD-1234 │                            │
+      │     verification_url     │                            │
+      │◄─────────────────────────┤                            │
+      │                          │                            │
+      │  3. display to user:     │                            │
+      │  "Visit example.com/activate"                         │
+      │  "Enter code: ABCD-1234" │                            │
+      │                          │   4. user visits URL       │
+      │                          │◄───────────────────────────┤
+      │                          │   5. user enters code      │
+      │                          │◄───────────────────────────┤
+      │                          │   6. user authenticates    │
+      │                          │◄───────────────────────────┤
+      │                          │                            │
+      │  7. CLI polls for token  │                            │
+      ├─────────────────────────►│                            │
+      │  8. access token         │                            │
+      │     + ID token (OIDC)    │                            │
+      │◄─────────────────────────┤                            │
+```
+
+In plain English:
+
+1. The CLI asks the Authorization Server for a device code
+2. The Authorization Server returns a short code (e.g. `ABCD-1234`) and a URL
+3. The CLI shows the user: "Visit example.com/activate and enter ABCD-1234"
+4. The user opens their phone or laptop browser and visits that URL
+5. The user enters the code and logs in normally
+6. Meanwhile, the CLI polls the Authorization Server every few seconds: "is the
+   user done yet?"
+7. Once the user finishes, the next poll returns real tokens
+8. The CLI now has an access token and ID token — same as Authorization Code flow
+
+The user authenticates on a device that *can* open a browser. The CLI receives
+tokens without ever needing to redirect anything.
+
+This flow is what GitHub CLI, AWS CLI, and similar tools use for `gh auth login`
+or `aws sso login`.
+
 ## From identity to ReBAC
 
 Authentication gives you the user id. ReBAC uses it:
@@ -280,18 +393,18 @@ exactly the gap ReBAC fills.
 ## Which flow should I use?
 
 ```text
-App type              Recommended approach                Notes
+App type              Flow                                Notes
 ────────────────────  ──────────────────────────────────  ──────────────────────
-Server web app        Auth Code + PKCE + session          Store tokens server-side
-SPA (browser)         Auth Code + PKCE                    Avoid implicit flow
-Native/mobile app     Auth Code + PKCE                    Use system browser
-Machine-to-machine    Client Credentials                   No user present
-CLI with user login   Device Authorization or Auth Code    Depends on UX
+Server web app        Flow 1: Auth Code + PKCE + session  Store tokens server-side
+SPA (browser)         Flow 1: Auth Code + PKCE            Avoid implicit flow
+Native/mobile app     Flow 1: Auth Code + PKCE            Use system browser + PKCE
+Machine-to-machine    Flow 2: Client Credentials          No user, no browser
+CLI / device          Flow 3: Device Authorization        Or Auth Code with localhost
 ```
 
 For this repo:
-- Future browser/server version: Authorization Code + PKCE + OIDC
-- Current terminal client: Auth Code + PKCE with localhost callback, or Device flow
+- Future browser/server version: Flow 1 (Authorization Code + PKCE + OIDC)
+- Current terminal client: Flow 3 (Device Authorization) or Flow 1 with localhost callback
 - Tutorial mode (current): you type `alice`, `bob`, or `casey` — login is skipped
   to keep focus on authorization
 
