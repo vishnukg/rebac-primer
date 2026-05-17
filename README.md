@@ -38,11 +38,15 @@ Read [docs/00-course-map.md](docs/00-course-map.md) for the full learning path.
 
 Short version:
 
-1. TypeScript foundations → docs 01–07
-2. Authorization theory → docs 08–11
-3. OpenFGA model → doc 12–13
-4. Docker and local services → docs 20–23
-5. Go implementation → docs 40–41
+1. Shared authn/authz and ReBAC concepts -> docs 01-05
+2. TypeScript implementation track -> docs 10-17
+3. Go implementation track -> docs 20-25
+4. Shared Docker/local services -> docs 30-33
+5. Shared production concerns -> doc 40
+
+You can learn either language without reading the other language track. The
+authorization, OpenFGA model, Docker, and production-readiness chapters are the
+common spine for both implementations.
 
 ## Commands
 

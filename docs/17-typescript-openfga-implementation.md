@@ -109,7 +109,7 @@ The trace explains why access was allowed or denied.
 
 ## The real OpenFGA adapter
 
-Open `src/authz/openfga-client.ts`.
+Open `typescript/src/authz/openfga-client.ts`.
 
 ```ts
 export class OpenFgaAuthorizer implements Authorizer {
@@ -171,13 +171,13 @@ This becomes an OpenFGA write request.
 Start OpenFGA:
 
 ```bash
-docker compose -f deployments/docker-compose.yml up -d
+make openfga-up
 ```
 
 You then need to:
 
 1. create a store
-2. write the model from `src/authz/model.ts`
+2. write the model from `typescript/src/authz/model.ts`
 3. write tuples
 4. configure `OpenFgaAuthorizer` with `apiUrl`, `storeId`, and optionally
    `authorizationModelId`

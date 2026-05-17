@@ -13,12 +13,13 @@ but because boring startup is what lets you focus on the authorization model.
 ## Services in this repo
 
 ```text
-app      -> TypeScript ReBAC HTTP server
+ts-app   -> TypeScript ReBAC HTTP server
+go-app   -> Go ReBAC HTTP server
 openfga  -> local OpenFGA server
 ```
 
-The app service is behind a profile so you can choose whether to run it in
-Docker or directly with npm.
+The app services are behind profiles so you can choose whether to run either app
+in Docker or directly on your host.
 
 ## Recommended local workflows
 
@@ -26,22 +27,24 @@ Docker or directly with npm.
 
 This is the default workflow for this repo.
 
-Build and test without local Node:
+Build and test without local Node or Go:
 
 ```bash
-make check
+make ts-check
+make go-check
 ```
 
-Run the app container:
+Run an app container:
 
 ```bash
-make server
+make ts-server
+make go-server
 ```
 
-Run the client in another terminal:
+Run the TypeScript terminal client in another terminal:
 
 ```bash
-make client
+make ts-client
 ```
 
 ### Workflow B: OpenFGA only
@@ -63,16 +66,17 @@ make openfga-down
 You can still use Compose directly:
 
 ```bash
-docker compose -f deployments/docker-compose.yml --profile app up --build
+docker compose -f deployments/docker-compose.yml --profile ts-app up --build
+docker compose -f deployments/docker-compose.yml --profile go-app up --build
 ```
 
 But prefer `make` for day-to-day work so local and CI command shapes stay
 consistent.
 
-## What the current app uses
+## What the current apps use
 
-The current HTTP server uses the in-memory `GraphAuthorizer` so the client/server
-demo works without a live OpenFGA store.
+The current HTTP servers use the in-memory `GraphAuthorizer` so the
+client/server demos work without a live OpenFGA store.
 
 That is deliberate for the primer:
 
@@ -94,8 +98,10 @@ Prefer the Make targets:
 
 ```bash
 make compose-config
-make server
-make server-down
+make ts-server
+make ts-server-down
+make go-server
+make go-server-down
 ```
 
 Raw Compose equivalents:
@@ -106,16 +112,18 @@ Start services:
 docker compose -f deployments/docker-compose.yml up
 ```
 
-Start with app profile:
+Start with an app profile:
 
 ```bash
-docker compose -f deployments/docker-compose.yml --profile app up
+docker compose -f deployments/docker-compose.yml --profile ts-app up
+docker compose -f deployments/docker-compose.yml --profile go-app up
 ```
 
 Rebuild:
 
 ```bash
-docker compose -f deployments/docker-compose.yml --profile app up --build
+docker compose -f deployments/docker-compose.yml --profile ts-app up --build
+docker compose -f deployments/docker-compose.yml --profile go-app up --build
 ```
 
 Stop and remove containers:
@@ -127,7 +135,8 @@ docker compose -f deployments/docker-compose.yml down
 View logs:
 
 ```bash
-docker compose -f deployments/docker-compose.yml logs -f app
+docker compose -f deployments/docker-compose.yml logs -f ts-app
+docker compose -f deployments/docker-compose.yml logs -f go-app
 ```
 
 ## Local service checklist
@@ -144,6 +153,7 @@ For this repo:
 
 ```bash
 curl http://127.0.0.1:4000/health
+curl http://127.0.0.1:4001/health
 ```
 
 should return:
@@ -156,7 +166,7 @@ should return:
 
 ## Checkpoint
 
-Why does the app service use a Compose profile?
+Why do the app services use Compose profiles?
 
 Good answer: so you can run only OpenFGA when developing the app on your host,
-or include the app container when you want to test the container path.
+or include one app container when you want to test that container path.

@@ -15,6 +15,47 @@ You do need a few graph ideas:
 
 This chapter teaches only the graph theory needed for authorization.
 
+## One Sentence Version
+
+A graph is just things connected to other things.
+
+```text
+thing --relationship--> thing
+```
+
+ReBAC asks whether a user is connected to a resource through relationships that
+the model says are useful.
+
+```text
+user:workspaceEditor --member--> team:platformTeam
+team:platformTeam    --editor--> workspace:productWorkspace
+document:roadmap...  --workspace--> workspace:productWorkspace
+```
+
+The hard part is not graph theory. The hard part is being precise about what
+each connection means.
+
+## Graph Vocabulary Cheat Sheet
+
+| Word | Meaning in plain English | Example in this repo |
+|------|--------------------------|----------------------|
+| Node | A thing | `user:workspaceEditor` |
+| Edge | A connection between things | `member` |
+| Label | The name on an edge | `editor`, `viewer`, `workspace` |
+| Direction | Which way the relationship points | document points to workspace |
+| Path | A chain of edges | user -> team -> workspace |
+| Reachability | Whether a path exists | can this user reach this permission? |
+| Cycle | A path that loops back | A points to B, B points to A |
+
+When you read ReBAC code, keep asking:
+
+```text
+What node am I on?
+What relation am I checking?
+Which edge can I follow next?
+Have I already visited this place?
+```
+
 ## Scene
 
 The workspace editor can edit the roadmap document because she is in the platform team,
@@ -28,6 +69,38 @@ workspace editor -> platform team -> product workspace -> roadmap document
 ```
 
 ReBAC makes that graph explicit and asks whether a useful path exists.
+
+## A Map Analogy
+
+Think of the graph like a transit map.
+
+```text
+station = node
+line    = relation
+route   = path
+```
+
+Question:
+
+```text
+Can Alice get from Station A to Station D?
+```
+
+ReBAC question:
+
+```text
+Can user:workspaceEditor reach document:roadmapDocument#can_edit?
+```
+
+The model is the transit rulebook. It says which lines count for which trip.
+
+```text
+viewer line -> can_read
+editor line -> can_edit and can_read
+owner line  -> can_delete, can_edit, and can_read
+```
+
+Tuples are the current map data. If a tuple is removed, a route may disappear.
 
 ## Nodes
 
@@ -222,6 +295,52 @@ owner    -> direct owner OR workspace owner
 ```
 
 Traversal is not random. It follows the model definitions.
+
+## Worked Traversal
+
+Here is the same check as a slow trace:
+
+```text
+Question:
+  Can user:workspaceEditor can_edit document:roadmapDocument?
+
+Step 1:
+  document can_edit means document editor.
+
+Step 2:
+  document editor can come from workspace editor.
+
+Step 3:
+  document:roadmapDocument has workspace workspace:productWorkspace.
+
+Step 4:
+  workspace:productWorkspace has editor team:platformTeam#member.
+
+Step 5:
+  team:platformTeam#member asks:
+  is user:workspaceEditor a member of team:platformTeam?
+
+Step 6:
+  yes, tuple exists:
+  team:platformTeam member user:workspaceEditor
+
+Result:
+  allowed
+```
+
+The denial case is the same process with a missing path:
+
+```text
+Can user:workspaceViewer can_edit document:roadmapDocument?
+
+document can_edit -> editor
+document editor -> workspace editor
+workspace editor -> team:platformTeam#member
+team member path does not contain user:workspaceViewer
+workspaceViewer only has viewer, not editor
+
+Result: denied
+```
 
 ## The model is the map
 

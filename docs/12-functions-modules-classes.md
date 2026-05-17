@@ -72,7 +72,7 @@ much.
 
 This chapter focuses on modules as design boundaries. For the deeper Node
 runtime model, including ESM loading, `.js` import extensions, module caching,
-and singleton patterns, read `07-node-esm-and-module-patterns.md`.
+and singleton patterns, read `16-node-esm-and-module-patterns.md`.
 
 ## Interfaces describe behavior
 

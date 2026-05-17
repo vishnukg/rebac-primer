@@ -30,6 +30,96 @@ Is this request really from the workspace editor?
 
 That is authentication.
 
+## The shortest useful mental model
+
+Authentication is the login part of the story.
+
+Authorization is the permission part of the story.
+
+OAuth/OIDC helps the app turn a request into a known user:
+
+```text
+request with token/session
+        |
+        v
+verify token/session
+        |
+        v
+"this is user:workspaceEditor"
+```
+
+ReBAC starts after that:
+
+```text
+"this is user:workspaceEditor"
+        |
+        v
+can this user edit document:roadmapDocument?
+        |
+        v
+allow or deny
+```
+
+Keep those two questions separate:
+
+```text
+Authn question: "Who is making this request?"
+Authz question: "What may this user do now?"
+```
+
+If you mix them together, OAuth starts to feel like it should answer everything.
+It does not. OAuth/OIDC gives the app an identity. Your authorization system uses
+that identity to make product-specific decisions.
+
+## Four Boxes
+
+Most OAuth/OIDC explanations become easier if you can name the four boxes:
+
+```text
+┌──────────────┐      wants to use       ┌──────────────┐
+│ User         │ ──────────────────────► │ Your App     │
+│ workspace... │                         │ docs app     │
+└──────────────┘                         └──────┬───────┘
+                                                │ asks for login
+                                                ▼
+                                         ┌──────────────┐
+                                         │ Identity     │
+                                         │ Provider     │
+                                         │ Auth0/GitHub │
+                                         └──────┬───────┘
+                                                │ issues tokens
+                                                ▼
+                                         ┌──────────────┐
+                                         │ API / Server │
+                                         │ protected by │
+                                         │ tokens       │
+                                         └──────────────┘
+```
+
+In a small server app, "Your App" and "API / Server" may be the same process.
+They are still different roles in the mental model.
+
+## What each thing proves
+
+This table prevents a common beginner mistake:
+
+| Thing | What it proves | What it does not prove |
+|-------|----------------|------------------------|
+| Password/login at IdP | The user authenticated with the identity provider | The user can edit a document |
+| ID token | The user's identity was asserted by the IdP | The user has app permissions |
+| Access token | A client can call an API | The requested action is allowed |
+| App session | The app remembers an authenticated user | The user can access every resource |
+| ReBAC check | A graph path grants a specific permission | The user's login is still valid |
+
+Practical sequence:
+
+```text
+1. Verify login/session/token.
+2. Map identity to an app user id, such as user:workspaceEditor.
+3. Run authorization for the requested action and object.
+4. Execute only if authorization allows it.
+```
+
 ## Current standard landscape
 
 As of 2026, the practical modern OAuth picture is:

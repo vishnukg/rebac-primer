@@ -30,6 +30,92 @@ Can the outside collaborator read one shared document but nothing else?
 
 Now global roles are not enough.
 
+## The decision shape
+
+Every authorization check needs the same three pieces:
+
+```text
+subject + action + object -> allow or deny
+```
+
+For this repo:
+
+```text
+subject = user:workspaceEditor
+action  = can_edit
+object  = document:roadmapDocument
+```
+
+The check becomes:
+
+```text
+Can user:workspaceEditor can_edit document:roadmapDocument?
+```
+
+That sentence sounds strange at first because `can_edit` is written as a
+relation. OpenFGA and this repo use relation names for both relationships and
+computed permissions:
+
+```text
+relationship: user is member of team
+permission:   user can_edit document
+```
+
+Both are graph questions.
+
+## A Request Timeline
+
+Authorization is one step in a larger request:
+
+```text
+HTTP request
+  |
+  v
+authenticate
+  "this request is from user:workspaceEditor"
+  |
+  v
+load/parse target
+  "the target is document:roadmapDocument"
+  |
+  v
+authorize
+  "can user:workspaceEditor can_edit document:roadmapDocument?"
+  |
+  +-- denied  -> return 403
+  |
+  +-- allowed -> run business action
+```
+
+Two failures are easy to confuse:
+
+```text
+401 Unauthorized: the app does not know who you are
+403 Forbidden:    the app knows who you are, but you cannot do this
+```
+
+The names are historical and slightly confusing. For learning:
+
+```text
+401 -> authentication problem
+403 -> authorization problem
+```
+
+## A Tiny Permission Matrix
+
+Before thinking about graphs, write the desired outcomes:
+
+| Actor | Read roadmap? | Edit roadmap? | Why |
+|-------|---------------|---------------|-----|
+| workspaceEditor | yes | yes | team membership grants workspace editor |
+| workspaceViewer | yes | no | viewer grants read, not edit |
+| outsideCollaborator | no | no | no relationship path |
+
+This table is a specification. The code and model should make the table true.
+
+If a model cannot explain one row in plain English, slow down before adding more
+relations.
+
 ## Authentication vs authorization
 
 ```text
@@ -64,6 +150,36 @@ Architecture:
 ```
 
 Do not skip authorization just because authentication succeeded.
+
+## Common Beginner Mistakes
+
+Mistake 1: treating login as permission.
+
+```text
+Bad:  user is logged in, so allow document update
+Good: user is logged in, then check can_edit on this document
+```
+
+Mistake 2: checking only broad roles.
+
+```text
+Bad:  user has role editor, so can edit every document
+Good: user can edit this document if a relationship path grants can_edit
+```
+
+Mistake 3: putting authorization only in the client.
+
+```text
+Bad:  hide the edit button and trust the browser
+Good: hide the edit button for UX, but enforce permission on the server
+```
+
+Mistake 4: making the HTTP handler own the policy.
+
+```text
+Bad:  every route knows graph rules
+Good: domain service asks Authorizer for an allow/deny decision
+```
 
 ## DAC, MAC, RBAC, ABAC, ReBAC
 
@@ -268,6 +384,141 @@ HTTP parses.
 Domain decides when authz is required.
 Authorizer answers allow/deny.
 Tuple store holds facts.
+```
+
+## Future Agentic Systems
+
+Agentic systems make authorization more important because a model or agent may
+take many actions on behalf of a user:
+
+```text
+read documents
+summarize private content
+send messages
+create tickets
+modify data
+call tools
+trigger workflows
+```
+
+The core questions do not change:
+
+```text
+Who is acting?
+What action is being attempted?
+Which object is the action targeting?
+Is the action allowed right now?
+```
+
+But agentic systems add one more question:
+
+```text
+On whose behalf is the agent acting?
+```
+
+A useful mental model:
+
+```text
+human user
+  authenticates with OAuth/OIDC
+  |
+  v
+app session
+  identifies user:workspaceEditor
+  |
+  v
+agent run
+  acts on behalf of user:workspaceEditor
+  |
+  v
+tool call
+  asks Authorizer before touching data
+```
+
+Diagram:
+
+```text
+┌──────────────┐
+│ Human User   │
+└──────┬───────┘
+       │ login
+       ▼
+┌──────────────┐
+│ Authn layer  │ validates identity
+└──────┬───────┘
+       │ user:workspaceEditor
+       ▼
+┌──────────────┐
+│ Agent runtime│ plans tool calls
+└──────┬───────┘
+       │ wants to read/edit object
+       ▼
+┌──────────────┐
+│ Authz layer  │ Check(user, relation, object)
+└──────┬───────┘
+       │ allow/deny
+       ▼
+┌──────────────┐
+│ Tool/API     │ executes only if allowed
+└──────────────┘
+```
+
+Two identities may matter:
+
+| Identity | Example | Why it matters |
+|----------|---------|----------------|
+| User identity | `user:workspaceEditor` | Whose data and permissions are being used |
+| Agent identity | `agent:docAssistant` | Which agent/tooling is allowed to operate |
+
+For many apps, the agent should not get broad new powers. It should inherit a
+limited subset of the user's permissions:
+
+```text
+agent can read only documents the user can read
+agent can edit only documents the user can edit
+agent can call only tools the app permits for this workflow
+```
+
+That gives you two checks:
+
+```text
+1. Can the user perform this action on this object?
+2. Is this agent/tool allowed to perform this kind of action?
+```
+
+Example:
+
+```text
+User asks: "Update the roadmap with the new launch date."
+
+Authn:
+  request belongs to user:workspaceEditor
+
+Agent planning:
+  agent wants to call update_document on document:roadmapDocument
+
+Authz:
+  Check(user:workspaceEditor, can_edit, document:roadmapDocument)
+  Check(agent:docAssistant, can_use, tool:update_document)
+
+Only if both are allowed:
+  execute the update
+```
+
+ReBAC can model these relationships too:
+
+```text
+user:workspaceEditor member team:platformTeam
+workspace:productWorkspace editor team:platformTeam#member
+document:roadmapDocument workspace workspace:productWorkspace
+agent:docAssistant can_use tool:update_document
+```
+
+The important production habit is the same as normal web apps:
+
+```text
+Do not trust the plan.
+Authorize each tool call before it executes.
 ```
 
 ## Fail closed

@@ -1,7 +1,7 @@
 # Go ReBAC implementation
 
 This chapter walks through the Go implementation of the collaborative documents
-authorization system. Read the Go primer (doc 40) before this one — it covers the
+authorization system. Read `20-go-primer.md` before this one — it covers the Go
 language concepts that appear here.
 
 The goal is to read the same design in a second language and notice what changes,
@@ -17,7 +17,7 @@ go/
 ├── Dockerfile
 ├── cmd/server/main.go          Entry point — starts the HTTP server
 └── internal/
-    ├── authz/                  Types, tuple store, graph evaluator, OpenFGA stub
+    ├── authz/                  Types, tuple store, graph evaluator, OpenFGA adapter
     │   ├── types.go
     │   ├── store.go
     │   ├── graph.go
@@ -526,14 +526,25 @@ func New(ctx context.Context) (*App, error) {
 }
 ```
 
-To swap `GraphAuthorizer` for `OpenFGAAuthorizer`, change one line:
+To swap `GraphAuthorizer` for `OpenFGAAuthorizer`, replace the authorizer
+construction:
 
 ```go
 // authorizer := authz.NewGraphAuthorizer(tupleStore)
-authorizer := authz.NewOpenFGAAuthorizer(authz.OpenFGAConfig{
+authorizer, err := authz.NewOpenFGAAuthorizer(authz.OpenFGAConfig{
     APIURL:  "http://localhost:8080",
     StoreID: "your-store-id",
 })
+if err != nil {
+    return nil, err
+}
+```
+
+Because this introduces `err` before the demo document is seeded, the later
+create call should use assignment instead of declaration:
+
+```go
+_, err = docs.Create(ctx, domain.CreateDocumentInput{ ... })
 ```
 
 Nothing else changes. The domain and HTTP layers never find out.
@@ -707,15 +718,14 @@ The same HTTP API as the TypeScript server (`make ts-server`), just on port 4001
 
 ## Exercise
 
-The `OpenFGAAuthorizer` in `go/internal/authz/openfga.go` is a stub. Complete it:
+The `OpenFGAAuthorizer` in `go/internal/authz/openfga.go` is the SDK-backed
+adapter. To use it in the server path:
 
-1. Inside the `go/` directory run `go get github.com/openfga/go-sdk@latest` (or
-   use `make go-shell` to enter the container first).
-2. Implement `Check` using the SDK's `client.Check()` method — the pattern is the
-   same as `typescript/src/authz/openfga-client.ts`.
+1. Start OpenFGA with `make openfga-up`.
+2. Create a store, write `OpenFGAModel`, and write the fixture tuples.
 3. Wire it into `app/app.go` by replacing `NewGraphAuthorizer` with
-   `NewOpenFGAAuthorizer`, then run `make openfga-up` and confirm the server
-   still responds to the same `curl` requests.
+   `NewOpenFGAAuthorizer`, passing the API URL, store ID, and optional model ID.
+4. Confirm the server still responds to the same `curl` requests.
 
 ---
 

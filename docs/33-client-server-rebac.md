@@ -1,8 +1,8 @@
 # Client/server ReBAC demo
 
-This repo now includes a small client/server example.
+This repo includes small client/server examples.
 
-It is intentionally modest:
+The TypeScript version is intentionally modest:
 
 - Node built-in `http` server
 - JSON API
@@ -11,7 +11,8 @@ It is intentionally modest:
 - no TUI framework
 - ReBAC enforced in the service layer
 
-The goal is to show the pattern before adding more libraries.
+The Go version exposes the same HTTP shape with the standard library. The goal
+is to show the pattern before adding more libraries.
 
 ## Scene
 
@@ -23,20 +24,30 @@ This demo makes that boundary visible.
 
 ## Run the server
 
+TypeScript:
+
 ```bash
-make server
+make ts-server
 ```
 
-The server listens on:
+Go:
+
+```bash
+make go-server
+```
+
+The servers listen on:
 
 ```text
-http://127.0.0.1:4000
+TypeScript: http://127.0.0.1:4000
+Go:         http://127.0.0.1:4001
 ```
 
 Health check:
 
 ```bash
 curl http://127.0.0.1:4000/health
+curl http://127.0.0.1:4001/health
 ```
 
 ## Run the client
@@ -44,7 +55,7 @@ curl http://127.0.0.1:4000/health
 In another terminal:
 
 ```bash
-make client
+make ts-client
 ```
 
 The client is a simple interactive terminal UI. It lets you:
@@ -74,12 +85,17 @@ Example read:
 
 ```bash
 curl "http://127.0.0.1:4000/documents/roadmapDocument?actorId=workspaceViewer"
+curl "http://127.0.0.1:4001/documents/roadmapDocument?actorId=workspaceViewer"
 ```
 
 Example update:
 
 ```bash
 curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
+  -H "content-type: application/json" \
+  -d '{"actorId":"workspaceEditor","body":"Updated from curl"}'
+
+curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
   -H "content-type: application/json" \
   -d '{"actorId":"workspaceEditor","body":"Updated from curl"}'
 ```
@@ -90,22 +106,35 @@ The workspace viewer can read but cannot update:
 curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
   -H "content-type: application/json" \
   -d '{"actorId":"workspaceViewer","body":"Should fail"}'
+
+curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
+  -H "content-type: application/json" \
+  -d '{"actorId":"workspaceViewer","body":"Should fail"}'
 ```
 
 ## Where ReBAC is enforced
 
 The HTTP layer parses requests and maps errors to responses.
 
-The domain service enforces authorization:
+The domain service enforces authorization.
+
+TypeScript:
 
 ```ts
 await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "edit");
 ```
 
+Go:
+
+```go
+err := s.requireAllowed(ctx, input.Actor, authz.RelationDocumentCanEdit, authz.Document(input.ID), "edit")
+```
+
 That is the important boundary.
 
-The client does not decide whether the workspace viewer can edit. The server decides. The server
-uses the domain service. The domain service uses the authorizer.
+The client does not decide whether the workspace viewer can edit. The server
+decides. The server uses the domain service. The domain service uses the
+authorizer.
 
 ```text
 client -> HTTP server -> DocumentService -> Authorizer -> relationship graph
@@ -118,9 +147,10 @@ The executable files stay intentionally thin:
 ```text
 src/server.ts     -> createServerApp(), then listen()
 src/client/tui.ts -> createClientApp(), then run()
+go/cmd/server/main.go -> app.New(), then ListenAndServe()
 ```
 
-The object graphs are assembled in `src/app`:
+The object graphs are assembled in the composition roots:
 
 ```text
 createServerApp
@@ -135,6 +165,13 @@ createClientApp
   -> HttpDocumentsClient
   -> Node readline terminal
   -> TerminalClient
+
+go app.New
+  -> InMemoryTupleStore
+  -> GraphAuthorizer
+  -> InMemoryDocumentRepository
+  -> DocumentService
+  -> httpserver.NewServer
 ```
 
 That split matters because ReBAC code is easier to reason about when business
@@ -172,13 +209,14 @@ That is why the default test suite focuses on domain and graph behavior.
 You can still run the server normally on your machine:
 
 ```bash
-make server
+make ts-server
+make go-server
 ```
 
 and exercise it with:
 
 ```bash
-make client
+make ts-client
 ```
 
 ## Checkpoint

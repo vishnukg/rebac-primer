@@ -2,7 +2,7 @@
 
 Local development usually needs multiple processes:
 
-- the TypeScript app
+- the TypeScript app, Go app, or both
 - OpenFGA
 - maybe a database later
 - maybe a CLI on the host
@@ -12,8 +12,8 @@ Docker networking is how those processes find each other.
 ## Scene
 
 The app says `ECONNREFUSED`. OpenFGA is running. The port looks right. The
-problem is often not OpenFGA or TypeScript. It is where the request is coming
-from: your host or another container.
+problem is often not OpenFGA or the application language. It is where the
+request is coming from: your host or another container.
 
 ## Host vs container networking
 
@@ -84,11 +84,16 @@ Common OpenFGA ports:
 
 ## Compose profiles
 
-The app service uses a profile:
+The app services use profiles:
 
 ```yaml
-profiles:
-  - app
+ts-app:
+  profiles:
+    - ts-app
+
+go-app:
+  profiles:
+    - go-app
 ```
 
 That means plain Compose can start only OpenFGA:
@@ -97,10 +102,11 @@ That means plain Compose can start only OpenFGA:
 docker compose -f deployments/docker-compose.yml up openfga
 ```
 
-And this starts the app too:
+And these start the app containers:
 
 ```bash
-docker compose -f deployments/docker-compose.yml --profile app up
+docker compose -f deployments/docker-compose.yml --profile ts-app up
+docker compose -f deployments/docker-compose.yml --profile go-app up
 ```
 
 Profiles keep local infrastructure flexible.
@@ -115,6 +121,7 @@ docker compose -f deployments/docker-compose.yml ps
 
 ```bash
 curl http://127.0.0.1:4000/health
+curl http://127.0.0.1:4001/health
 ```
 
 ```bash

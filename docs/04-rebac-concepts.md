@@ -51,6 +51,109 @@ Can user:workspaceEditor edit document:roadmapDocument?
 
 Yes, because a path exists through the graph.
 
+## Build ReBAC From Normal Sentences
+
+Do not start by thinking about OpenFGA syntax. Start with product sentences.
+
+Product sentence:
+
+```text
+Workspace editors can edit documents in that workspace.
+```
+
+Break it into nouns:
+
+```text
+workspace editor
+document
+workspace
+```
+
+Break it into relationships:
+
+```text
+user is a member of team
+team members are editors of workspace
+document belongs to workspace
+workspace editors are document editors
+document editors can edit documents
+```
+
+Then write the graph facts:
+
+```text
+team:platformTeam member user:workspaceEditor
+workspace:productWorkspace editor team:platformTeam#member
+document:roadmapDocument workspace workspace:productWorkspace
+```
+
+Then write the model rules:
+
+```text
+document editor can come from workspace editor
+document can_edit comes from document editor
+```
+
+ReBAC is the combination of:
+
+```text
+facts + rules -> decision
+```
+
+## Three Layers To Keep Separate
+
+Beginners often mix these together. Keep them separate:
+
+| Layer | Question | Example |
+|-------|----------|---------|
+| Identity | Who is the user? | `user:workspaceEditor` |
+| Relationship facts | What relationships exist now? | team member, workspace editor |
+| Authorization model | How do relationships imply permissions? | editor implies can_edit |
+
+The final check uses all three:
+
+```text
+identity: user:workspaceEditor
+facts:    user is member of platform team
+model:    team members can be workspace editors, workspace editors can edit docs
+result:   allowed
+```
+
+## The Ladder Model
+
+For this repo, think of document access as a ladder:
+
+```text
+owner
+  |
+  v
+editor
+  |
+  v
+viewer
+```
+
+Higher rungs include lower rungs:
+
+```text
+owner  -> editor -> viewer
+editor -> viewer
+viewer -> can_read and can_comment
+editor -> can_edit
+owner  -> can_delete
+```
+
+So the questions become:
+
+```text
+can_read?    find viewer
+can_comment? find viewer
+can_edit?    find editor
+can_delete?  find owner
+```
+
+The graph traversal is mostly a search for the needed rung.
+
 ## Architecture view
 
 In an application, ReBAC usually sits behind a small authorization interface:
@@ -91,6 +194,50 @@ HTTP handler -> DocumentService -> Authorizer -> InMemoryTupleStore/OpenFGA
 That separation matters. The HTTP layer should not know graph traversal rules.
 The domain service should not know SDK details. The authorizer should answer one
 question: allowed or denied.
+
+## End-To-End Request Example
+
+Here is the whole story, from request to decision:
+
+```text
+PATCH /documents/roadmapDocument
+actorId=workspaceEditor
+body="new roadmap"
+```
+
+In a production app, `actorId` would come from an authenticated session or token.
+This repo passes it explicitly so the authorization lesson is visible.
+
+```text
+HTTP handler
+  parses document id and actor id
+  |
+  v
+DocumentService.Update
+  knows editing a document requires can_edit
+  |
+  v
+Authorizer.Check
+  asks: user:workspaceEditor can_edit document:roadmapDocument?
+  |
+  v
+Tuple store + model rules
+  find a valid relationship path
+  |
+  v
+allowed
+  |
+  v
+repository saves updated document
+```
+
+If the actor is `workspaceViewer`, the first half is the same. Only the graph
+answer changes:
+
+```text
+user:workspaceViewer can_read document:roadmapDocument  -> allowed
+user:workspaceViewer can_edit document:roadmapDocument  -> denied
+```
 
 ## The graph
 
@@ -359,6 +506,86 @@ The workspace viewer cannot edit.
 
 Good authorization tests should include near misses. They prove your model is
 not simply too permissive.
+
+## ReBAC For Agentic Tool Calls
+
+In an agentic system, the agent usually does not directly "own" the data. It is
+acting for a user, a team, a workflow, or an organization.
+
+That means the authorization question should include delegation:
+
+```text
+Can this agent perform this action on this object for this user?
+```
+
+You can model that in layers.
+
+Layer 1: user access to the object.
+
+```text
+Check(user:workspaceEditor, can_edit, document:roadmapDocument)
+```
+
+Layer 2: agent access to the tool.
+
+```text
+Check(agent:docAssistant, can_use, tool:updateDocument)
+```
+
+Layer 3: optional delegation from user to agent.
+
+```text
+Check(agent:docAssistant, delegate, user:workspaceEditor)
+```
+
+A combined decision might look like:
+
+```text
+allow tool call if:
+  user can_edit document
+  agent can_use updateDocument tool
+  agent is delegated by this user or this workspace
+```
+
+The graph could contain facts like:
+
+```text
+agent:docAssistant delegate user:workspaceEditor
+tool:updateDocument can_use agent:docAssistant
+team:platformTeam member user:workspaceEditor
+workspace:productWorkspace editor team:platformTeam#member
+document:roadmapDocument workspace workspace:productWorkspace
+```
+
+Then a tool call is not just a prompt response. It becomes an authorized action:
+
+```text
+agent proposes action
+  |
+  v
+server validates requested object and relation
+  |
+  v
+server runs ReBAC checks
+  |
+  +-- denied  -> tool call blocked
+  |
+  +-- allowed -> tool call executes
+```
+
+This is especially useful when agents can operate across many resources:
+
+```text
+docs
+issues
+calendar events
+source code repositories
+customer records
+deployment systems
+```
+
+ReBAC gives each tool call a precise permission question instead of relying on a
+broad "agent is trusted" flag.
 
 ## Exercise
 

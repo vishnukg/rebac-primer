@@ -1,26 +1,11 @@
-// Package authz — OpenFGA adapter stub.
-//
-// This file is a placeholder for an OpenFGAAuthorizer that wraps the official
-// Go SDK. It satisfies the Authorizer interface and can be swapped in for the
-// GraphAuthorizer without changing any domain code.
-//
-// To activate this adapter:
-//
-//  1. Add the SDK dependency:
-//     go get github.com/openfga/go-sdk@v0.6.3
-//
-//  2. Replace this stub with a real implementation that:
-//     - Creates a store and uploads OpenFGAModel on first run.
-//     - Writes tuples from the fixture set.
-//     - Calls client.Check() for each Authorizer.Check() call.
-//
-// See docs/13-typescript-openfga-implementation.md for the TS counterpart.
-
 package authz
 
 import (
 	"context"
 	"fmt"
+
+	openfga "github.com/openfga/go-sdk"
+	fgaclient "github.com/openfga/go-sdk/client"
 )
 
 // OpenFGAConfig holds the connection details for an OpenFGA server.
@@ -33,27 +18,85 @@ type OpenFGAConfig struct {
 	AuthorizationModelID string
 }
 
-// OpenFGAAuthorizer is a stub that will wrap github.com/openfga/go-sdk.
-// It currently returns an error so the compiler confirms interface satisfaction
-// without requiring the SDK to be present.
+type openFGAClient interface {
+	Check(ctx context.Context, req fgaclient.ClientCheckRequest) (*fgaclient.ClientCheckResponse, error)
+	WriteTuples(ctx context.Context, tuples []fgaclient.ClientTupleKey) error
+}
+
+type sdkOpenFGAClient struct {
+	client *fgaclient.OpenFgaClient
+}
+
+func (s *sdkOpenFGAClient) Check(ctx context.Context, req fgaclient.ClientCheckRequest) (*fgaclient.ClientCheckResponse, error) {
+	return s.client.Check(ctx).Body(req).Execute()
+}
+
+func (s *sdkOpenFGAClient) WriteTuples(ctx context.Context, tuples []fgaclient.ClientTupleKey) error {
+	_, err := s.client.WriteTuples(ctx).Body(tuples).Execute()
+	return err
+}
+
+// OpenFGAAuthorizer adapts the official OpenFGA Go SDK to this repo's
+// Authorizer interface. Domain code depends on Authorizer, not SDK request types.
 type OpenFGAAuthorizer struct {
-	cfg OpenFGAConfig
+	client openFGAClient
 }
 
-// NewOpenFGAAuthorizer creates an OpenFGAAuthorizer. Run `go get github.com/openfga/go-sdk`
-// and implement the body of Check before using this in production.
-func NewOpenFGAAuthorizer(cfg OpenFGAConfig) *OpenFGAAuthorizer {
-	return &OpenFGAAuthorizer{cfg: cfg}
+// NewOpenFGAAuthorizer creates an OpenFGAAuthorizer backed by the official SDK.
+func NewOpenFGAAuthorizer(cfg OpenFGAConfig) (*OpenFGAAuthorizer, error) {
+	sdk, err := fgaclient.NewSdkClient(&fgaclient.ClientConfiguration{
+		ApiUrl:               cfg.APIURL,
+		StoreId:              cfg.StoreID,
+		AuthorizationModelId: cfg.AuthorizationModelID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("openfga: create sdk client: %w", err)
+	}
+
+	return newOpenFGAAuthorizerWithClient(&sdkOpenFGAClient{client: sdk}), nil
 }
 
-// Check satisfies the Authorizer interface.
-// Replace this stub with a real call to the OpenFGA SDK.
-func (o *OpenFGAAuthorizer) Check(_ context.Context, req CheckRequest) (CheckResult, error) {
-	return CheckResult{}, fmt.Errorf(
-		"OpenFGAAuthorizer is a stub: add github.com/openfga/go-sdk and implement Check "+
-			"(tried to check %s has %s on %s against store %s)",
-		req.User, req.Relation, req.Object, o.cfg.StoreID,
-	)
+func newOpenFGAAuthorizerWithClient(client openFGAClient) *OpenFGAAuthorizer {
+	return &OpenFGAAuthorizer{client: client}
+}
+
+// Check satisfies the Authorizer interface by asking OpenFGA to evaluate the
+// relationship graph remotely.
+func (o *OpenFGAAuthorizer) Check(ctx context.Context, req CheckRequest) (CheckResult, error) {
+	resp, err := o.client.Check(ctx, fgaclient.ClientCheckRequest{
+		User:     string(req.User),
+		Relation: string(req.Relation),
+		Object:   string(req.Object),
+	})
+	if err != nil {
+		return CheckResult{}, fmt.Errorf("openfga: check %s has %s on %s: %w", req.User, req.Relation, req.Object, err)
+	}
+	if resp == nil {
+		return CheckResult{}, fmt.Errorf("openfga: check %s has %s on %s: empty response", req.User, req.Relation, req.Object)
+	}
+
+	return CheckResult{
+		Allowed: resp.GetAllowed(),
+		Trace:   []string{"OpenFGA evaluated the relationship graph remotely"},
+	}, nil
+}
+
+// WriteTuples writes relationship facts to OpenFGA without exposing SDK tuple
+// types to callers.
+func (o *OpenFGAAuthorizer) WriteTuples(ctx context.Context, tuples []TupleKey) error {
+	sdkTuples := make([]fgaclient.ClientTupleKey, 0, len(tuples))
+	for _, tuple := range tuples {
+		sdkTuples = append(sdkTuples, *openfga.NewTupleKey(
+			string(tuple.User),
+			string(tuple.Relation),
+			string(tuple.Object),
+		))
+	}
+
+	if err := o.client.WriteTuples(ctx, sdkTuples); err != nil {
+		return fmt.Errorf("openfga: write tuples: %w", err)
+	}
+	return nil
 }
 
 // Ensure OpenFGAAuthorizer satisfies the Authorizer interface at compile time.

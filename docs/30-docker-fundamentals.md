@@ -2,11 +2,11 @@
 
 Docker lets you package an application with the runtime environment it needs.
 
-For this repo, Docker has two jobs:
+For this repo, Docker has three jobs:
 
 - run supporting services such as OpenFGA
-- run the TypeScript ReBAC server in a repeatable local environment
-- run build/test tooling so local Node is optional
+- run the TypeScript and Go ReBAC servers in repeatable local environments
+- run build/test tooling so local Node and Go installs are optional
 
 ## Scene
 
@@ -29,9 +29,9 @@ You can create many containers from the same image.
 
 ## Dockerfile
 
-Open `deployments/Dockerfile`.
+Open `typescript/Dockerfile` and `go/Dockerfile`.
 
-It has three stages:
+The TypeScript Dockerfile has three stages:
 
 ```text
 deps    -> install npm dependencies
@@ -48,6 +48,14 @@ CMD ["node", "dist/src/server.js"]
 That is the production-shaped path. `tsx` is useful during development, but a
 container should usually run built output.
 
+The Go Dockerfile follows the same idea with different tooling:
+
+```text
+dev     -> Go toolchain for build/test work
+build   -> compile the server binary
+runtime -> run the compiled binary in a small Alpine image
+```
+
 ## 3 Musketeers workflow
 
 This repo follows the 3 Musketeers pattern:
@@ -61,29 +69,33 @@ Docker         -> repeatable execution environment
 The point is simple: a developer and CI should run the same command shape.
 
 ```bash
-make test
+make ts-test
+make go-test
 ```
 
-does not call local `npm test`. It runs:
+do not call local test tools directly. They run through Compose tool containers:
 
 ```text
-docker compose run --rm tools npm test
+docker compose run --rm ts-tools npm test
+docker compose run --rm go-tools go test ./...
 ```
 
-That means you do not need local Node installed for normal project work. You need
-Docker, Compose, and Make.
+That means you do not need local Node or Go installed for normal project work.
+You need Docker, Compose, and Make.
 
 ## Tool container
 
-The `tools` Compose service uses the `deps` stage of the Dockerfile:
+The `ts-tools` Compose service uses the `deps` stage of the TypeScript Dockerfile:
 
 ```yaml
-tools:
+ts-tools:
   build:
+    context: ../typescript
+    dockerfile: Dockerfile
     target: deps
   volumes:
-    - ..:/workspace
-    - node_modules:/workspace/node_modules
+    - ../typescript:/workspace
+    - ts_node_modules:/workspace/node_modules
 ```
 
 The source code is bind-mounted into `/workspace`. The `node_modules` directory
@@ -93,27 +105,49 @@ not pollute your host machine.
 Use:
 
 ```bash
-make deps
+make ts-deps
 ```
 
 to refresh dependencies in that volume.
 
+The `go-tools` service uses the Go `dev` stage and a Go module cache volume:
+
+```yaml
+go-tools:
+  build:
+    context: ../go
+    dockerfile: Dockerfile
+    target: dev
+  volumes:
+    - ../go:/workspace
+    - go_cache:/root/go/pkg/mod
+```
+
 ## Build context
 
-When Compose builds the app, it uses the repo root as the build context:
+When Compose builds each app, it uses that language directory as the build
+context:
 
 ```yaml
 build:
-  context: ..
-  dockerfile: deployments/Dockerfile
+  context: ../typescript
+  dockerfile: Dockerfile
 ```
 
-The context is the directory Docker can read while building. Files outside the
+For Go:
+
+```yaml
+build:
+  context: ../go
+  dockerfile: Dockerfile
+```
+
+The context is the directory Docker can read while building. Files outside that
 context are invisible to the build.
 
 ## Layers and caching
 
-The Dockerfile copies dependency manifests before source:
+The TypeScript Dockerfile copies dependency manifests before source:
 
 ```dockerfile
 COPY package.json package-lock.json ./
@@ -131,7 +165,7 @@ reuse the npm install layer.
 
 ## Ports
 
-The app listens on port `4000` inside the container:
+The TypeScript app listens on port `4000` inside the container:
 
 ```dockerfile
 EXPOSE 4000
@@ -153,19 +187,31 @@ host_port:container_port
 So `http://127.0.0.1:4000` on your machine reaches port `4000` in the
 container.
 
+The Go app uses the same pattern on port `4001`:
+
+```yaml
+ports:
+  - "4001:4001"
+```
+
 ## Environment variables
 
-The app reads:
+Both apps read:
 
 ```text
 PORT
 ```
 
-Compose sets:
+Compose sets `4000` for TypeScript and `4001` for Go:
 
 ```yaml
-environment:
-  PORT: "4000"
+ts-app:
+  environment:
+    PORT: "4000"
+
+go-app:
+  environment:
+    PORT: "4001"
 ```
 
 Keep configuration in environment variables when it changes per environment.
@@ -176,35 +222,30 @@ Keep code and images the same.
 Run the normal project lifecycle:
 
 ```bash
-make deps
-make build
-make test
-make coverage
-make check
+make ts-deps
+make ts-check
+make go-check
 ```
 
 Open a shell in the tool container:
 
 ```bash
-make shell
+make ts-shell
+make go-shell
 ```
 
-Build the app image:
+Run an app profile:
 
 ```bash
-make server-build
+make ts-server
+make go-server
 ```
 
-Run the app profile:
+Stop an app profile:
 
 ```bash
-make server
-```
-
-Stop services:
-
-```bash
-make server-down
+make ts-server-down
+make go-server-down
 ```
 
 ## What to remember
