@@ -16,13 +16,13 @@ func seedStore(extra ...authz.TupleKey) *authz.InMemoryTupleStore {
 }
 
 func TestGraphAuthorizer_TeamMemberCanEditDocument(t *testing.T) {
-	// Arrange: workspaceEditor is a member of platformTeam, which is an editor of
+	// Arrange: alice is a member of platformTeam, which is an editor of
 	// productWorkspace. roadmapDocument lives in productWorkspace. The graph
 	// traversal should resolve this chain and grant can_edit.
 	store := seedStore()
 	auth := authz.NewGraphAuthorizer(store)
 	req := authz.CheckRequest{
-		User:     fixtures.WorkspaceEditor,
+		User:     fixtures.Alice,
 		Relation: authz.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	}
@@ -42,7 +42,7 @@ func TestGraphAuthorizer_TeamMemberCanEditDocument(t *testing.T) {
 	}
 	// The trace must show the subject-set resolution step so readers can see how
 	// the chain team → workspace → document is walked.
-	wantStep := "Resolve subject set team:platformTeam#member: does it contain user:workspaceEditor?"
+	wantStep := "Resolve subject set team:platformTeam#member: does it contain user:alice?"
 	found := false
 	for _, line := range result.Trace {
 		if line == wantStep {
@@ -58,8 +58,8 @@ func TestGraphAuthorizer_TeamMemberCanEditDocument(t *testing.T) {
 	}
 }
 
-func TestGraphAuthorizer_WorkspaceViewerCanReadButNotEdit(t *testing.T) {
-	// Arrange: workspaceViewer has viewer on productWorkspace.
+func TestGraphAuthorizer_BobCanReadButNotEdit(t *testing.T) {
+	// Arrange: bob has viewer on productWorkspace.
 	// viewer → can_read should be allowed; viewer → can_edit should be denied.
 	store := seedStore()
 	auth := authz.NewGraphAuthorizer(store)
@@ -67,7 +67,7 @@ func TestGraphAuthorizer_WorkspaceViewerCanReadButNotEdit(t *testing.T) {
 
 	// Act: can_read
 	readResult, err := auth.Check(ctx, authz.CheckRequest{
-		User:     fixtures.WorkspaceViewer,
+		User:     fixtures.Bob,
 		Relation: authz.RelationDocumentCanRead,
 		Object:   fixtures.RoadmapDocument,
 	})
@@ -77,7 +77,7 @@ func TestGraphAuthorizer_WorkspaceViewerCanReadButNotEdit(t *testing.T) {
 		t.Fatalf("unexpected error on read check: %v", err)
 	}
 	if !readResult.Allowed {
-		t.Error("expected workspaceViewer can_read=true but got false")
+		t.Error("expected bob can_read=true but got false")
 		for _, line := range readResult.Trace {
 			t.Logf("  trace: %s", line)
 		}
@@ -85,7 +85,7 @@ func TestGraphAuthorizer_WorkspaceViewerCanReadButNotEdit(t *testing.T) {
 
 	// Act: can_edit
 	editResult, err := auth.Check(ctx, authz.CheckRequest{
-		User:     fixtures.WorkspaceViewer,
+		User:     fixtures.Bob,
 		Relation: authz.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	})
@@ -95,19 +95,19 @@ func TestGraphAuthorizer_WorkspaceViewerCanReadButNotEdit(t *testing.T) {
 		t.Fatalf("unexpected error on edit check: %v", err)
 	}
 	if editResult.Allowed {
-		t.Error("expected workspaceViewer can_edit=false but got true")
+		t.Error("expected bob can_edit=false but got true")
 		for _, line := range editResult.Trace {
 			t.Logf("  trace: %s", line)
 		}
 	}
 }
 
-func TestGraphAuthorizer_OutsideCollaboratorIsDenied(t *testing.T) {
-	// Arrange: outsideCollaborator has no tuples in the graph.
+func TestGraphAuthorizer_CaseyIsDenied(t *testing.T) {
+	// Arrange: casey has no tuples in the graph.
 	store := seedStore()
 	auth := authz.NewGraphAuthorizer(store)
 	req := authz.CheckRequest{
-		User:     fixtures.OutsideCollaborator,
+		User:     fixtures.Casey,
 		Relation: authz.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	}
@@ -120,7 +120,7 @@ func TestGraphAuthorizer_OutsideCollaboratorIsDenied(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result.Allowed {
-		t.Error("expected outsideCollaborator can_edit=false but got true")
+		t.Error("expected casey can_edit=false but got true")
 	}
 	if last := result.Trace[len(result.Trace)-1]; last != "Result: denied" {
 		t.Errorf("expected last trace line %q, got %q", "Result: denied", last)
@@ -133,11 +133,11 @@ func TestGraphAuthorizer_CycleDetectionDoesNotHang(t *testing.T) {
 	cyclicDoc := authz.Document("cyclicDoc")
 	store := authz.NewInMemoryTupleStore(
 		authz.Tuple(cyclicDoc, authz.RelationDocumentWorkspace, authz.Subject(cyclicDoc)),
-		authz.Tuple(cyclicDoc, authz.RelationDocumentViewer, authz.Subject(fixtures.WorkspaceViewer)),
+		authz.Tuple(cyclicDoc, authz.RelationDocumentViewer, authz.Subject(fixtures.Bob)),
 	)
 	auth := authz.NewGraphAuthorizer(store)
 	req := authz.CheckRequest{
-		User:     fixtures.WorkspaceViewer,
+		User:     fixtures.Bob,
 		Relation: authz.RelationDocumentCanRead,
 		Object:   cyclicDoc,
 	}
@@ -158,13 +158,13 @@ func TestGraphAuthorizer_CycleDetectionDoesNotHang(t *testing.T) {
 }
 
 func TestGraphAuthorizer_TeamAdminIsAlsoMember(t *testing.T) {
-	// Arrange: outsideCollaborator is an admin of platformTeam.
+	// Arrange: casey is an admin of platformTeam.
 	// The model rule "team.member includes team.admin" must make them a member too.
-	extra := authz.Tuple(fixtures.PlatformTeam, authz.RelationTeamAdmin, authz.Subject(fixtures.OutsideCollaborator))
+	extra := authz.Tuple(fixtures.PlatformTeam, authz.RelationTeamAdmin, authz.Subject(fixtures.Casey))
 	store := seedStore(extra)
 	auth := authz.NewGraphAuthorizer(store)
 	req := authz.CheckRequest{
-		User:     fixtures.OutsideCollaborator,
+		User:     fixtures.Casey,
 		Relation: authz.RelationTeamMember,
 		Object:   fixtures.PlatformTeam,
 	}
@@ -214,21 +214,21 @@ func TestGraphAuthorizer_PermissionMatrix(t *testing.T) {
 		relation authz.Relation
 		want     bool
 	}{
-		// workspaceEditor — inherits editor via team → workspace → document
-		{"editor_can_read", fixtures.WorkspaceEditor, authz.RelationDocumentCanRead, true},
-		{"editor_can_comment", fixtures.WorkspaceEditor, authz.RelationDocumentCanComment, true},
-		{"editor_can_edit", fixtures.WorkspaceEditor, authz.RelationDocumentCanEdit, true},
-		{"editor_cannot_delete", fixtures.WorkspaceEditor, authz.RelationDocumentCanDelete, false},
+		// alice — inherits editor via team → workspace → document
+		{"editor_can_read", fixtures.Alice, authz.RelationDocumentCanRead, true},
+		{"editor_can_comment", fixtures.Alice, authz.RelationDocumentCanComment, true},
+		{"editor_can_edit", fixtures.Alice, authz.RelationDocumentCanEdit, true},
+		{"editor_cannot_delete", fixtures.Alice, authz.RelationDocumentCanDelete, false},
 
-		// workspaceViewer — inherits viewer via workspace → document
-		{"viewer_can_read", fixtures.WorkspaceViewer, authz.RelationDocumentCanRead, true},
-		{"viewer_can_comment", fixtures.WorkspaceViewer, authz.RelationDocumentCanComment, true},
-		{"viewer_cannot_edit", fixtures.WorkspaceViewer, authz.RelationDocumentCanEdit, false},
-		{"viewer_cannot_delete", fixtures.WorkspaceViewer, authz.RelationDocumentCanDelete, false},
+		// bob — inherits viewer via workspace → document
+		{"viewer_can_read", fixtures.Bob, authz.RelationDocumentCanRead, true},
+		{"viewer_can_comment", fixtures.Bob, authz.RelationDocumentCanComment, true},
+		{"viewer_cannot_edit", fixtures.Bob, authz.RelationDocumentCanEdit, false},
+		{"viewer_cannot_delete", fixtures.Bob, authz.RelationDocumentCanDelete, false},
 
-		// outsideCollaborator — no tuples, no path
-		{"outside_cannot_read", fixtures.OutsideCollaborator, authz.RelationDocumentCanRead, false},
-		{"outside_cannot_edit", fixtures.OutsideCollaborator, authz.RelationDocumentCanEdit, false},
+		// casey — no tuples, no path
+		{"outside_cannot_read", fixtures.Casey, authz.RelationDocumentCanRead, false},
+		{"outside_cannot_edit", fixtures.Casey, authz.RelationDocumentCanEdit, false},
 	}
 
 	for _, row := range rows {
@@ -262,7 +262,7 @@ func BenchmarkGraphAuthorizer_Check(b *testing.B) {
 	store := seedStore()
 	auth := authz.NewGraphAuthorizer(store)
 	req := authz.CheckRequest{
-		User:     fixtures.WorkspaceEditor,
+		User:     fixtures.Alice,
 		Relation: authz.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	}

@@ -24,12 +24,25 @@ That is where relationship-based access control becomes useful.
 
 ## Scene
 
-You are building collaborative docs. A global `editor` role is too blunt. The workspace
-editor should edit the roadmap document because she is on the platform team. The
-workspace viewer should read it but fail to edit it. The outside collaborator should get
-nothing unless the graph gives her a path.
+You are building collaborative docs. A global `editor` role is too blunt.
+Alice should edit the roadmap document because she is on the platform team. Bob
+should read it but fail to edit it. Casey should get nothing unless the graph
+gives them a path.
 
 ReBAC is how you model that without creating a new role for every document.
+
+## Cast Of Characters
+
+The examples use human names for actors and product names for resources:
+
+| Person or object | ReBAC ID | What it means |
+|------------------|----------|---------------|
+| Alice | `user:alice` | platform team member; can read and edit the roadmap |
+| Bob | `user:bob` | direct workspace viewer; can read but cannot edit |
+| Casey | `user:casey` | outside collaborator; denied by default |
+| Platform Team | `team:platformTeam` | team whose members edit the product workspace |
+| Product Workspace | `workspace:productWorkspace` | workspace that owns the roadmap document |
+| Roadmap Document | `document:roadmapDocument` | document being protected |
 
 ## The ReBAC idea
 
@@ -38,7 +51,7 @@ ReBAC stores authorization as relationships between things.
 In this repo:
 
 ```text
-user:workspaceEditor is a member of team:platformTeam
+user:alice is a member of team:platformTeam
 team:platformTeam is an editor of workspace:productWorkspace
 document:roadmapDocument belongs to workspace:productWorkspace
 ```
@@ -46,7 +59,7 @@ document:roadmapDocument belongs to workspace:productWorkspace
 From those facts, the system can answer:
 
 ```text
-Can user:workspaceEditor edit document:roadmapDocument?
+Can user:alice edit document:roadmapDocument?
 ```
 
 Yes, because a path exists through the graph.
@@ -82,7 +95,7 @@ document editors can edit documents
 Then write the graph facts:
 
 ```text
-team:platformTeam member user:workspaceEditor
+team:platformTeam member user:alice
 workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
 ```
@@ -106,14 +119,14 @@ Beginners often mix these together. Keep them separate:
 
 | Layer | Question | Example |
 |-------|----------|---------|
-| Identity | Who is the user? | `user:workspaceEditor` |
+| Identity | Who is the user? | `user:alice` |
 | Relationship facts | What relationships exist now? | team member, workspace editor |
 | Authorization model | How do relationships imply permissions? | editor implies can_edit |
 
 The final check uses all three:
 
 ```text
-identity: user:workspaceEditor
+identity: user:alice
 facts:    user is member of platform team
 model:    team members can be workspace editors, workspace editors can edit docs
 result:   allowed
@@ -201,7 +214,7 @@ Here is the whole story, from request to decision:
 
 ```text
 PATCH /documents/roadmapDocument
-actorId=workspaceEditor
+actorId=alice
 body="new roadmap"
 ```
 
@@ -218,7 +231,7 @@ DocumentService.Update
   |
   v
 Authorizer.Check
-  asks: user:workspaceEditor can_edit document:roadmapDocument?
+  asks: user:alice can_edit document:roadmapDocument?
   |
   v
 Tuple store + model rules
@@ -231,12 +244,12 @@ allowed
 repository saves updated document
 ```
 
-If the actor is `workspaceViewer`, the first half is the same. Only the graph
+If the actor is Bob (`user:bob`), the first half is the same. Only the graph
 answer changes:
 
 ```text
-user:workspaceViewer can_read document:roadmapDocument  -> allowed
-user:workspaceViewer can_edit document:roadmapDocument  -> denied
+user:bob can_read document:roadmapDocument  -> allowed
+user:bob can_edit document:roadmapDocument  -> denied
 ```
 
 ## The graph
@@ -244,7 +257,7 @@ user:workspaceViewer can_edit document:roadmapDocument  -> denied
 Here is the tutorial graph:
 
 ```text
-user:workspaceEditor
+user:alice
    |
    | member
    v
@@ -262,7 +275,7 @@ document:roadmapDocument
 The important thing is not the drawing. The important thing is the path:
 
 ```text
-workspaceEditor -> platform team -> product workspace -> roadmap document -> can_edit
+alice -> platform team -> product workspace -> roadmap document -> can_edit
 ```
 
 That path is what authorization checks evaluate.
@@ -273,9 +286,9 @@ The same graph as tuples:
 ┌────────────────────────────┬───────────┬────────────────────────────┐
 │ object                     │ relation  │ user                       │
 ├────────────────────────────┼───────────┼────────────────────────────┤
-│ team:platformTeam          │ member    │ user:workspaceEditor        │
+│ team:platformTeam          │ member    │ user:alice                 │
 │ workspace:productWorkspace │ editor    │ team:platformTeam#member    │
-│ workspace:productWorkspace │ viewer    │ user:workspaceViewer        │
+│ workspace:productWorkspace │ viewer    │ user:bob                   │
 │ document:roadmapDocument   │ workspace │ workspace:productWorkspace  │
 └────────────────────────────┴───────────┴────────────────────────────┘
 ```
@@ -287,13 +300,13 @@ Tuples are the data. The model explains how to interpret them.
 Objects are typed ids:
 
 ```text
-user:workspaceEditor
+user:alice
 team:platformTeam
 workspace:productWorkspace
 document:roadmapDocument
 ```
 
-The type before the colon matters. `user:workspaceEditor` and `team:workspaceEditor` are different
+The type before the colon matters. `user:alice` and `team:alice` are different
 objects.
 
 This repo models object ids in TypeScript as branded strings:
@@ -322,14 +335,14 @@ Relations are named edges.
 Examples:
 
 ```text
-team:platformTeam member user:workspaceEditor
+team:platformTeam member user:alice
 workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
 ```
 
 Read each one aloud:
 
-- The workspace editor is a member of the platform team.
+- Alice is a member of the platform team.
 - Members of the platform team are editors of the product workspace.
 - The roadmap document belongs to the product workspace.
 
@@ -374,7 +387,7 @@ You model the relationship once.
 This is a direct user:
 
 ```text
-user:workspaceEditor
+user:alice
 ```
 
 This is a subject set:
@@ -397,14 +410,14 @@ means:
 anyone who is a member of team:platformTeam is an editor of workspace:productWorkspace
 ```
 
-Subject sets are why team membership changes are powerful. If the workspace editor leaves the
-team, remove one tuple:
+Subject sets are why team membership changes are powerful. If Alice leaves the
+platform team, remove one tuple:
 
 ```text
-team:platformTeam member user:workspaceEditor
+team:platformTeam member user:alice
 ```
 
-The workspace editor immediately loses inherited workspace and document access.
+Alice immediately loses inherited workspace and document access.
 
 ## Permissions vs relationships
 
@@ -447,7 +460,7 @@ Check(user, relation, object)
 Example:
 
 ```text
-Check(user:workspaceEditor, can_edit, document:roadmapDocument)
+Check(user:alice, can_edit, document:roadmapDocument)
 ```
 
 The graph evaluator tries to prove the relation.
@@ -455,11 +468,11 @@ The graph evaluator tries to prove the relation.
 In this repo, `GraphAuthorizer` produces a trace:
 
 ```text
-Check whether user:workspaceEditor has can_edit on document:roadmapDocument
+Check whether user:alice has can_edit on document:roadmapDocument
 document.can_edit includes document.editor
 document.editor can inherit workspace.editor from workspace:productWorkspace
-Resolve subject set team:platformTeam#member: does it contain user:workspaceEditor?
-Found direct tuple (team:platformTeam, member, user:workspaceEditor)
+Resolve subject set team:platformTeam#member: does it contain user:alice?
+Found direct tuple (team:platformTeam, member, user:alice)
 Result: allowed
 ```
 
@@ -481,27 +494,27 @@ DocumentService        Authorizer          Tuple graph
       │                    │◄───────────────────┤ team:platformTeam#member
       │                    │ resolve member     │
       │                    ├───────────────────►│
-      │                    │◄───────────────────┤ user:workspaceEditor ✓
+      │                    │◄───────────────────┤ user:alice ✓
       │ allowed            │                    │
       │◄───────────────────┤                    │
 ```
 
 ## Denial is absence of a path
 
-The workspace viewer has viewer access:
+Bob has viewer access:
 
 ```text
-workspace:productWorkspace viewer user:workspaceViewer
+workspace:productWorkspace viewer user:bob
 ```
 
-So the workspace viewer can read and comment. But the workspace viewer cannot edit because
-there is no path from `user:workspaceViewer` to `document:roadmapDocument#editor`.
+So Bob can read and comment. But Bob cannot edit because
+there is no path from `user:bob` to `document:roadmapDocument#editor`.
 
 That "near miss" is important:
 
 ```text
-The workspace viewer can read.
-The workspace viewer cannot edit.
+Bob can read.
+Bob cannot edit.
 ```
 
 Good authorization tests should include near misses. They prove your model is
@@ -523,7 +536,7 @@ You can model that in layers.
 Layer 1: user access to the object.
 
 ```text
-Check(user:workspaceEditor, can_edit, document:roadmapDocument)
+Check(user:alice, can_edit, document:roadmapDocument)
 ```
 
 Layer 2: agent access to the tool.
@@ -535,7 +548,7 @@ Check(agent:docAssistant, can_use, tool:updateDocument)
 Layer 3: optional delegation from user to agent.
 
 ```text
-Check(agent:docAssistant, delegate, user:workspaceEditor)
+Check(agent:docAssistant, delegate, user:alice)
 ```
 
 A combined decision might look like:
@@ -550,9 +563,9 @@ allow tool call if:
 The graph could contain facts like:
 
 ```text
-agent:docAssistant delegate user:workspaceEditor
+agent:docAssistant delegate user:alice
 tool:updateDocument can_use agent:docAssistant
-team:platformTeam member user:workspaceEditor
+team:platformTeam member user:alice
 workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
 ```
@@ -596,11 +609,11 @@ make ts-server   # start the server
 # or inside the container: npm run dev
 ```
 
-Then change `typescript/src/testing/fixtures.ts` so the workspace viewer is an
-editor instead of a viewer:
+Then change `typescript/src/testing/fixtures.ts` so Bob is an editor instead of
+a viewer:
 
 ```ts
-tuple(productWorkspace, "editor", workspaceViewer)
+tuple(productWorkspace, "editor", bob)
 ```
 
 **Go:** run the graph test with verbose output and read every trace line:

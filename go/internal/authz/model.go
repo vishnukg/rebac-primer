@@ -34,11 +34,11 @@ type document
     define can_delete: owner
 `
 
-// RelationshipGraphExample illustrates the tuple chain that grants
-// workspaceEditor can_edit access to roadmapDocument.
+// RelationshipGraphExample illustrates the tuple chain that grants Alice
+// can_edit access to roadmapDocument.
 var RelationshipGraphExample = []string{
-	"team:platformTeam#member contains user:workspaceEditor",
+	"team:platformTeam#member contains user:alice",
 	"workspace:productWorkspace#editor contains team:platformTeam#member",
 	"document:roadmapDocument#workspace points at workspace:productWorkspace",
-	"therefore user:workspaceEditor can_edit document:roadmapDocument",
+	"therefore user:alice can_edit document:roadmapDocument",
 }

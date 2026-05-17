@@ -16,16 +16,16 @@ real ReBAC systems almost always start with an authenticated user.
 
 ## Scene
 
-The workspace editor opens the document app. Before the app can ask:
+Alice opens the document app. Before the app can ask:
 
 ```text
-Can the workspace editor edit document:roadmapDocument?
+Can Alice edit document:roadmapDocument?
 ```
 
 it must first know:
 
 ```text
-Is this request really from the workspace editor?
+Is this request really from Alice?
 ```
 
 That is authentication.
@@ -45,13 +45,13 @@ request with token/session
 verify token/session
         |
         v
-"this is user:workspaceEditor"
+"this is user:alice"
 ```
 
 ReBAC starts after that:
 
 ```text
-"this is user:workspaceEditor"
+"this is user:alice"
         |
         v
 can this user edit document:roadmapDocument?
@@ -115,7 +115,7 @@ Practical sequence:
 
 ```text
 1. Verify login/session/token.
-2. Map identity to an app user id, such as user:workspaceEditor.
+2. Map identity to an app user id, such as user:alice.
 3. Run authorization for the requested action and object.
 4. Execute only if authorization allows it.
 ```
@@ -201,7 +201,7 @@ The app eventually gets tokens that prove the login happened.
 OAuth uses a few standard roles:
 
 ```text
-Resource Owner       the user, such as the workspace editor
+Resource Owner       the user, such as Alice
 Client               your app
 Authorization Server the identity provider issuing tokens
 Resource Server      API protected by tokens
@@ -210,7 +210,7 @@ Resource Server      API protected by tokens
 In a small app, "client" and "resource server" may both be your backend.
 
 ```text
-The workspace editor -> resource owner
+Alice             -> resource owner
 TS ReBAC app      -> client and resource server
 GitHub/Auth0/etc. -> authorization server
 ```
@@ -382,7 +382,7 @@ You usually need both:
 ```text
 Access token has documents.write scope
 AND
-OpenFGA says user:workspaceEditor can_edit document:roadmapDocument
+OpenFGA says user:alice can_edit document:roadmapDocument
 ```
 
 Diagram:
@@ -517,7 +517,7 @@ Authorization uses that user id in a check.
 In this repo's tutorial data:
 
 ```text
-OAuth subject -> user:workspaceEditor
+OAuth subject -> user:alice
 ```
 
 In a real app:
@@ -595,8 +595,8 @@ CLI calls API
 API validates token and performs ReBAC check
 ```
 
-For this tutorial, the CLI is intentionally simpler and lets you type `workspaceEditor`,
-`workspaceViewer`, or `outsideCollaborator`. That keeps the first lesson focused on authorization.
+For this tutorial, the CLI is intentionally simpler and lets you type `alice`,
+`bob`, or `casey`. That keeps the first lesson focused on authorization.
 
 ## Where OAuth should live in the architecture
 
@@ -633,13 +633,13 @@ Keep authentication, authorization, and business logic separate.
 OAuth can tell the app:
 
 ```text
-this request is from user:workspaceEditor
+this request is from user:alice
 ```
 
 OAuth does not naturally answer:
 
 ```text
-can user:workspaceEditor edit document:roadmapDocument because she is in team:platformTeam?
+can user:alice edit document:roadmapDocument because she is in team:platformTeam?
 ```
 
 That second question is the ReBAC question.
@@ -667,8 +667,8 @@ You might be tempted to put every team and permission in a JWT.
 That becomes stale quickly:
 
 ```text
-The workspace editor leaves team:platformTeam
-The workspace editor still has an old token saying she is in team:platformTeam
+Alice leaves team:platformTeam
+Alice still has an old token saying she is in team:platformTeam
 ```
 
 Prefer stable identity in the token and fresh authorization checks for important
@@ -687,7 +687,7 @@ user:github:12345
 over:
 
 ```text
-user:workspaceEditor@example.com
+user:alice@example.com
 ```
 
 ### Mistake 4: Treating OAuth scopes as object permissions

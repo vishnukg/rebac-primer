@@ -49,7 +49,7 @@ describe("OpenFGA model", () => {
 
     // Act
     const hasWorkspaceEditorEditPath = example.includes(
-      "therefore user:workspaceEditor can_edit document:roadmapDocument"
+      "therefore user:alice can_edit document:roadmapDocument"
     );
 
     // Assert

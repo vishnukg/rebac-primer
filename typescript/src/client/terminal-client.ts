@@ -16,9 +16,9 @@ export class TerminalClient {
   async run(): Promise<void> {
     this.config.write("TS ReBAC client");
     this.config.write("Enter an actor id when prompted. Available actors:");
-    this.config.write("  workspaceEditor      — can read and edit (workspace editor via team membership)");
-    this.config.write("  workspaceViewer      — can read only");
-    this.config.write("  outsideCollaborator  — denied (no path through the graph)");
+    this.config.write("  alice  — can read and edit (Platform Team member)");
+    this.config.write("  bob    — can read only (direct workspace viewer)");
+    this.config.write("  casey  — denied (outside collaborator; no graph path)");
 
     const healthy = await this.config.client.health();
     if (!healthy) {

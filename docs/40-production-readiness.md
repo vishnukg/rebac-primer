@@ -294,7 +294,7 @@ OpenFGA exposes a `consistency` parameter:
 
 ```ts
 await fgaClient.check({
-  user: "user:workspaceEditor",
+  user: "user:alice",
   relation: "can_read",
   object: "document:roadmapDocument",
   consistency: ConsistencyPreference.HigherConsistency
@@ -317,7 +317,7 @@ which documents a user can access:
 
 ```ts
 const response = await fgaClient.listObjects({
-  user: "user:workspaceEditor",
+  user: "user:alice",
   relation: "can_read",
   type: "document"
 });
@@ -346,7 +346,7 @@ Use this when a single UI action needs multiple permission answers at once.
 The tutorial identifies actors by a string passed in a request field:
 
 ```json
-{ "actorId": "workspaceEditor" }
+{ "actorId": "alice" }
 ```
 
 In production, the actor identity comes from a verified token, not a request

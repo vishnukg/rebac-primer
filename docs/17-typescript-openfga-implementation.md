@@ -97,7 +97,7 @@ This is the useful part:
 
 ```ts
 const result = await authorizer.check({
-  user: workspaceEditor,
+  user: alice,
   relation: "can_edit",
   object: roadmapDocument
 });

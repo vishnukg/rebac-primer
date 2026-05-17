@@ -54,7 +54,7 @@ func TestHandler_CreateDocument_Returns201ForEditor(t *testing.T) {
 		"title":       "Test Document",
 		"body":        "Hello, world",
 		"workspaceId": "productWorkspace",
-		"actorId":     "workspaceEditor",
+		"actorId":     "alice",
 	}
 	body, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(body))
@@ -83,7 +83,7 @@ func TestHandler_CreateDocument_Returns400WhenFieldsMissing(t *testing.T) {
 	payload := map[string]string{
 		"id":          "oops",
 		"workspaceId": "productWorkspace",
-		"actorId":     "workspaceEditor",
+		"actorId":     "alice",
 	}
 	body, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(body))
@@ -100,9 +100,9 @@ func TestHandler_CreateDocument_Returns400WhenFieldsMissing(t *testing.T) {
 }
 
 func TestHandler_GetDocument_Returns200ForViewer(t *testing.T) {
-	// Arrange: roadmapDocument is pre-seeded; workspaceViewer has can_read via the graph.
+	// Arrange: roadmapDocument is pre-seeded; bob has can_read via the graph.
 	handler := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument?actorId=workspaceViewer", nil)
+	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument?actorId=bob", nil)
 	rec := httptest.NewRecorder()
 
 	// Act
@@ -126,9 +126,9 @@ func TestHandler_GetDocument_Returns200ForViewer(t *testing.T) {
 }
 
 func TestHandler_GetDocument_Returns403ForOutsider(t *testing.T) {
-	// Arrange: outsideCollaborator has no tuples — every check must deny.
+	// Arrange: casey has no tuples — every check must deny.
 	handler := newTestHandler(t)
-	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument?actorId=outsideCollaborator", nil)
+	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument?actorId=casey", nil)
 	rec := httptest.NewRecorder()
 
 	// Act
@@ -156,11 +156,11 @@ func TestHandler_GetDocument_Returns400WhenActorMissing(t *testing.T) {
 }
 
 func TestHandler_PatchDocument_Returns403ForViewer(t *testing.T) {
-	// Arrange: workspaceViewer has viewer, not editor — PATCH must be denied.
+	// Arrange: bob has viewer, not editor — PATCH must be denied.
 	handler := newTestHandler(t)
 	payload := map[string]string{
 		"body":    "should not save",
-		"actorId": "workspaceViewer",
+		"actorId": "bob",
 	}
 	body, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader(body))
@@ -181,7 +181,7 @@ func TestHandler_PatchDocument_Returns200ForEditor(t *testing.T) {
 	handler := newTestHandler(t)
 	payload := map[string]string{
 		"body":    "updated by editor",
-		"actorId": "workspaceEditor",
+		"actorId": "alice",
 	}
 	body, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader(body))

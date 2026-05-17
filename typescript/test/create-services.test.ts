@@ -8,9 +8,9 @@ describe("createServices", () => {
 
     // Act
     const services = await createServices();
-    const document = await services.documents.read(roadmapId, "user:workspaceViewer");
+    const document = await services.documents.read(roadmapId, "user:bob");
     const decision = await services.authorizer.check({
-      user: "user:workspaceEditor",
+      user: "user:alice",
       relation: "can_edit",
       object: "document:roadmapDocument"
     });

@@ -67,9 +67,9 @@ The client is a simple interactive terminal UI. It lets you:
 Actors:
 
 ```text
-workspaceEditor       -> can edit through team membership
-workspaceViewer       -> can read as workspace viewer
-outsideCollaborator   -> denied by default
+alice -> Alice, can edit through Platform Team membership
+bob   -> Bob, can read as a direct workspace viewer
+casey -> Casey, denied by default
 ```
 
 ## API routes
@@ -77,15 +77,15 @@ outsideCollaborator   -> denied by default
 ```text
 GET /health
 POST /documents
-GET /documents/:id?actorId=workspaceEditor
+GET /documents/:id?actorId=alice
 PATCH /documents/:id
 ```
 
 Example read:
 
 ```bash
-curl "http://127.0.0.1:4000/documents/roadmapDocument?actorId=workspaceViewer"
-curl "http://127.0.0.1:4001/documents/roadmapDocument?actorId=workspaceViewer"
+curl "http://127.0.0.1:4000/documents/roadmapDocument?actorId=bob"
+curl "http://127.0.0.1:4001/documents/roadmapDocument?actorId=bob"
 ```
 
 Example update:
@@ -93,23 +93,23 @@ Example update:
 ```bash
 curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
   -H "content-type: application/json" \
-  -d '{"actorId":"workspaceEditor","body":"Updated from curl"}'
+  -d '{"actorId":"alice","body":"Updated from curl"}'
 
 curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
   -H "content-type: application/json" \
-  -d '{"actorId":"workspaceEditor","body":"Updated from curl"}'
+  -d '{"actorId":"alice","body":"Updated from curl"}'
 ```
 
-The workspace viewer can read but cannot update:
+Bob can read but cannot update:
 
 ```bash
 curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
   -H "content-type: application/json" \
-  -d '{"actorId":"workspaceViewer","body":"Should fail"}'
+  -d '{"actorId":"bob","body":"Should fail"}'
 
 curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
   -H "content-type: application/json" \
-  -d '{"actorId":"workspaceViewer","body":"Should fail"}'
+  -d '{"actorId":"bob","body":"Should fail"}'
 ```
 
 ## Where ReBAC is enforced
@@ -132,7 +132,7 @@ err := s.requireAllowed(ctx, input.Actor, authz.RelationDocumentCanEdit, authz.D
 
 That is the important boundary.
 
-The client does not decide whether the workspace viewer can edit. The server
+The client does not decide whether Bob can edit. The server
 decides. The server uses the domain service. The domain service uses the
 authorizer.
 
@@ -224,9 +224,9 @@ make ts-client
 Try the client as three actors:
 
 ```text
-workspaceEditor
-workspaceViewer
-outsideCollaborator
+alice
+bob
+casey
 ```
 
 If you can predict who can read and who can edit before pressing Enter, the

@@ -23,9 +23,9 @@ Viewers can read.
 Then customers ask:
 
 ```text
-Can the workspace viewer edit only documents in workspace:productWorkspace?
-Can the workspace editor edit documents because she is in team:platformTeam?
-Can the outside collaborator read one shared document but nothing else?
+Can Bob edit only documents in workspace:productWorkspace?
+Can Alice edit documents because she is in team:platformTeam?
+Can Casey read one shared document but nothing else?
 ```
 
 Now global roles are not enough.
@@ -41,7 +41,7 @@ subject + action + object -> allow or deny
 For this repo:
 
 ```text
-subject = user:workspaceEditor
+subject = user:alice
 action  = can_edit
 object  = document:roadmapDocument
 ```
@@ -49,7 +49,7 @@ object  = document:roadmapDocument
 The check becomes:
 
 ```text
-Can user:workspaceEditor can_edit document:roadmapDocument?
+Can user:alice edit document:roadmapDocument?
 ```
 
 That sentence sounds strange at first because `can_edit` is written as a
@@ -72,7 +72,7 @@ HTTP request
   |
   v
 authenticate
-  "this request is from user:workspaceEditor"
+  "this request is from user:alice"
   |
   v
 load/parse target
@@ -80,7 +80,7 @@ load/parse target
   |
   v
 authorize
-  "can user:workspaceEditor can_edit document:roadmapDocument?"
+  "can user:alice edit document:roadmapDocument?"
   |
   +-- denied  -> return 403
   |
@@ -105,11 +105,11 @@ The names are historical and slightly confusing. For learning:
 
 Before thinking about graphs, write the desired outcomes:
 
-| Actor | Read roadmap? | Edit roadmap? | Why |
-|-------|---------------|---------------|-----|
-| workspaceEditor | yes | yes | team membership grants workspace editor |
-| workspaceViewer | yes | no | viewer grants read, not edit |
-| outsideCollaborator | no | no | no relationship path |
+| Actor | ReBAC subject | Read roadmap? | Edit roadmap? | Why |
+|-------|---------------|---------------|---------------|-----|
+| Alice | `user:alice` | yes | yes | team membership grants workspace editor |
+| Bob | `user:bob` | yes | no | viewer grants read, not edit |
+| Casey | `user:casey` | no | no | no relationship path |
 
 This table is a specification. The code and model should make the table true.
 
@@ -135,12 +135,12 @@ Architecture:
        │
        ▼
 ┌──────────────┐
-│ Authenticate │ "this is user:workspaceEditor"
+│ Authenticate │ "this is user:alice"
 └──────┬───────┘
        │
        ▼
 ┌──────────────┐
-│ Authorize    │ "can user:workspaceEditor edit document:roadmapDocument?"
+│ Authorize    │ "can user:alice edit document:roadmapDocument?"
 └──────┬───────┘
        │
        ▼
@@ -201,14 +201,14 @@ compare most often.
 RBAC grants permissions through roles.
 
 ```text
-user:workspaceEditor -> role:editor
+user:alice -> role:editor
 role:editor -> permission:edit_document
 ```
 
 Diagram:
 
 ```text
-user:workspaceEditor
+user:alice
     │
     ▼
 role:editor
@@ -285,7 +285,7 @@ inside policy expressions.
 ReBAC decides from relationships.
 
 ```text
-user:workspaceEditor member team:platformTeam
+user:alice member team:platformTeam
 team:platformTeam editor workspace:productWorkspace
 document:roadmapDocument workspace workspace:productWorkspace
 ```
@@ -293,7 +293,7 @@ document:roadmapDocument workspace workspace:productWorkspace
 Diagram:
 
 ```text
-user:workspaceEditor -> team:platformTeam -> workspace:productWorkspace -> document:roadmapDocument
+user:alice -> team:platformTeam -> workspace:productWorkspace -> document:roadmapDocument
 ```
 
 ReBAC is strong when your product is naturally relational:
@@ -346,7 +346,7 @@ remember to update role when team changes
 ReBAC version:
 
 ```text
-team:platformTeam member user:workspaceEditor
+team:platformTeam member user:alice
 workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
 ```
@@ -429,11 +429,11 @@ human user
   |
   v
 app session
-  identifies user:workspaceEditor
+  identifies user:alice
   |
   v
 agent run
-  acts on behalf of user:workspaceEditor
+  acts on behalf of user:alice
   |
   v
 tool call
@@ -451,7 +451,7 @@ Diagram:
 ┌──────────────┐
 │ Authn layer  │ validates identity
 └──────┬───────┘
-       │ user:workspaceEditor
+       │ user:alice
        ▼
 ┌──────────────┐
 │ Agent runtime│ plans tool calls
@@ -472,7 +472,7 @@ Two identities may matter:
 
 | Identity | Example | Why it matters |
 |----------|---------|----------------|
-| User identity | `user:workspaceEditor` | Whose data and permissions are being used |
+| User identity | `user:alice` | Whose data and permissions are being used |
 | Agent identity | `agent:docAssistant` | Which agent/tooling is allowed to operate |
 
 For many apps, the agent should not get broad new powers. It should inherit a
@@ -497,13 +497,13 @@ Example:
 User asks: "Update the roadmap with the new launch date."
 
 Authn:
-  request belongs to user:workspaceEditor
+  request belongs to user:alice
 
 Agent planning:
   agent wants to call update_document on document:roadmapDocument
 
 Authz:
-  Check(user:workspaceEditor, can_edit, document:roadmapDocument)
+  Check(user:alice, can_edit, document:roadmapDocument)
   Check(agent:docAssistant, can_use, tool:update_document)
 
 Only if both are allowed:
@@ -513,7 +513,7 @@ Only if both are allowed:
 ReBAC can model these relationships too:
 
 ```text
-user:workspaceEditor member team:platformTeam
+user:alice member team:platformTeam
 workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
 agent:docAssistant can_use tool:update_document
@@ -567,9 +567,9 @@ This repo has tests for those patterns.
 Write the authorization question for these actions:
 
 ```text
-The workspace editor reads roadmap document.
-The workspace viewer edits roadmap document.
-The outside collaborator creates a document in workspace:productWorkspace.
+Alice reads roadmap document.
+Bob edits roadmap document.
+Casey creates a document in workspace:productWorkspace.
 ```
 
 Format:
@@ -582,8 +582,8 @@ Check(<user>, <relation>, <object>)
 Example:
 
 ```text
-Can user:workspaceEditor edit document:roadmapDocument?
-Check(user:workspaceEditor, can_edit, document:roadmapDocument)
+Can user:alice edit document:roadmapDocument?
+Check(user:alice, can_edit, document:roadmapDocument)
 ```
 
 ## Checkpoint

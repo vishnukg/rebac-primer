@@ -9,13 +9,13 @@ import (
 )
 
 func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
-	// Arrange: workspaceEditor can edit (and therefore read and comment) the
+	// Arrange: alice can edit (and therefore read and comment) the
 	// roadmap document. Only can_delete should be denied because editor ≠ owner.
 	store := seedStore()
 	auth := authz.NewGraphAuthorizer(store)
 
 	// Act
-	summary, err := authz.AllPermissions(context.Background(), auth, fixtures.WorkspaceEditor, fixtures.RoadmapDocument)
+	summary, err := authz.AllPermissions(context.Background(), auth, fixtures.Alice, fixtures.RoadmapDocument)
 
 	// Assert
 	if err != nil {
@@ -35,12 +35,12 @@ func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
 }
 
 func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
-	// Arrange: workspaceViewer has viewer access only.
+	// Arrange: bob has viewer access only.
 	store := seedStore()
 	auth := authz.NewGraphAuthorizer(store)
 
 	// Act
-	summary, err := authz.AllPermissions(context.Background(), auth, fixtures.WorkspaceViewer, fixtures.RoadmapDocument)
+	summary, err := authz.AllPermissions(context.Background(), auth, fixtures.Bob, fixtures.RoadmapDocument)
 
 	// Assert
 	if err != nil {
@@ -67,7 +67,7 @@ func TestAllPermissions_NonDocumentObjectReturnsEmptySummary(t *testing.T) {
 	auth := authz.NewGraphAuthorizer(store)
 
 	// Act
-	summary, err := authz.AllPermissions(context.Background(), auth, fixtures.WorkspaceEditor, fixtures.ProductWorkspace)
+	summary, err := authz.AllPermissions(context.Background(), auth, fixtures.Alice, fixtures.ProductWorkspace)
 
 	// Assert
 	if err != nil {
@@ -84,9 +84,9 @@ func TestBulkCheck_ReturnsResultsInInputOrder(t *testing.T) {
 	store := seedStore()
 	auth := authz.NewGraphAuthorizer(store)
 	reqs := []authz.CheckRequest{
-		{User: fixtures.WorkspaceEditor, Relation: authz.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
-		{User: fixtures.WorkspaceViewer, Relation: authz.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
-		{User: fixtures.WorkspaceViewer, Relation: authz.RelationDocumentCanRead, Object: fixtures.RoadmapDocument},
+		{User: fixtures.Alice, Relation: authz.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
+		{User: fixtures.Bob, Relation: authz.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
+		{User: fixtures.Bob, Relation: authz.RelationDocumentCanRead, Object: fixtures.RoadmapDocument},
 	}
 
 	// Act

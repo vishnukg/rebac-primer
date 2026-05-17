@@ -178,7 +178,7 @@ the smaller `Authorizer` interface to the rest of the app.
 These are plain functions:
 
 ```ts
-user("workspaceEditor");
+user("alice");
 team("platformTeam");
 workspace("productWorkspace");
 document("roadmapDocument");
@@ -253,7 +253,7 @@ This repo leans object-oriented for application structure:
 
 It uses functions and type aliases for value-level vocabulary:
 
-- `user("workspaceEditor")`
+- `user("alice")`
 - `workspace("productWorkspace")`
 - `document("roadmapDocument")`
 - `tuple(...)`

@@ -3,7 +3,7 @@ import { InMemoryTupleStore, type TupleStore } from "../authz/memory-store.js";
 import type { Authorizer } from "../authz/types.js";
 import { InMemoryDocumentRepository } from "../domain/repository.js";
 import { DocumentService, type DocumentOperations } from "../domain/service.js";
-import { productWorkspace, seedRelationshipTuples, workspaceEditor } from "../testing/fixtures.js";
+import { productWorkspace, seedRelationshipTuples, alice } from "../testing/fixtures.js";
 
 export type AppServices = Readonly<{
   documents: DocumentOperations;
@@ -22,7 +22,7 @@ export async function createServices(): Promise<AppServices> {
     title: "Roadmap",
     body: "Initial roadmap document",
     workspace: productWorkspace,
-    actor: workspaceEditor
+    actor: alice
   });
 
   return { documents, authorizer, tupleStore };

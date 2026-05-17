@@ -207,7 +207,7 @@ team:platformTeam#member
       │
       │ member
       ▼
-user:workspaceEditor
+user:alice
 ```
 
 The `from` keyword is what lets document access flow from the parent workspace.
@@ -225,14 +225,14 @@ editor -> can_edit
 owner  -> can_delete
 ```
 
-So if the workspace editor is a workspace editor, and the roadmap document belongs to that
+So if Alice is a workspace editor, and the roadmap document belongs to that
 workspace:
 
 ```text
-The workspace editor can edit the roadmap document.
-The workspace editor can read the roadmap document.
-The workspace editor can comment on the roadmap document.
-The workspace editor cannot delete the roadmap document unless she is also an owner.
+Alice can edit the roadmap document.
+Alice can read the roadmap document.
+Alice can comment on the roadmap document.
+Alice cannot delete the roadmap document unless she is also an owner.
 ```
 
 This is the kind of rule you want in the model, not scattered across handlers.
@@ -275,10 +275,10 @@ Do not start by typing DSL. Start with the rule.
 
 ## Tuple examples
 
-These tuples are enough to grant the workspace editor edit access:
+These tuples are enough to grant Alice edit access:
 
 ```text
-(team:platformTeam, member, user:workspaceEditor)
+(team:platformTeam, member, user:alice)
 (workspace:productWorkspace, editor, team:platformTeam#member)
 (document:roadmapDocument, workspace, workspace:productWorkspace)
 ```
@@ -286,7 +286,7 @@ These tuples are enough to grant the workspace editor edit access:
 No tuple says:
 
 ```text
-(document:roadmapDocument, editor, user:workspaceEditor)
+(document:roadmapDocument, editor, user:alice)
 ```
 
 That is the point. The access is inherited.

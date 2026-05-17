@@ -8,7 +8,7 @@ describe("TerminalClient", () => {
     // Arrange
     const prompts: string[] = [];
     const writes: string[] = [];
-    const answers = ["1", "workspaceViewer", "3"];
+    const answers = ["1", "bob", "3"];
     const terminal: QuestionTerminal = {
       question: async (prompt) => {
         prompts.push(prompt);
@@ -24,13 +24,13 @@ describe("TerminalClient", () => {
       title: "Roadmap",
       body: "Read the tutorial",
       workspace: "workspace:productWorkspace",
-      updatedBy: "user:workspaceEditor"
+      updatedBy: "user:alice"
     };
     const client: DocumentsClient = {
       health: async () => true,
       readDocument: async (id, actorId) => {
         expect(id).toBe("roadmapDocument");
-        expect(actorId).toBe("workspaceViewer");
+        expect(actorId).toBe("bob");
         return document;
       },
       updateDocument: async () => {
@@ -50,14 +50,14 @@ describe("TerminalClient", () => {
     expect(prompts).toEqual(["Choose: ", "Actor id: ", "Choose: "]);
     expect(writes).toContain("\nRoadmap");
     expect(writes).toContain("Read the tutorial");
-    expect(writes).toContain("updated by user:workspaceEditor");
+    expect(writes).toContain("updated by user:alice");
   });
 
   it("given_update_choice_when_terminal_client_runs_then_document_is_updated_and_printed", async () => {
     // Arrange
     const prompts: string[] = [];
     const writes: string[] = [];
-    const answers = ["2", "workspaceEditor", "Ship the primer", "3"];
+    const answers = ["2", "alice", "Ship the primer", "3"];
     const terminal: QuestionTerminal = {
       question: async (prompt) => {
         prompts.push(prompt);
@@ -73,7 +73,7 @@ describe("TerminalClient", () => {
       title: "Roadmap",
       body: "Ship the primer",
       workspace: "workspace:productWorkspace",
-      updatedBy: "user:workspaceEditor"
+      updatedBy: "user:alice"
     };
     const client: DocumentsClient = {
       health: async () => true,
@@ -82,7 +82,7 @@ describe("TerminalClient", () => {
       },
       updateDocument: async (id, actorId, body) => {
         expect(id).toBe("roadmapDocument");
-        expect(actorId).toBe("workspaceEditor");
+        expect(actorId).toBe("alice");
         expect(body).toBe("Ship the primer");
         return document;
       }
@@ -98,13 +98,13 @@ describe("TerminalClient", () => {
 
     // Assert
     expect(prompts).toEqual(["Choose: ", "Actor id: ", "New body: ", "Choose: "]);
-    expect(writes).toContain("Updated roadmapDocument; updated by user:workspaceEditor");
+    expect(writes).toContain("Updated roadmapDocument; updated by user:alice");
   });
 
   it("given_denied_read_when_terminal_client_runs_then_denial_message_is_written_and_loop_continues", async () => {
     // Arrange
     const writes: string[] = [];
-    const answers = ["1", "outsideCollaborator", "3"];
+    const answers = ["1", "casey", "3"];
     const terminal: QuestionTerminal = {
       question: async () => {
         const answer = answers.shift();
@@ -115,7 +115,7 @@ describe("TerminalClient", () => {
     const client: DocumentsClient = {
       health: async () => true,
       readDocument: async () => {
-        throw new Error("user:outsideCollaborator cannot read document:roadmapDocument");
+        throw new Error("user:casey cannot read document:roadmapDocument");
       },
       updateDocument: async () => {
         throw new Error("Update was not expected");
@@ -131,7 +131,7 @@ describe("TerminalClient", () => {
     await terminalClient.run();
 
     // Assert
-    expect(writes).toContain("Denied: user:outsideCollaborator cannot read document:roadmapDocument");
+    expect(writes).toContain("Denied: user:casey cannot read document:roadmapDocument");
   });
 
   it("given_unhealthy_server_when_terminal_client_runs_then_health_check_error_is_thrown", async () => {

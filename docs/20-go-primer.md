@@ -590,12 +590,12 @@ marking each section:
 ```go
 // go/internal/authz/graph_test.go
 func TestGraphAuthorizer_TeamMemberCanEditDocument(t *testing.T) {
-    // Arrange: workspaceEditor is a member of platformTeam, which is an editor of
+    // Arrange: alice is a member of platformTeam, which is an editor of
     // productWorkspace. roadmapDocument lives in productWorkspace.
     store := seedStore()
     auth := authz.NewGraphAuthorizer(store)
     req := authz.CheckRequest{
-        User:     fixtures.WorkspaceEditor,
+        User:     fixtures.Alice,
         Relation: authz.RelationDocumentCanEdit,
         Object:   fixtures.RoadmapDocument,
     }
@@ -678,7 +678,7 @@ Open `go/internal/authz/graph_test.go`.
    `GraphAuthorizer` builds.
 
 2. Add a new test: `TestGraphAuthorizer_WorkspaceOwnerCanDelete`. Make
-   `outsideCollaborator` an `owner` of `productWorkspace` by adding an extra
+   Casey (`user:casey`) an `owner` of `productWorkspace` by adding an extra
    tuple, then verify they can `can_delete` `roadmapDocument`. Use the AAA
    structure with `// Arrange`, `// Act`, `// Assert` comments.
 

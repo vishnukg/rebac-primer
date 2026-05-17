@@ -47,9 +47,9 @@ same authorization questions against the same model.
 Here is the story you will keep coming back to:
 
 ```text
-The workspace editor edits the roadmap document because she is in the platform team.
-The workspace viewer can read the roadmap document but cannot edit it.
-The outside collaborator has no path through the graph, so access is denied.
+Alice edits the roadmap document because she is in the platform team.
+Bob can read the roadmap document but cannot edit it.
+Casey has no path through the graph, so access is denied.
 ```
 
 That tiny cast of users keeps the examples grounded.
@@ -176,10 +176,10 @@ that the user can edit one specific document.
 
 1. Read `03-graph-theory-for-rebac.md`.
 2. Read `04-rebac-concepts.md`.
-3. Draw the path from `user:workspaceEditor` to `document:roadmapDocument#can_edit`.
+3. Draw the path from `user:alice` to `document:roadmapDocument#can_edit`.
 4. Remove one tuple from either fixture file and predict which access check changes.
 
-Checkpoint: explain why the workspace viewer can read but cannot edit.
+Checkpoint: explain why Bob can read but cannot edit.
 
 ### Day 3: OpenFGA model
 
@@ -237,7 +237,7 @@ Go:
 2. Run `make go-test`.
 3. Change `SeedRelationshipTuples()` in `go/internal/fixtures/fixtures.go` and predict which tests fail.
 
-Checkpoint: explain why the workspace viewer can read but cannot edit.
+Checkpoint: explain why Bob can read but cannot edit.
 
 ### Day 7: Language-specific depth
 
@@ -339,7 +339,7 @@ The entertaining part of this repo is the feedback loop:
 
 - break a relation and watch the compiler object
 - remove a tuple and watch access disappear
-- run the terminal client as the workspace editor, the workspace viewer, then the outside collaborator
+- run the terminal client as Alice, Bob, then Casey
 - start services locally and make the graph answer real HTTP requests
 
 Every chapter should leave you with something you can run, break, or explain.

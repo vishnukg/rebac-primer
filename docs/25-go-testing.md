@@ -39,12 +39,12 @@ Every test in this repo follows the AAA style. The comments are literal:
 
 ```go
 // go/internal/authz/graph_test.go
-func TestGraphAuthorizer_OutsideCollaboratorIsDenied(t *testing.T) {
-    // Arrange: outsideCollaborator has no tuples in the graph.
+func TestGraphAuthorizer_CaseyIsDenied(t *testing.T) {
+    // Arrange: Casey has no tuples in the graph.
     store := seedStore()
     auth := authz.NewGraphAuthorizer(store)
     req := authz.CheckRequest{
-        User:     fixtures.OutsideCollaborator,
+        User:     fixtures.Casey,
         Relation: authz.RelationDocumentCanEdit,
         Object:   fixtures.RoadmapDocument,
     }
@@ -57,7 +57,7 @@ func TestGraphAuthorizer_OutsideCollaboratorIsDenied(t *testing.T) {
         t.Fatalf("unexpected error: %v", err)
     }
     if result.Allowed {
-        t.Error("expected outsideCollaborator can_edit=false but got true")
+        t.Error("expected Casey can_edit=false but got true")
     }
 }
 ```
@@ -114,8 +114,8 @@ func TestGraphAuthorizer_PermissionMatrix(t *testing.T) {
         relation authz.Relation
         want     bool
     }{
-        {"editor_can_read", fixtures.WorkspaceEditor, authz.RelationDocumentCanRead, true},
-        {"viewer_cannot_edit", fixtures.WorkspaceViewer, authz.RelationDocumentCanEdit, false},
+        {"editor_can_read", fixtures.Alice, authz.RelationDocumentCanRead, true},
+        {"viewer_cannot_edit", fixtures.Bob, authz.RelationDocumentCanEdit, false},
         // ...
     }
 
@@ -172,7 +172,7 @@ func BenchmarkGraphAuthorizer_Check(b *testing.B) {
     store := seedStore()
     auth := authz.NewGraphAuthorizer(store)
     req := authz.CheckRequest{
-        User:     fixtures.WorkspaceEditor,
+        User:     fixtures.Alice,
         Relation: authz.RelationDocumentCanEdit,
         Object:   fixtures.RoadmapDocument,
     }

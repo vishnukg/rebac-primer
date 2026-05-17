@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createServices } from "../src/app/create-services.js";
 import { handleHttpRequest } from "../src/http/handler.js";
-import { workspaceEditor } from "../src/testing/fixtures.js";
+import { alice } from "../src/testing/fixtures.js";
 
 describe("handleHttpRequest", () => {
   it("given_health_request_when_handling_http_request_then_ok_response_is_returned", async () => {
@@ -32,7 +32,7 @@ describe("handleHttpRequest", () => {
       {
         method: "GET",
         path: "/documents/roadmapDocument",
-        query: new URLSearchParams({ actorId: "workspaceViewer" })
+        query: new URLSearchParams({ actorId: "bob" })
       }
     );
 
@@ -41,7 +41,7 @@ describe("handleHttpRequest", () => {
     expect(response.body).toMatchObject({
       document: {
         id: "roadmapDocument",
-        updatedBy: workspaceEditor
+        updatedBy: alice
       }
     });
   });
@@ -57,7 +57,7 @@ describe("handleHttpRequest", () => {
         method: "PATCH",
         path: "/documents/roadmapDocument",
         query: new URLSearchParams(),
-        body: { actorId: "workspaceViewer", body: "Should not save" }
+        body: { actorId: "bob", body: "Should not save" }
       }
     );
 

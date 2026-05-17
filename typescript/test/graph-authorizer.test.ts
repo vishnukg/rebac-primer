@@ -3,12 +3,12 @@ import { GraphAuthorizer } from "../src/authz/graph-authorizer.js";
 import { InMemoryTupleStore } from "../src/authz/memory-store.js";
 import { tuple } from "../src/authz/types.js";
 import {
-  outsideCollaborator,
+  casey,
   platformTeam,
   roadmapDocument,
   seedRelationshipTuples,
-  workspaceEditor,
-  workspaceViewer
+  alice,
+  bob
 } from "../src/testing/fixtures.js";
 
 describe("GraphAuthorizer", () => {
@@ -18,14 +18,14 @@ describe("GraphAuthorizer", () => {
 
     // Act
     const result = await authorizer.check({
-      user: workspaceEditor,
+      user: alice,
       relation: "can_edit",
       object: roadmapDocument
     });
 
     // Assert
     expect(result.allowed).toBe(true);
-    expect(result.trace).toContain("Resolve subject set team:platformTeam#member: does it contain user:workspaceEditor?");
+    expect(result.trace).toContain("Resolve subject set team:platformTeam#member: does it contain user:alice?");
   });
 
   it("given_workspace_viewer_when_checking_document_permissions_then_read_is_allowed_and_edit_is_denied", async () => {
@@ -34,12 +34,12 @@ describe("GraphAuthorizer", () => {
 
     // Act
     const readResult = await authorizer.check({
-      user: workspaceViewer,
+      user: bob,
       relation: "can_read",
       object: roadmapDocument
     });
     const editResult = await authorizer.check({
-      user: workspaceViewer,
+      user: bob,
       relation: "can_edit",
       object: roadmapDocument
     });
@@ -55,7 +55,7 @@ describe("GraphAuthorizer", () => {
 
     // Act
     const result = await authorizer.check({
-      user: outsideCollaborator,
+      user: casey,
       relation: "can_read",
       object: roadmapDocument
     });
@@ -70,13 +70,13 @@ describe("GraphAuthorizer", () => {
     const authorizer = new GraphAuthorizer(
       new InMemoryTupleStore([
         ...seedRelationshipTuples(),
-        tuple(platformTeam, "admin", outsideCollaborator)
+        tuple(platformTeam, "admin", casey)
       ])
     );
 
     // Act
     const result = await authorizer.check({
-      user: outsideCollaborator,
+      user: casey,
       relation: "member",
       object: platformTeam
     });

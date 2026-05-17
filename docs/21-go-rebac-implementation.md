@@ -520,7 +520,7 @@ func NewWithConfig(ctx context.Context, cfg Config) (*App, error) {
         Title:     "Roadmap",
         Body:      "Initial roadmap document",
         Workspace: fixtures.ProductWorkspace,
-        Actor:     fixtures.WorkspaceEditor,
+        Actor:     fixtures.Alice,
     })
     if err != nil {
         return nil, fmt.Errorf("app: seed demo document: %w", err)
@@ -573,12 +573,12 @@ with explicit section comments.
 ```go
 // go/internal/authz/graph_test.go
 func TestGraphAuthorizer_TeamMemberCanEditDocument(t *testing.T) {
-    // Arrange: workspaceEditor is a member of platformTeam, which is an editor of
+    // Arrange: alice is a member of platformTeam, which is an editor of
     // productWorkspace. roadmapDocument lives in productWorkspace.
     store := seedStore()
     auth := authz.NewGraphAuthorizer(store)
     req := authz.CheckRequest{
-        User:     fixtures.WorkspaceEditor,
+        User:     fixtures.Alice,
         Relation: authz.RelationDocumentCanEdit,
         Object:   fixtures.RoadmapDocument,
     }
@@ -607,12 +607,12 @@ passing runs. When the test fails you can read every step of the graph walk.
 ```go
 // go/internal/domain/service_test.go
 func TestDocumentService_Update_ForbiddenForViewer(t *testing.T) {
-    // Arrange: workspaceViewer has viewer, not editor — update must be denied.
+    // Arrange: bob has viewer, not editor — update must be denied.
     svc := newSeededService(t)
     input := domain.UpdateDocumentInput{
         ID:    "roadmapDocument",
         Body:  "should not save",
-        Actor: fixtures.WorkspaceViewer,
+        Actor: fixtures.Bob,
     }
 
     // Act
@@ -643,7 +643,7 @@ server started, no network involved:
 func TestHandler_GetDocument_Returns200ForViewer(t *testing.T) {
     // Arrange
     handler := newTestHandler(t)
-    req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument?actorId=workspaceViewer", nil)
+    req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument?actorId=bob", nil)
     rec := httptest.NewRecorder()
 
     // Act
@@ -688,21 +688,21 @@ Then test the API:
 # Health check
 curl http://localhost:4001/health
 
-# Read the pre-seeded document as the workspace viewer
-curl "http://localhost:4001/documents/roadmapDocument?actorId=workspaceViewer"
+# Read the pre-seeded document as Bob
+curl "http://localhost:4001/documents/roadmapDocument?actorId=bob"
 
 # Try to read as an outsider (403)
-curl "http://localhost:4001/documents/roadmapDocument?actorId=outsideCollaborator"
+curl "http://localhost:4001/documents/roadmapDocument?actorId=casey"
 
-# Create a document as the workspace editor
+# Create a document as Alice
 curl -X POST http://localhost:4001/documents \
   -H "Content-Type: application/json" \
-  -d '{"id":"notes","title":"Notes","body":"hello","workspaceId":"productWorkspace","actorId":"workspaceEditor"}'
+  -d '{"id":"notes","title":"Notes","body":"hello","workspaceId":"productWorkspace","actorId":"alice"}'
 
-# Try to update as the workspace viewer (403)
+# Try to update as Bob (403)
 curl -X PATCH http://localhost:4001/documents/roadmapDocument \
   -H "Content-Type: application/json" \
-  -d '{"body":"should not save","actorId":"workspaceViewer"}'
+  -d '{"body":"should not save","actorId":"bob"}'
 ```
 
 The same HTTP API as the TypeScript server (`make ts-server`), just on port 4001.

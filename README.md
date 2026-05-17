@@ -89,15 +89,24 @@ Run `make` with no arguments to see all targets.
 ## The authorization story
 
 ```text
-The workspace editor can edit the roadmap document
+Alice can edit the roadmap document
   because she is in the platform team
   which is an editor of the product workspace
   which the roadmap document lives in.
 
-The workspace viewer can read but not edit.
+Bob can read but not edit.
 
-The outside collaborator has no path through the graph — access is denied.
+Casey has no path through the graph — access is denied.
 ```
+
+| Person or object | ReBAC ID | Role in the example |
+|------------------|----------|---------------------|
+| Alice | `user:alice` | platform team member; can edit |
+| Bob | `user:bob` | workspace viewer; can read only |
+| Casey | `user:casey` | outside collaborator; denied |
+| Platform Team | `team:platformTeam` | grants workspace editor access |
+| Product Workspace | `workspace:productWorkspace` | contains the roadmap document |
+| Roadmap Document | `document:roadmapDocument` | protected document |
 
 Both implementations answer the same question with the same graph traversal
 algorithm. Reading them side by side is the lesson.

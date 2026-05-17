@@ -39,7 +39,7 @@ func TestOpenFGAAuthorizer_CheckMapsRequestAndResult(t *testing.T) {
 
 	// Act
 	result, err := auth.Check(context.Background(), CheckRequest{
-		User:     User("workspaceEditor"),
+		User:     User("alice"),
 		Relation: RelationDocumentCanRead,
 		Object:   Document("roadmapDocument"),
 	})
@@ -54,7 +54,7 @@ func TestOpenFGAAuthorizer_CheckMapsRequestAndResult(t *testing.T) {
 	if len(result.Trace) != 1 || result.Trace[0] != "OpenFGA evaluated the relationship graph remotely" {
 		t.Fatalf("unexpected trace: %#v", result.Trace)
 	}
-	if fake.checkReq.User != "user:workspaceEditor" {
+	if fake.checkReq.User != "user:alice" {
 		t.Errorf("got user %q", fake.checkReq.User)
 	}
 	if fake.checkReq.Relation != "can_read" {
@@ -72,7 +72,7 @@ func TestOpenFGAAuthorizer_CheckWrapsSDKError(t *testing.T) {
 
 	// Act
 	_, err := auth.Check(context.Background(), CheckRequest{
-		User:     User("workspaceEditor"),
+		User:     User("alice"),
 		Relation: RelationDocumentCanEdit,
 		Object:   Document("roadmapDocument"),
 	})
@@ -91,7 +91,7 @@ func TestOpenFGAAuthorizer_WriteTuplesMapsRepoTuplesToSDKTuples(t *testing.T) {
 	fake := &fakeOpenFGAClient{}
 	auth := newOpenFGAAuthorizerWithClient(fake)
 	tuples := []TupleKey{
-		Tuple(Document("roadmapDocument"), RelationDocumentOwner, Subject(User("workspaceEditor"))),
+		Tuple(Document("roadmapDocument"), RelationDocumentOwner, Subject(User("alice"))),
 	}
 
 	// Act
@@ -104,7 +104,7 @@ func TestOpenFGAAuthorizer_WriteTuplesMapsRepoTuplesToSDKTuples(t *testing.T) {
 	if len(fake.wroteTuples) != 1 {
 		t.Fatalf("expected one tuple write, got %d", len(fake.wroteTuples))
 	}
-	want := *openfga.NewTupleKey("user:workspaceEditor", "owner", "document:roadmapDocument")
+	want := *openfga.NewTupleKey("user:alice", "owner", "document:roadmapDocument")
 	if fake.wroteTuples[0] != want {
 		t.Fatalf("got tuple %#v, want %#v", fake.wroteTuples[0], want)
 	}
@@ -117,7 +117,7 @@ func TestOpenFGAAuthorizer_WriteTuplesWrapsSDKError(t *testing.T) {
 
 	// Act
 	err := auth.WriteTuples(context.Background(), []TupleKey{
-		Tuple(Document("roadmapDocument"), RelationDocumentOwner, Subject(User("workspaceEditor"))),
+		Tuple(Document("roadmapDocument"), RelationDocumentOwner, Subject(User("alice"))),
 	})
 
 	// Assert

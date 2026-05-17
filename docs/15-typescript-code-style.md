@@ -195,7 +195,7 @@ if (isObjectOfType(parent.user, "workspace")) {
 
 ```ts
 export const relationshipGraphExample = [
-  "team:platformTeam#member contains user:workspaceEditor",
+  "team:platformTeam#member contains user:alice",
   "workspace:productWorkspace#editor contains team:platformTeam#member"
 ] as const;
 ```

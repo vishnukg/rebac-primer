@@ -77,7 +77,7 @@ func NewWithConfig(ctx context.Context, cfg Config) (*App, error) {
 		Title:     "Roadmap",
 		Body:      "Initial roadmap document",
 		Workspace: fixtures.ProductWorkspace,
-		Actor:     fixtures.WorkspaceEditor,
+		Actor:     fixtures.Alice,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("app: seed demo document: %w", err)

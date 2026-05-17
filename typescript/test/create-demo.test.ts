@@ -8,13 +8,13 @@ describe("createDemoApp", () => {
 
     // Act
     const decision = await app.authorizer.check({
-      user: "user:workspaceEditor",
+      user: "user:alice",
       relation: "can_edit",
       object: app.document
     });
 
     // Assert
-    expect(app.actors).toEqual(["user:workspaceEditor", "user:workspaceViewer", "user:outsideCollaborator"]);
+    expect(app.actors).toEqual(["user:alice", "user:bob", "user:casey"]);
     expect(app.document).toBe("document:roadmapDocument");
     expect(decision.allowed).toBe(true);
   });

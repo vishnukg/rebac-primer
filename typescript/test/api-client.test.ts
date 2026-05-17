@@ -22,9 +22,9 @@ describe("HttpDocumentsClient", () => {
   it("given_document_response_when_reading_document_then_document_is_returned", async () => {
     // Arrange
     const fetcher: Fetcher = async (url) => {
-      expect(url.toString()).toBe("http://server.test/documents/roadmapDocument?actorId=workspaceEditor");
+      expect(url.toString()).toBe("http://server.test/documents/roadmapDocument?actorId=alice");
       return new Response(JSON.stringify({
-        document: { id: "roadmapDocument", title: "Roadmap", body: "v1", workspace: "workspace:productWorkspace", updatedBy: "user:workspaceEditor" }
+        document: { id: "roadmapDocument", title: "Roadmap", body: "v1", workspace: "workspace:productWorkspace", updatedBy: "user:alice" }
       }), {
         status: 200,
         headers: { "content-type": "application/json" }
@@ -33,7 +33,7 @@ describe("HttpDocumentsClient", () => {
     const client = new HttpDocumentsClient("http://server.test", fetcher);
 
     // Act
-    const document = await client.readDocument("roadmapDocument", "workspaceEditor");
+    const document = await client.readDocument("roadmapDocument", "alice");
 
     // Assert
     expect(document.id).toBe("roadmapDocument");
@@ -42,17 +42,17 @@ describe("HttpDocumentsClient", () => {
   it("given_denied_response_when_updating_document_then_server_error_message_is_thrown", async () => {
     // Arrange
     const fetcher: Fetcher = async () =>
-      new Response(JSON.stringify({ error: "user:workspaceViewer cannot edit document:roadmapDocument" }), {
+      new Response(JSON.stringify({ error: "user:bob cannot edit document:roadmapDocument" }), {
         status: 403,
         headers: { "content-type": "application/json" }
       });
     const client = new HttpDocumentsClient("http://server.test", fetcher);
 
     // Act
-    const updatePromise = client.updateDocument("roadmapDocument", "workspaceViewer", "nope");
+    const updatePromise = client.updateDocument("roadmapDocument", "bob", "nope");
 
     // Assert
-    await expect(updatePromise).rejects.toThrow("user:workspaceViewer cannot edit document:roadmapDocument");
+    await expect(updatePromise).rejects.toThrow("user:bob cannot edit document:roadmapDocument");
   });
 
   it("given_error_response_without_error_field_when_reading_document_then_status_text_is_thrown", async () => {
@@ -66,7 +66,7 @@ describe("HttpDocumentsClient", () => {
     );
 
     // Act
-    const readPromise = client.readDocument("roadmapDocument", "workspaceEditor");
+    const readPromise = client.readDocument("roadmapDocument", "alice");
 
     // Assert
     await expect(readPromise).rejects.toThrow("Internal Server Error");
@@ -82,7 +82,7 @@ describe("HttpDocumentsClient", () => {
     );
 
     // Act
-    const readPromise = client.readDocument("roadmapDocument", "workspaceEditor");
+    const readPromise = client.readDocument("roadmapDocument", "alice");
 
     // Assert
     await expect(readPromise).rejects.toThrow("Response body did not contain a document");

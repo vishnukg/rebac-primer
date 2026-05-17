@@ -18,7 +18,7 @@ func TestAuditAuthorizer_DelegatesResultToInner(t *testing.T) {
 	var buf bytes.Buffer
 	audit := authz.NewAuditAuthorizer(inner, &buf)
 	req := authz.CheckRequest{
-		User:     fixtures.WorkspaceEditor,
+		User:     fixtures.Alice,
 		Relation: authz.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	}
@@ -42,7 +42,7 @@ func TestAuditAuthorizer_WritesLogLine(t *testing.T) {
 	var buf bytes.Buffer
 	audit := authz.NewAuditAuthorizer(inner, &buf)
 	req := authz.CheckRequest{
-		User:     fixtures.WorkspaceViewer,
+		User:     fixtures.Bob,
 		Relation: authz.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	}
@@ -76,7 +76,7 @@ func TestAuditAuthorizer_SatisfiesAuthorizerInterface(t *testing.T) {
 
 	// Assert
 	result, err := a.Check(context.Background(), authz.CheckRequest{
-		User:     fixtures.WorkspaceEditor,
+		User:     fixtures.Alice,
 		Relation: authz.RelationDocumentCanRead,
 		Object:   fixtures.RoadmapDocument,
 	})
@@ -97,7 +97,7 @@ func TestReadOnlyStore_ExposesReadMethods(t *testing.T) {
 	found := ro.Has(
 		fixtures.PlatformTeam,
 		authz.RelationTeamMember,
-		authz.Subject(fixtures.WorkspaceEditor),
+		authz.Subject(fixtures.Alice),
 	)
 
 	// Assert
@@ -115,7 +115,7 @@ func TestReadOnlyStore_CanDriveGraphAuthorizer(t *testing.T) {
 	// Act
 	auth := authz.NewGraphAuthorizer(ro)
 	result, err := auth.Check(context.Background(), authz.CheckRequest{
-		User:     fixtures.WorkspaceEditor,
+		User:     fixtures.Alice,
 		Relation: authz.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	})

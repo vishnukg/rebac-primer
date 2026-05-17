@@ -27,7 +27,7 @@ ReBAC asks whether a user is connected to a resource through relationships that
 the model says are useful.
 
 ```text
-user:workspaceEditor --member--> team:platformTeam
+user:alice --member--> team:platformTeam
 team:platformTeam    --editor--> workspace:productWorkspace
 document:roadmap...  --workspace--> workspace:productWorkspace
 ```
@@ -39,7 +39,7 @@ each connection means.
 
 | Word | Meaning in plain English | Example in this repo |
 |------|--------------------------|----------------------|
-| Node | A thing | `user:workspaceEditor` |
+| Node | A thing | `user:alice` |
 | Edge | A connection between things | `member` |
 | Label | The name on an edge | `editor`, `viewer`, `workspace` |
 | Direction | Which way the relationship points | document points to workspace |
@@ -58,14 +58,14 @@ Have I already visited this place?
 
 ## Scene
 
-The workspace editor can edit the roadmap document because she is in the platform team,
-the platform team can edit the product workspace, and the roadmap document belongs to
-the product workspace.
+Alice can edit the roadmap document because she is in the platform team, the
+platform team can edit the product workspace, and the roadmap document belongs
+to the product workspace.
 
 That sentence is already a graph.
 
 ```text
-workspace editor -> platform team -> product workspace -> roadmap document
+Alice -> platform team -> product workspace -> roadmap document
 ```
 
 ReBAC makes that graph explicit and asks whether a useful path exists.
@@ -89,7 +89,7 @@ Can Alice get from Station A to Station D?
 ReBAC question:
 
 ```text
-Can user:workspaceEditor reach document:roadmapDocument#can_edit?
+Can user:alice reach document:roadmapDocument#can_edit?
 ```
 
 The model is the transit rulebook. It says which lines count for which trip.
@@ -109,7 +109,7 @@ A node is a thing in the graph.
 In this repo, nodes are OpenFGA objects:
 
 ```text
-user:workspaceEditor
+user:alice
 team:platformTeam
 workspace:productWorkspace
 document:roadmapDocument
@@ -119,7 +119,7 @@ Diagram:
 
 ```text
 ┌──────────────────────┐
-│ user:workspaceEditor │
+│ user:alice │
 └──────────────────────┘
 
 ┌───────────────────┐
@@ -142,25 +142,25 @@ Nodes are the nouns.
 An edge connects two nodes.
 
 ```text
-user:workspaceEditor --member--> team:platformTeam
+user:alice --member--> team:platformTeam
 ```
 
 In OpenFGA tuple form, the same fact is stored as:
 
 ```text
-(team:platformTeam, member, user:workspaceEditor)
+(team:platformTeam, member, user:alice)
 ```
 
 The tuple is written from object perspective:
 
 ```text
-team:platformTeam has member user:workspaceEditor
+team:platformTeam has member user:alice
 ```
 
 When drawing it for intuition, it is often easier to read from user outward:
 
 ```text
-user:workspaceEditor is member of team:platformTeam
+user:alice is member of team:platformTeam
 ```
 
 Both are the same relationship. Be comfortable flipping the sentence.
@@ -170,8 +170,8 @@ Both are the same relationship. Be comfortable flipping the sentence.
 Edges have labels.
 
 ```text
-user:workspaceEditor --member--> team:platformTeam
-user:workspaceViewer   --viewer--> workspace:productWorkspace
+user:alice --member--> team:platformTeam
+user:bob   --viewer--> workspace:productWorkspace
 ```
 
 The label matters. A `viewer` edge does not mean the same thing as an `editor`
@@ -216,10 +216,10 @@ exists.
 
 A path is a sequence of connected edges.
 
-The workspace editor's edit path:
+Alice's edit path:
 
 ```text
-user:workspaceEditor
+user:alice
       │ member
       ▼
 team:platformTeam
@@ -233,7 +233,7 @@ document:roadmapDocument ──► can_edit ✓
 
 Reading top to bottom:
 
-- The workspace editor is a member of the platform team.
+- Alice is a member of the platform team.
 - Platform team members are editors of the product workspace.
 - The roadmap document declares it belongs to that workspace.
 - Document editor access is inherited from the workspace, so `can_edit` is granted.
@@ -259,7 +259,7 @@ Can I get from node A to node B by following allowed edges?
 ReBAC check asks a reachability question:
 
 ```text
-Can user:workspaceEditor reach document:roadmapDocument#can_edit?
+Can user:alice reach document:roadmapDocument#can_edit?
 ```
 
 If yes:
@@ -283,7 +283,7 @@ Traversal means walking the graph.
 The authorizer starts with a question:
 
 ```text
-Check(user:workspaceEditor, can_edit, document:roadmapDocument)
+Check(user:alice, can_edit, document:roadmapDocument)
 ```
 
 Then it expands relations using the model:
@@ -302,7 +302,7 @@ Here is the same check as a slow trace:
 
 ```text
 Question:
-  Can user:workspaceEditor can_edit document:roadmapDocument?
+  Can user:alice edit document:roadmapDocument?
 
 Step 1:
   document can_edit means document editor.
@@ -318,11 +318,11 @@ Step 4:
 
 Step 5:
   team:platformTeam#member asks:
-  is user:workspaceEditor a member of team:platformTeam?
+  is user:alice a member of team:platformTeam?
 
 Step 6:
   yes, tuple exists:
-  team:platformTeam member user:workspaceEditor
+  team:platformTeam member user:alice
 
 Result:
   allowed
@@ -331,13 +331,13 @@ Result:
 The denial case is the same process with a missing path:
 
 ```text
-Can user:workspaceViewer can_edit document:roadmapDocument?
+Can user:bob edit document:roadmapDocument?
 
 document can_edit -> editor
 document editor -> workspace editor
 workspace editor -> team:platformTeam#member
-team member path does not contain user:workspaceViewer
-workspaceViewer only has viewer, not editor
+team member path does not contain user:bob
+Bob only has viewer, not editor
 
 Result: denied
 ```
@@ -347,7 +347,7 @@ Result: denied
 Tuples are facts:
 
 ```text
-team:platformTeam member user:workspaceEditor
+team:platformTeam member user:alice
 workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
 ```
@@ -378,7 +378,7 @@ If tuples are data, the model is logic.
 Here is all four nodes and their edges in one diagram:
 
 ```text
-user:workspaceEditor        user:workspaceViewer
+user:alice        user:bob
        │                            │
        │ member                     │ viewer
        ▼                            │
@@ -396,9 +396,9 @@ team:platformTeam                   │
 
 Three things to notice:
 
-- The workspace editor reaches the workspace through the platform team, not directly.
-- The workspace viewer has a direct viewer edge to the workspace.
-- The outside collaborator has no node in this graph — no path, no access.
+- Alice reaches the workspace through the platform team, not directly.
+- Bob has a direct viewer edge to the workspace.
+- Casey has no node in this graph — no path, no access.
 
 Keep this diagram in mind. Every check in this repo is a reachability question against it.
 
@@ -431,7 +431,7 @@ any user reachable as a member of team:platformTeam is an editor of workspace:pr
 Diagram:
 
 ```text
-user:workspaceEditor ──member──► team:platformTeam
+user:alice ──member──► team:platformTeam
                               │
                               │ team:platformTeam#member
                               ▼
@@ -476,8 +476,8 @@ Deep graphs are not automatically bad, but they are harder to debug.
 Good ReBAC model design keeps common authorization paths explainable:
 
 ```text
-The workspace editor can edit the roadmap document because:
-  the workspace editor is a member of the platform team.
+Alice can edit the roadmap document because:
+  Alice is a member of the platform team.
   the platform team edits the product workspace.
   the roadmap document belongs to the product workspace.
 ```
@@ -488,7 +488,7 @@ If the explanation takes a paragraph, simplify the model.
 
 | Graph term | ReBAC meaning |
 |------------|---------------|
-| node | object such as `user:workspaceEditor` or `document:roadmapDocument` |
+| node | object such as `user:alice` or `document:roadmapDocument` |
 | edge | tuple relationship |
 | label | relation name such as `member` or `editor` |
 | path | chain of relationships proving access |
@@ -507,7 +507,7 @@ Is there a valid path from the user to the requested relation on the object?
 Example:
 
 ```text
-Is there a valid path from user:workspaceEditor to document:roadmapDocument#can_edit?
+Is there a valid path from user:alice to document:roadmapDocument#can_edit?
 ```
 
 Answer:
@@ -522,19 +522,19 @@ no  -> denied
 Draw this graph on paper:
 
 ```text
-team:platformTeam member user:workspaceEditor
+team:platformTeam member user:alice
 workspace:productWorkspace editor team:platformTeam#member
-workspace:productWorkspace viewer user:workspaceViewer
+workspace:productWorkspace viewer user:bob
 document:roadmapDocument workspace workspace:productWorkspace
 ```
 
 Then answer:
 
 ```text
-Can the workspace editor edit the roadmap document?
-Can the workspace viewer edit the roadmap document?
-Can the workspace viewer read the roadmap document?
-Can the outside collaborator read the roadmap document?
+Can Alice edit the roadmap document?
+Can Bob edit the roadmap document?
+Can Bob read the roadmap document?
+Can Casey read the roadmap document?
 ```
 
 Do not run the tests first. Predict from the graph.

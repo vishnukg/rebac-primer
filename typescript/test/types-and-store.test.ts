@@ -14,17 +14,17 @@ import {
 describe("typed OpenFGA helpers", () => {
   it("given_domain_ids_when_building_objects_and_subject_sets_then_openfga_strings_are_consistent", () => {
     // Arrange
-    const userId = "workspaceEditor";
+    const userId = "alice";
     const documentId = "roadmapDocument";
     const teamId = "platformTeam";
 
     // Act
-    const workspaceEditor = user(userId);
+    const alice = user(userId);
     const roadmapDocument = document(documentId);
     const platformMembers = subjectSet(team(teamId), "member");
 
     // Assert
-    expect(workspaceEditor).toBe("user:workspaceEditor");
+    expect(alice).toBe("user:alice");
     expect(roadmapDocument).toBe("document:roadmapDocument");
     expect(platformMembers).toBe("team:platformTeam#member");
   });

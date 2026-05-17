@@ -6,11 +6,11 @@ import { DocumentNotFoundError, ForbiddenError } from "../src/domain/document.js
 import { InMemoryDocumentRepository } from "../src/domain/repository.js";
 import { DocumentService } from "../src/domain/service.js";
 import {
-  outsideCollaborator,
+  casey,
   productWorkspace,
   seedRelationshipTuples,
-  workspaceEditor,
-  workspaceViewer
+  alice,
+  bob
 } from "../src/testing/fixtures.js";
 
 describe("DocumentService", () => {
@@ -28,11 +28,11 @@ describe("DocumentService", () => {
       title: "Strategy",
       body: "Ship carefully.",
       workspace: productWorkspace,
-      actor: workspaceEditor
+      actor: alice
     });
 
     // Assert
-    expect(created.updatedBy).toBe(workspaceEditor);
+    expect(created.updatedBy).toBe(alice);
   });
 
   it("given_workspace_viewer_when_creating_document_then_forbidden_error_is_thrown", async () => {
@@ -49,7 +49,7 @@ describe("DocumentService", () => {
       title: "Incident Plan",
       body: "Draft",
       workspace: productWorkspace,
-      actor: workspaceViewer
+      actor: bob
     });
 
     // Assert
@@ -60,7 +60,7 @@ describe("DocumentService", () => {
     // Arrange
     const store = new InMemoryTupleStore([
       ...seedRelationshipTuples(),
-      tuple(document("roadmapDocument"), "owner", outsideCollaborator)
+      tuple(document("roadmapDocument"), "owner", casey)
     ]);
     const service = new DocumentService(
       new InMemoryDocumentRepository(),
@@ -71,19 +71,19 @@ describe("DocumentService", () => {
       title: "Roadmap",
       body: "v1",
       workspace: productWorkspace,
-      actor: workspaceEditor
+      actor: alice
     });
 
     // Act
     const updated = await service.update({
       id: "roadmapDocument",
       body: "v2",
-      actor: outsideCollaborator
+      actor: casey
     });
 
     // Assert
     expect(updated.body).toBe("v2");
-    expect(updated.updatedBy).toBe(outsideCollaborator);
+    expect(updated.updatedBy).toBe(casey);
   });
 
   it("given_actor_without_read_path_when_reading_document_then_forbidden_error_is_thrown", async () => {
@@ -98,11 +98,11 @@ describe("DocumentService", () => {
       title: "Private Plan",
       body: "v1",
       workspace: productWorkspace,
-      actor: workspaceEditor
+      actor: alice
     });
 
     // Act
-    const readPromise = service.read("private-plan", outsideCollaborator);
+    const readPromise = service.read("private-plan", casey);
 
     // Assert
     await expect(readPromise).rejects.toBeInstanceOf(ForbiddenError);
@@ -120,7 +120,7 @@ describe("DocumentService", () => {
     const updatePromise = service.update({
       id: "missing",
       body: "v2",
-      actor: workspaceEditor
+      actor: alice
     });
 
     // Assert

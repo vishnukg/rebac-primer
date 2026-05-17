@@ -13,7 +13,7 @@ describe("InMemoryDocumentRepository", () => {
       title: "Roadmap",
       body: "v1",
       workspace: workspace("productWorkspace"),
-      updatedBy: "user:workspaceEditor"
+      updatedBy: "user:alice"
     });
     const documents = await repository.list();
 
@@ -29,7 +29,7 @@ describe("InMemoryDocumentRepository", () => {
       title: "Roadmap",
       body: "v1",
       workspace: workspace("productWorkspace"),
-      updatedBy: "user:workspaceEditor" as const
+      updatedBy: "user:alice" as const
     };
 
     // Act
