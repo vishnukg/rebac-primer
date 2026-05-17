@@ -1,431 +1,155 @@
-# OAuth-based authentication
+# OAuth and OIDC: who is this person?
 
-Authentication and authorization are related, but they are not the same thing.
+Before your app can ask "can Alice edit this document?" it must know the request
+actually came from Alice. That is the login problem. OAuth and OIDC are the
+modern standards for solving it — without your app ever handling Alice's password
+directly.
+
+## Two acronyms, one sentence each
+
+**OAuth 2.0** — a framework for delegated access: a user authorizes your app to
+call APIs on their behalf without giving your app their password.
+
+**OpenID Connect (OIDC)** — an identity layer built on top of OAuth: it adds a
+standard way for your app to learn *who* the user is, not just *that* they
+authenticated.
+
+In practice, almost every "log in with GitHub / Google / Auth0" button uses
+both:
+- OAuth handles the token plumbing
+- OIDC adds the "who is this person?" answer
+
+## Authentication vs. authorization
 
 ```text
-Authentication: who are you?
-Authorization:  what are you allowed to do?
+Authentication  →  Who are you?
+Authorization   →  What can you do?
 ```
 
-OAuth is mostly about delegated access and token-based flows. In modern web
-apps, OAuth is often paired with OpenID Connect so the app can also learn who
-the user is.
-
-This repo does not implement OAuth yet, but you need the mental model because
-real ReBAC systems almost always start with an authenticated user.
-
-## Scene
-
-Alice opens the document app. Before the app can ask:
+OAuth/OIDC handles authentication. Your ReBAC system handles authorization.
+They hand off to each other:
 
 ```text
-Can Alice edit document:roadmapDocument?
+OAuth/OIDC proves:   "This request is from user:alice"
+                            │
+                            ▼
+ReBAC decides:       "Can user:alice edit document:roadmapDocument?"
+                            │
+                            ▼
+                     allow or deny
 ```
 
-it must first know:
+Keep these two questions separate. OAuth does not decide document permissions.
+It only proves identity.
+
+## The four players
+
+Any OAuth/OIDC flow involves four roles:
 
 ```text
-Is this request really from Alice?
-```
-
-That is authentication.
-
-## The shortest useful mental model
-
-Authentication is the login part of the story.
-
-Authorization is the permission part of the story.
-
-OAuth/OIDC helps the app turn a request into a known user:
-
-```text
-request with token/session
-        |
-        v
-verify token/session
-        |
-        v
-"this is user:alice"
-```
-
-ReBAC starts after that:
-
-```text
-"this is user:alice"
-        |
-        v
-can this user edit document:roadmapDocument?
-        |
-        v
-allow or deny
-```
-
-Keep those two questions separate:
-
-```text
-Authn question: "Who is making this request?"
-Authz question: "What may this user do now?"
-```
-
-If you mix them together, OAuth starts to feel like it should answer everything.
-It does not. OAuth/OIDC gives the app an identity. Your authorization system uses
-that identity to make product-specific decisions.
-
-## Four Boxes
-
-Most OAuth/OIDC explanations become easier if you can name the four boxes:
-
-```text
-┌──────────────┐      wants to use       ┌──────────────┐
-│ User         │ ──────────────────────► │ Your App     │
-│ workspace... │                         │ docs app     │
-└──────────────┘                         └──────┬───────┘
-                                                │ asks for login
-                                                ▼
-                                         ┌──────────────┐
-                                         │ Authorization│
-                                         │ Server (IdP) │
-                                         │ Auth0/GitHub │
-                                         └──────┬───────┘
-                                                │ issues tokens
-                                                ▼
-                                         ┌──────────────┐
-                                         │ Resource     │
-                                         │ Server / API │
-                                         │ token-gated  │
-                                         └──────────────┘
-```
-
-The OAuth spec name for the token-issuing box is **Authorization Server**. When
-that same component also performs login and issues OIDC ID tokens it is also
-called an **Identity Provider** (IdP) or **OpenID Provider** (OP). In practice
-one vendor (Auth0, Okta, Entra ID, GitHub, Google) plays both roles, so the
-terms get mixed; the role names from the spec are spelled out below.
-
-In a small server app, "Your App" and the Resource Server may be the same
-process. They are still different roles in the mental model.
-
-## What each thing proves
-
-This table prevents a common beginner mistake:
-
-| Thing | What it proves | What it does not prove |
-|-------|----------------|------------------------|
-| Password/login at IdP | The user authenticated with the identity provider | The user can edit a document |
-| ID token | The user's identity was asserted by the IdP | The user has app permissions |
-| Access token | A client can call an API | The requested action is allowed |
-| App session | The app remembers an authenticated user | The user can access every resource |
-| ReBAC check | A graph path grants a specific permission | The user's login is still valid |
-
-Practical sequence:
-
-```text
-1. Verify login/session/token.
-2. Map identity to an app user id, such as user:alice.
-3. Run authorization for the requested action and object.
-4. Execute only if authorization allows it.
-```
-
-## Current standard landscape
-
-As of 2026, the practical modern OAuth picture is:
-
-```text
-OAuth 2.0             base authorization framework
-OpenID Connect 1.0   identity layer on top of OAuth 2.0
-RFC 9700             OAuth 2.0 Security Best Current Practice
-OAuth 2.1            active draft, not yet the final replacement RFC
-```
-
-The important teaching point:
-
-```text
-Use OAuth 2.0/OIDC with current security best practices.
-Do not learn old OAuth 2.0 examples that still recommend implicit flow or
-password grant for browser/mobile apps.
-```
-
-OAuth 2.1 is useful to study because it consolidates modern OAuth guidance, but
-until it is final, the safest wording is "OAuth 2.0 plus current BCP guidance."
-
-Primary references:
-
-- [RFC 9700: OAuth 2.0 Security Best Current Practice](https://www.rfc-editor.org/rfc/rfc9700)
-- [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0-final.html)
-- [OAuth 2.1 Internet-Draft](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/)
-
-This course teaches that modern posture:
-
-- Authorization Code flow
-- PKCE
-- exact redirect URI matching
-- no implicit flow for SPAs
-- no resource owner password credentials grant
-- refresh token rotation or sender-constrained refresh tokens
-- sender-constrained access tokens when the threat model requires it
-- OpenID Connect for authentication
-
-## The big picture
-
-Typical OAuth/OIDC login flow:
-
-```text
-┌────────────┐       1. Login        ┌──────────────┐
-│            │ ────────────────────► │              │
-│  Browser   │                       │  Your App    │
-│            │ ◄──────────────────── │              │
-└────────────┘ 2. Redirect to IdP    └──────┬───────┘
-                                            │
-                                            │ 3. Authorization request
-                                            ▼
-                                     ┌──────────────┐
-                                     │ Identity     │
-                                     │ Provider     │
-                                     │ GitHub/Auth0 │
-                                     └──────┬───────┘
-                                            │
-                                            │ 4. Redirect back with code
-                                            ▼
-┌────────────┐                       ┌──────────────┐
-│            │ 5. Callback + code    │              │
-│  Browser   │ ────────────────────► │  Your App    │
-│            │                       │              │
-└────────────┘                       └──────┬───────┘
-                                            │
-                                            │ 6. Exchange code for tokens
-                                            ▼
-                                     ┌──────────────┐
-                                     │ Identity     │
-                                     │ Provider     │
-                                     └──────────────┘
-```
-
-The app eventually gets tokens that prove the login happened.
-
-## OAuth roles
-
-OAuth uses a few standard roles:
-
-```text
-Resource Owner       the user, such as Alice
+Resource Owner       Alice — the user who wants to use the app
 Client               your app
-Authorization Server the identity provider issuing tokens
-Resource Server      API protected by tokens
+Authorization Server the IdP (GitHub, Auth0, Google) that handles login
+                     and issues tokens
+Resource Server      the API your app calls, protected by tokens
 ```
 
-In a small app, "client" and "resource server" may both be your backend.
+In a small app, your backend is both the Client and the Resource Server. That is
+fine — they are different roles in the protocol, not necessarily different
+servers.
+
+The Authorization Server is also called an **Identity Provider (IdP)** when it
+does OIDC (which it almost always does today).
+
+## The flow: what actually happens
+
+Here is a typical login, step by step:
 
 ```text
-Alice             -> resource owner
-TS ReBAC app      -> client and resource server
-GitHub/Auth0/etc. -> authorization server
+Browser           Your App                   IdP (GitHub/Auth0)
+   │                  │                              │
+   │  1. click login  │                              │
+   │─────────────────►│                              │
+   │                  │  2. redirect to IdP          │
+   │◄─────────────────│                              │
+   │                                                 │
+   │  3. Alice logs in at IdP                        │
+   │────────────────────────────────────────────────►│
+   │                                                 │
+   │  4. IdP redirects back with a short-lived code  │
+   │◄────────────────────────────────────────────────┤
+   │                  │                              │
+   │  5. browser sends code to app                   │
+   │─────────────────►│                              │
+   │                  │  6. app exchanges code       │
+   │                  │     for tokens (server call) │
+   │                  │─────────────────────────────►│
+   │                  │  7. tokens                   │
+   │                  │◄─────────────────────────────┤
+   │                  │                              │
+   │  8. app session  │                              │
+   │◄─────────────────│                              │
 ```
 
-## Authorization Code flow
+In plain English:
 
-For backend web apps, the common secure flow is Authorization Code with PKCE.
+1. Alice clicks "log in" on your app
+2. Your app redirects Alice's browser to the IdP
+3. Alice authenticates at the IdP (password, MFA, etc.) — your app never sees this
+4. IdP redirects back to your app with a short-lived **authorization code**
+5. Alice's browser carries that code back to your app's callback URL
+6. Your app exchanges the code for real tokens — this is a server-to-server call,
+   never in the browser URL
+7. Your app receives tokens
+8. Your app creates a session for Alice
 
-High-level sequence:
+Your app never sees Alice's password. That is the entire point.
+
+## What are these tokens?
+
+Step 7 gives you up to three things:
 
 ```text
-Browser          App                 Identity Provider
-   │              │                          │
-   │ login        │                          │
-   ├─────────────►│                          │
-   │              │ redirect with challenge  │
-   │◄─────────────┤                          │
-   ├────────────────────────────────────────►│
-   │              │                          │ user authenticates
-   │◄────────────────────────────────────────┤ redirect with code
-   ├─────────────►│ callback code            │
-   │              ├─────────────────────────►│ exchange code + verifier
-   │              │◄─────────────────────────┤ tokens
-   │              │ create app session       │
-   │◄─────────────┤                          │
+Authorization code  →  short-lived, one-time value (like a coat-check ticket)
+                        your app exchanges this for real tokens — then it expires
+                        (not a token itself, just a stepping stone)
+
+Access token        →  proves "this client is authorized to call this API"
+                        sent with every API request as a Bearer token
+                        expires quickly (minutes to an hour)
+
+ID token            →  OIDC's contribution — proves "this person authenticated"
+                        contains the user's identity (name, stable ID, email)
+                        your app reads this to learn who just logged in
+
+Refresh token       →  optional long-lived token used to get new access tokens
+                        so Alice doesn't have to log in again every hour
 ```
 
-PKCE protects the code exchange so a stolen authorization code is not enough by
-itself.
-
-## Which flow should I use?
-
-Different application shapes need different OAuth patterns.
+The critical distinction:
 
 ```text
-┌────────────────────┬──────────────────────────────┬──────────────────────┐
-│ App type            │ Recommended approach         │ Notes                │
-├────────────────────┼──────────────────────────────┼──────────────────────┤
-│ Server web app      │ Auth Code + PKCE + session   │ Store tokens server  │
-│ SPA/browser app     │ Auth Code + PKCE             │ Avoid implicit flow  │
-│ Native/mobile app   │ Auth Code + PKCE             │ Custom URI/app links │
-│ Machine-to-machine  │ Client Credentials           │ No user present      │
-│ CLI user login      │ Device Authorization or code │ Depends on UX        │
-└────────────────────┴──────────────────────────────┴──────────────────────┘
+ID token     →  tells YOUR APP who the user is
+Access token →  tells THE API that the client is authorized to call it
 ```
 
-For this repo's future browser/server version, the clean path is:
+Do not use the ID token to call APIs. Do not use the access token to identify
+the user.
 
-```text
-Authorization Code + PKCE + OIDC
-```
+## OIDC: the "who" layer
 
-For the current terminal client, a real production CLI would usually use either:
+Without OIDC, OAuth only answers: "is this client allowed to call this API?" It
+does not tell you *who* the user is.
 
-```text
-Device Authorization flow
-```
-
-or:
-
-```text
-Authorization Code + PKCE with localhost callback
-```
-
-This repo's current TUI does not implement login yet. It lets you type actor ids
-so you can focus on ReBAC first.
-
-## Deprecated or discouraged flows
-
-You will still find old tutorials showing these:
-
-```text
-Implicit flow
-Resource Owner Password Credentials grant
-```
-
-Treat them as historical context, not your default design.
-
-### Implicit flow
-
-Old SPA tutorials used implicit flow because browsers could not safely keep
-client secrets.
-
-Modern guidance prefers Authorization Code with PKCE for browser-based apps.
-
-### Resource Owner Password Credentials
-
-Password grant asks your app to collect the user's password directly.
-
-That breaks the point of delegated login and should not be used for normal
-modern applications.
-
-## PKCE
-
-PKCE stands for Proof Key for Code Exchange.
-
-The client creates:
-
-```text
-code_verifier  -> secret random value
-code_challenge -> transformed value sent in authorization request
-```
-
-Flow:
-
-```text
-Client                         Authorization Server
-  │                                      │
-  │ auth request + code_challenge        │
-  ├─────────────────────────────────────►│
-  │                                      │ user login
-  │ authorization code                   │
-  │◄─────────────────────────────────────┤
-  │ token request + code_verifier        │
-  ├─────────────────────────────────────►│
-  │ verifies challenge matches verifier  │
-  │ access/id tokens                     │
-  │◄─────────────────────────────────────┤
-```
-
-If an attacker steals only the authorization code, they still do not have the
-`code_verifier`, so the token exchange should fail.
-
-## Tokens
-
-You will hear about three token-ish things:
-
-```text
-Authorization code: short-lived value exchanged for tokens
-Access token:       presented to APIs
-ID token:           OIDC token describing the authenticated user
-Refresh token:      long-lived token used to get new access tokens
-```
-
-Important distinction:
-
-```text
-Access token says: this client may call this API.
-ID token says: this user authenticated with this identity provider.
-```
-
-OpenID Connect is the layer that standardizes ID tokens.
-
-## Access token scopes vs app authorization
-
-OAuth scopes are coarse permissions granted to a client.
-
-Example:
-
-```text
-scope: documents.read
-scope: documents.write
-```
-
-Scopes answer:
-
-```text
-May this client call this category of API?
-```
-
-ReBAC answers:
-
-```text
-May this user edit this exact document?
-```
-
-You usually need both:
-
-```text
-Access token has documents.write scope
-AND
-OpenFGA says user:alice can_edit document:roadmapDocument
-```
-
-Diagram:
-
-```text
-┌──────────────┐
-│ Access token │ has scope documents.write?
-└──────┬───────┘
-       │ yes
-       ▼
-┌──────────────┐
-│ ReBAC check  │ can user edit this object?
-└──────┬───────┘
-       │ yes
-       ▼
- allow action
-```
-
-OAuth scopes should not become a replacement for object-level authorization.
-
-## JWTs
-
-Tokens are often JWTs.
-
-JWT shape:
-
-```text
-header.payload.signature
-```
-
-The payload may contain claims:
+OIDC adds the ID token — a JWT containing standard **claims** about the user:
 
 ```json
 {
   "sub": "github|12345",
-  "iss": "https://auth.example.com/",
-  "aud": "rebac-primer",
+  "name": "Alice",
+  "email": "alice@example.com",
+  "iss": "https://accounts.google.com",
+  "aud": "your-app-client-id",
   "exp": 1760000000
 }
 ```
@@ -433,318 +157,239 @@ The payload may contain claims:
 Common claims:
 
 ```text
-sub  subject: stable user identifier
-iss  issuer: who minted the token
-aud  audience: who the token is for
-exp  expiration
+sub   subject — stable user identifier (this is the one you care about most)
+iss   issuer  — who issued this token
+aud   audience — who this token is intended for (your app)
+exp   expiration timestamp
 ```
 
-Never trust a JWT just because it decodes. Verification means checking the
-signature and claims.
+The `sub` claim is the stable identifier to use as Alice's identity in your
+system. Use it — not the email — because emails change. Provider subject IDs do
+not.
 
-## Sessions vs bearer tokens
-
-Two common backend patterns:
+In your app:
 
 ```text
-Browser session:
-  browser sends secure cookie
-  server looks up session
-  server knows user id
-
-Bearer token:
-  client sends Authorization: Bearer <token>
-  server validates token
-  server extracts user id
+OAuth subject "github|12345"  →  app user id "user:github:12345"
 ```
 
-For server-rendered web apps, secure HTTP-only cookies are common. For APIs and
-CLIs, bearer tokens are common.
+## PKCE: why the code alone isn't enough
 
-## Sender-constrained tokens
+PKCE (pronounced "pixie") stands for Proof Key for Code Exchange. It solves a
+real threat: what if someone intercepts the authorization code from step 4?
 
-A bearer token works like cash:
+Without PKCE, stealing the code is enough to get tokens. With PKCE, the code is
+useless without a secret your app generated locally.
+
+How it works:
 
 ```text
-whoever possesses it can use it
+Before redirect:
+  Your app generates:  code_verifier  (random secret, kept in memory)
+                       code_challenge (hash of code_verifier, sent to IdP)
+
+Step 2 — redirect to IdP sends:
+  code_challenge
+
+Step 6 — token exchange sends:
+  the original code_verifier
+
+IdP verifies:  hash(code_verifier) == stored code_challenge → ok
 ```
 
-That is why token theft is serious.
-
-Modern OAuth deployments may use sender-constrained tokens for stronger
-security. Two important standards are:
+An attacker who intercepts the authorization code in step 4 does not have the
+`code_verifier`, so the token exchange fails. Use PKCE for all new apps.
 
 ```text
-mTLS  binds token use to a client certificate
-DPoP  binds token use to a public/private key proof at the application layer
+Client                           Authorization Server
+  │                                       │
+  │  auth request + code_challenge        │
+  ├──────────────────────────────────────►│
+  │                                       │  user logs in
+  │  authorization code                   │
+  │◄──────────────────────────────────────┤
+  │  token request + code_verifier        │
+  ├──────────────────────────────────────►│
+  │                                       │  verifies hash matches
+  │  access token + ID token              │
+  │◄──────────────────────────────────────┤
 ```
 
-Mental model:
+## From identity to ReBAC
+
+Authentication gives you the user id. ReBAC uses it:
 
 ```text
-Bearer token:
-  request has token -> accepted if token is valid
-
-Sender-constrained token:
-  request has token + proof of key/certificate -> accepted if both are valid
-```
-
-For a beginner project, learn bearer tokens first. For high-risk APIs, learn
-sender-constrained tokens next.
-
-## How authentication feeds ReBAC
-
-Authentication gives you the user id.
-
-Authorization uses that user id in a check.
-
-```text
-┌──────────────┐
-│ HTTP Request │
-│ Bearer JWT   │
-└──────┬───────┘
+HTTP request arrives
        │
        ▼
-┌──────────────┐
-│ Authenticate │ verify token, extract sub
-└──────┬───────┘
-       │ user:github:12345
+Auth middleware
+  verify token
+  extract sub: "github|12345"
+  map to:      "user:github:12345"
+       │
        ▼
-┌──────────────┐
-│ Authorize    │ Check(user, relation, object)
-└──────┬───────┘
-       │ allowed / denied
+ReBAC check
+  Check(user:github:12345, can_edit, document:roadmapDocument)
+       │
        ▼
-┌──────────────┐
-│ Handler      │ perform business action
-└──────────────┘
+allow or deny → handler runs business logic
 ```
 
-In this repo's tutorial data:
+Your `DocumentService` should receive an already-verified actor id. It should
+not parse JWTs or call the IdP.
 
 ```text
-OAuth subject -> user:alice
+Clean:  auth middleware → "user:github:12345" → DocumentService.check()
+Messy:  DocumentService parses Authorization header, calls OpenFGA
 ```
 
-In a real app:
+Keep authentication, authorization, and business logic as three separate layers.
+
+## Scopes vs. ReBAC
+
+OAuth scopes are coarse-grained permissions granted to a client application:
 
 ```text
-OAuth subject github|12345 -> user:github:12345
+scope: documents.read   →  may this client call the read API?
+scope: documents.write  →  may this client call the write API?
 ```
 
-That mapping should be stable. Do not use display names or emails as permanent
-authorization ids.
+These are not per-object decisions. They just say whether the client application
+is allowed to call a category of API at all.
 
-## Multiple concrete cases
-
-### Case 1: server-rendered app
+ReBAC is fine-grained and object-specific:
 
 ```text
-Browser -> App
-App redirects to IdP
-App receives code
-App stores tokens server-side
-Browser receives session cookie
-App maps session to user id for ReBAC checks
+can user:alice edit document:roadmapDocument?  ←  specific object, specific user
 ```
 
-Use when the backend owns the web session.
-
-### Case 2: SPA plus API
+You usually need both:
 
 ```text
-Browser SPA -> IdP with Authorization Code + PKCE
-SPA receives tokens according to provider guidance
-SPA calls API with access token
-API validates token
-API maps subject to ReBAC user id
-API performs ReBAC check
+Access token has documents.write scope?    yes, client is authorized to call the API
+       ↓
+ReBAC: can alice edit this document?       yes, this specific object is allowed
+       ↓
+allow action
 ```
 
-Be careful with token storage in browsers. Avoid old implicit flow examples.
+OAuth scopes are not a replacement for object-level authorization. That is
+exactly the gap ReBAC fills.
 
-### Case 3: native/mobile app
+## Which flow should I use?
 
 ```text
-Mobile app -> system browser
-IdP login -> app callback
-App exchanges code with PKCE
-App calls API with access token
-API performs ReBAC check
+App type              Recommended approach                Notes
+────────────────────  ──────────────────────────────────  ──────────────────────
+Server web app        Auth Code + PKCE + session          Store tokens server-side
+SPA (browser)         Auth Code + PKCE                    Avoid implicit flow
+Native/mobile app     Auth Code + PKCE                    Use system browser
+Machine-to-machine    Client Credentials                   No user present
+CLI with user login   Device Authorization or Auth Code    Depends on UX
 ```
 
-Native apps are public clients. PKCE is essential.
+For this repo:
+- Future browser/server version: Authorization Code + PKCE + OIDC
+- Current terminal client: Auth Code + PKCE with localhost callback, or Device flow
+- Tutorial mode (current): you type `alice`, `bob`, or `casey` — login is skipped
+  to keep focus on authorization
 
-### Case 4: machine-to-machine
+## Two patterns to avoid
+
+**Implicit flow** — an old SPA approach that returned tokens in the URL fragment.
+Authorization Code + PKCE replaced it. Do not use it.
+
+**Resource Owner Password Credentials** — your app collects the user's password
+directly. This breaks the entire point of delegated login. Do not use it.
+
+If a tutorial still recommends either of these, treat it as outdated.
+
+## JWTs in thirty seconds
+
+Tokens are often JWTs (JSON Web Tokens). A JWT has three parts:
 
 ```text
-Service A -> token endpoint using client credentials
-Service A -> API with access token
-API checks service identity/scopes
+header.payload.signature
 ```
 
-There may be no human user. ReBAC can still model service principals:
+The payload contains claims. The signature proves the IdP issued it. You must
+verify the signature before trusting any claims.
 
 ```text
-user:service-billing-worker
+Never trust a JWT just because it decodes. Always verify the signature.
 ```
-
-or a separate `service` type if your model needs it.
-
-### Case 5: CLI
-
-```text
-CLI starts login
-User authenticates in browser or enters device code
-CLI receives token
-CLI calls API
-API validates token and performs ReBAC check
-```
-
-For this tutorial, the CLI is intentionally simpler and lets you type `alice`,
-`bob`, or `casey`. That keeps the first lesson focused on authorization.
-
-## Where OAuth should live in the architecture
-
-Authentication is an HTTP boundary concern.
-
-```text
-HTTP server
-  -> authenticate request
-  -> create Actor/User identity
-  -> call domain service
-  -> domain service authorizes action
-```
-
-Do not make `DocumentService` parse JWTs. It should receive an already
-authenticated actor id.
-
-Clean boundary:
-
-```text
-auth middleware extracts user:github:12345
-DocumentService checks can_edit for user:github:12345
-```
-
-Messy boundary:
-
-```text
-DocumentService parses Authorization header and calls OpenFGA
-```
-
-Keep authentication, authorization, and business logic separate.
-
-## OAuth does not replace ReBAC
-
-OAuth can tell the app:
-
-```text
-this request is from user:alice
-```
-
-OAuth does not naturally answer:
-
-```text
-can user:alice edit document:roadmapDocument because she is in team:platformTeam?
-```
-
-That second question is the ReBAC question.
 
 ## Common mistakes
 
-### Mistake 1: Treating login as permission
-
-Bad:
+**1. Treating login as permission**
 
 ```text
-if user is logged in, allow edit
+Bad:    if user is logged in → allow edit
+Better: if user is logged in → check can_edit for this specific document
 ```
 
-Better:
+**2. Putting permissions in the token**
 
 ```text
-if user is logged in, check can_edit on this document
+Bad:    JWT contains all of Alice's teams and roles
+Problem: Alice leaves a team; her old token still claims she is in it
+Better: JWT contains Alice's stable identity; authorization checks happen live
 ```
 
-### Mistake 2: Putting too much in tokens
-
-You might be tempted to put every team and permission in a JWT.
-
-That becomes stale quickly:
+**3. Using email as the user id**
 
 ```text
-Alice leaves team:platformTeam
-Alice still has an old token saying she is in team:platformTeam
+Bad:    user:alice@example.com   (emails change)
+Better: user:github:12345        (stable, tied to provider subject)
 ```
 
-Prefer stable identity in the token and fresh authorization checks for important
-resource actions.
-
-### Mistake 3: Using email as the ReBAC user id
-
-Emails change. Provider subject ids are more stable.
-
-Prefer:
+**4. Treating OAuth scopes as object permissions**
 
 ```text
-user:github:12345
+Bad:    documents.write scope → can edit every document
+Better: documents.write scope → may call the write API
+        then ReBAC decides which documents alice can actually edit
 ```
 
-over:
+**5. Learning from outdated examples**
+
+If a tutorial recommends implicit flow for SPAs or password grant for
+first-party apps, it is outdated. Stop reading it.
+
+## Standards landscape (as of 2026)
 
 ```text
-user:alice@example.com
+OAuth 2.0            base authorization framework
+OpenID Connect 1.0   identity layer on top of OAuth 2.0
+RFC 9700             OAuth 2.0 Security Best Current Practice
+OAuth 2.1            active draft — consolidates modern guidance, not yet final
 ```
 
-### Mistake 4: Treating OAuth scopes as object permissions
+This course teaches the modern posture:
 
-Bad:
-
-```text
-documents.write scope -> can edit every document
-```
-
-Better:
-
-```text
-documents.write scope -> may call write API
-ReBAC check -> may edit this document
-```
-
-### Mistake 5: Learning from outdated flow diagrams
-
-If a tutorial recommends implicit flow for SPAs or password grant for first-party
-apps, treat it as outdated unless there is a very specific legacy reason.
-
-## Exercise
-
-Design the authentication boundary for this repo:
-
-1. pretend a request has `Authorization: Bearer <jwt>`
-2. verify the JWT in middleware
-3. extract `sub`
-4. convert it to `user:<provider-subject>`
-5. pass that actor id to `DocumentService`
-
-Do not change `DocumentService` to know about JWTs.
+- Authorization Code flow with PKCE
+- OpenID Connect for authentication
+- Exact redirect URI matching
+- Refresh token rotation
+- No implicit flow for SPAs
+- No Resource Owner Password Credentials grant
 
 ## Checkpoint
 
-Answer this:
+> What does OAuth/OIDC give ReBAC?
 
-```text
-What does OAuth give ReBAC?
-```
+OAuth/OIDC verifies who is making the request and gives your app a stable user
+identity. ReBAC then uses that identity to decide what the user can do on a
+specific object.
 
-Good answer: OAuth/OIDC gives the app a verified user identity. ReBAC then uses
-that identity to decide what the user can do on a specific object.
+Two separate questions:
+- OAuth/OIDC answers: **who?**
+- ReBAC answers: **what may they do with this?**
 
 ## Further reading
 
-Primary sources worth knowing:
-
-- RFC 9700: OAuth 2.0 Security Best Current Practice
-- OAuth 2.1 draft in the IETF OAuth Working Group
-- OpenID Connect Core 1.0
-- RFC 9449: DPoP
-- RFC 8705: OAuth mTLS
+- [RFC 9700: OAuth 2.0 Security Best Current Practice](https://www.rfc-editor.org/rfc/rfc9700)
+- [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0-final.html)
+- [OAuth 2.1 Internet-Draft](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/)
+- [RFC 9449: DPoP](https://www.rfc-editor.org/rfc/rfc9449) — sender-constrained tokens

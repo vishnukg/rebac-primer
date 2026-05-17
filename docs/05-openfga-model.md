@@ -76,6 +76,46 @@ Model:  what relationships can mean
 Tuples: which relationships currently exist
 ```
 
+## Reading the DSL
+
+Before walking through each type, here are the three syntax constructs you will
+see throughout the model. Everything is built from these three ideas.
+
+**Type restriction** — square brackets declare which subject types can be
+assigned directly to a relation:
+
+```text
+define admin: [user]
+```
+
+Only a `user:someone` is valid as a direct admin. Writing `team:platformTeam` as
+an admin would be rejected by the model.
+
+**Subject set** — the `type#relation` form means "everyone who holds that
+relation on that type":
+
+```text
+define editor: [user, team#member]
+```
+
+Both a literal `user:alice` and a `team:platformTeam#member` (all members of
+that team) are valid workspace editors. One tuple grants access to an entire
+team.
+
+**Graph traversal** — the `X from Y` form means "follow relation Y to a parent
+object, then check X there":
+
+```text
+define editor: workspace#editor from workspace
+```
+
+Find the object this document points to via its `workspace` relation, then check
+whether the user is an `editor` on that workspace. This is how permissions flow
+from parent to child.
+
+These three constructs are worth re-reading when any DSL line looks confusing.
+Most lines are just combinations of them.
+
 ## Users
 
 ```text
