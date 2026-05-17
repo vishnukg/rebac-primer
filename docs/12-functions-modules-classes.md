@@ -373,6 +373,11 @@ This gives you three practical wins:
 Think of the composition root as the cast list for the program. It says which
 actors are playing which interface roles in this run.
 
+The server composition root also reads environment configuration such as `PORT`
+and validates it before the server starts. That is the 12-factor shape: config
+comes from the environment, but business code receives ordinary typed values and
+interfaces.
+
 ## Private methods can improve reading flow
 
 `DocumentService` exposes public business actions:

@@ -10,14 +10,19 @@ export class InMemoryDocumentRepository implements DocumentRepository {
   private readonly documents = new Map<DocumentId, CollaborativeDocument>();
 
   async save(document: CollaborativeDocument): Promise<void> {
-    this.documents.set(document.id, document);
+    this.documents.set(document.id, cloneDocument(document));
   }
 
   async findById(id: DocumentId): Promise<CollaborativeDocument | undefined> {
-    return this.documents.get(id);
+    const document = this.documents.get(id);
+    return document ? cloneDocument(document) : undefined;
   }
 
   async list(): Promise<readonly CollaborativeDocument[]> {
-    return [...this.documents.values()];
+    return [...this.documents.values()].map(cloneDocument);
   }
+}
+
+function cloneDocument(document: CollaborativeDocument): CollaborativeDocument {
+  return { ...document };
 }

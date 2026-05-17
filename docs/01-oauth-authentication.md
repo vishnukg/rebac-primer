@@ -142,6 +142,12 @@ password grant for browser/mobile apps.
 OAuth 2.1 is useful to study because it consolidates modern OAuth guidance, but
 until it is final, the safest wording is "OAuth 2.0 plus current BCP guidance."
 
+Primary references:
+
+- [RFC 9700: OAuth 2.0 Security Best Current Practice](https://www.rfc-editor.org/rfc/rfc9700)
+- [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0-final.html)
+- [OAuth 2.1 Internet-Draft](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/)
+
 This course teaches that modern posture:
 
 - Authorization Code flow

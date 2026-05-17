@@ -20,4 +20,24 @@ describe("InMemoryDocumentRepository", () => {
     // Assert
     expect(documents).toHaveLength(1);
   });
+
+  it("given_saved_document_when_caller_mutates_original_then_repository_keeps_snapshot", async () => {
+    // Arrange
+    const repository = new InMemoryDocumentRepository();
+    const document = {
+      id: "roadmapDocument",
+      title: "Roadmap",
+      body: "v1",
+      workspace: workspace("productWorkspace"),
+      updatedBy: "user:workspaceEditor" as const
+    };
+
+    // Act
+    await repository.save(document);
+    document.body = "mutated outside repository";
+    const found = await repository.findById("roadmapDocument");
+
+    // Assert
+    expect(found?.body).toBe("v1");
+  });
 });

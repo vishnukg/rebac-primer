@@ -12,6 +12,10 @@ This separation is one of the best ideas in OpenFGA.
 
 Your model should change rarely. Your tuples change constantly.
 
+Reference: [OpenFGA concepts](https://openfga.dev/docs/concepts) explains the
+same split between authorization models, relationship tuples, users, objects,
+and checks.
+
 ## Scene
 
 The product rule sounds simple: workspace editors can edit workspace documents.

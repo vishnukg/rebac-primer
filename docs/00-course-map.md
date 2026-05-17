@@ -113,7 +113,7 @@ Read these after the shared ReBAC track if Go is your implementation language.
 
 | Doc | Topic | Code to inspect |
 |-----|-------|-----------------|
-| 40 | Production readiness: what this repo does not cover | conceptual |
+| 40 | Production readiness: turning tutorial patterns into a real service | conceptual |
 
 ---
 
@@ -272,6 +272,8 @@ Docker Compose.
 1. Read `40-production-readiness.md`.
 2. For each gap listed, write one sentence describing where in this repo the
    production concern would be handled.
+3. Use the checklist to separate learning-only shortcuts from production
+   requirements.
 
 Checkpoint: explain why the `Authorizer` interface makes it straightforward to
 swap `GraphAuthorizer` for a real OpenFGA client in a production deployment.

@@ -498,6 +498,14 @@ and `domain` concrete types. Everything else depends only on interfaces.
 ```go
 // go/internal/app/app.go
 func New(ctx context.Context) (*App, error) {
+    cfg, err := ConfigFromEnv(os.Getenv)
+    if err != nil {
+        return nil, err
+    }
+    return NewWithConfig(ctx, cfg)
+}
+
+func NewWithConfig(ctx context.Context, cfg Config) (*App, error) {
     // authz layer — concrete types
     tupleStore := authz.NewInMemoryTupleStore(fixtures.SeedRelationshipTuples()...)
     authorizer := authz.NewGraphAuthorizer(tupleStore)
@@ -522,9 +530,13 @@ func New(ctx context.Context) (*App, error) {
     handler := httpserver.NewServer(docs)
 
     // ...
-    return &App{Handler: handler, Port: port}, nil
+    return &App{Handler: handler, Port: cfg.Port}, nil
 }
 ```
+
+`ConfigFromEnv` reads 12-factor style process configuration. `NewWithConfig`
+keeps the object graph explicit and testable without requiring tests to mutate
+global environment variables.
 
 To swap `GraphAuthorizer` for `OpenFGAAuthorizer`, replace the authorizer
 construction:

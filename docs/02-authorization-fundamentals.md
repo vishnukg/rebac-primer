@@ -401,6 +401,11 @@ call tools
 trigger workflows
 ```
 
+This section is deliberately conceptual. Agentic authorization is still an
+emerging architecture area, but the fundamentals here are stable: authenticate
+the principal, identify who the action is on behalf of, and authorize each
+server-side operation before it executes.
+
 The core questions do not change:
 
 ```text

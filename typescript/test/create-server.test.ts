@@ -13,4 +13,15 @@ describe("createServerApp", () => {
     expect(app.port).toBe(4999);
     expect(app.server.listening).toBe(false);
   });
+
+  it("given_invalid_port_environment_variable_when_server_app_is_created_then_error_is_thrown", async () => {
+    // Arrange
+    const env = { PORT: "not-a-port" };
+
+    // Act
+    const createAction = () => createServerApp(env);
+
+    // Assert
+    await expect(createAction).rejects.toThrow("Invalid PORT");
+  });
 });
