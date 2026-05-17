@@ -223,10 +223,11 @@ services:
 Run `openfga migrate` before starting the server to initialize the schema.
 
 Do not run production on `latest` image tags. Pin image versions so a deployment
-is repeatable:
+is repeatable. OpenFGA's published tags do not carry a leading `v` — use the
+plain `X.Y.Z` form you see on the [releases page](https://github.com/openfga/openfga/releases):
 
 ```yaml
-image: openfga/openfga:vX.Y.Z
+image: openfga/openfga:X.Y.Z
 ```
 
 Production OpenFGA also needs the same operational basics as any other service:

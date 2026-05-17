@@ -563,12 +563,17 @@ allow tool call if:
 The graph could contain facts like:
 
 ```text
-agent:docAssistant delegate user:alice
+user:alice delegate agent:docAssistant
 tool:updateDocument can_use agent:docAssistant
 team:platformTeam member user:alice
 workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
 ```
+
+The first tuple reads "the agent is in alice's `delegate` set" — i.e. Alice has
+delegated to the agent. That direction matches the layer-3 check
+`Check(agent:docAssistant, delegate, user:alice)`, which asks whether the agent
+appears in alice's `delegate` relation.
 
 Then a tool call is not just a prompt response. It becomes an authorized action:
 

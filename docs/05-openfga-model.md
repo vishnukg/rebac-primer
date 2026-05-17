@@ -1,6 +1,14 @@
 # OpenFGA model
 
-OpenFGA separates authorization into three layers:
+Imagine the product manager walks over and says: "Alice should be able to edit
+the roadmap doc because she's on the platform team." You could code that rule
+directly into `DocumentService.Update`. But then the next request — "engineers
+on this workspace can comment but not edit" — needs another `if`. And the one
+after that needs another. Soon the rules are scattered across handlers and
+nobody can answer "who can edit this document, and why?"
+
+OpenFGA replaces that pile of `if`s with three layers you can reason about
+independently:
 
 ```text
 store  -> environment namespace
@@ -8,9 +16,9 @@ model  -> schema: object types, relations, computed permissions
 tuples -> runtime facts: who has what on what
 ```
 
-This separation is one of the best ideas in OpenFGA.
-
-Your model should change rarely. Your tuples change constantly.
+The split matters because each layer changes on a different clock. Your model
+should change rarely (the *shape* of the rules). Your tuples change constantly
+(the *data*). Your store almost never changes (one per environment).
 
 Reference: [OpenFGA concepts](https://openfga.dev/docs/concepts) explains the
 same split between authorization models, relationship tuples, users, objects,

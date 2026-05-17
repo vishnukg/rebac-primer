@@ -141,6 +141,11 @@ point where other work can continue.
 
 ## Event loop and microtasks
 
+> **Optional deep dive.** The rest of this chapter is what you need for ReBAC
+> work. The next two sections (event loop, concurrency vs parallelism) are
+> background mechanics — useful, but skip to **Sequential awaits** if you want
+> to keep moving and come back when an async bug forces you to.
+
 Node runs JavaScript on an event loop.
 
 For this primer, use this mental model:

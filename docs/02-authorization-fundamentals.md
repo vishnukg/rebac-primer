@@ -286,9 +286,15 @@ ReBAC decides from relationships.
 
 ```text
 user:alice member team:platformTeam
-team:platformTeam editor workspace:productWorkspace
+workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
 ```
+
+Each line is one tuple, written as `object relation user`. The middle line uses
+the subject set `team:platformTeam#member` so editor access flows from team
+membership rather than being attached to the team object itself. Subject sets
+are introduced in detail in `04-rebac-concepts.md`; for now read the line as
+"members of the platform team are editors of the product workspace."
 
 Diagram:
 

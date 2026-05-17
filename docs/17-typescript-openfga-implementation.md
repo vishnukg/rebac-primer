@@ -126,11 +126,12 @@ The adapter owns the SDK client. The rest of the app does not.
 The `check` method converts from this repo's request shape:
 
 ```ts
-type CheckRequest = {
+// typescript/src/authz/types.ts
+export type CheckRequest = Readonly<{
   user: RebacObject<"user">;
   relation: Relation;
   object: RebacObject;
-};
+}>;
 ```
 
 to the SDK call:

@@ -62,6 +62,7 @@ make → docker compose → containerized tools
 make ts-deps
 make ts-build
 make ts-test
+make ts-coverage
 make ts-check
 make ts-server
 make ts-client
@@ -72,6 +73,7 @@ make ts-client
 ```bash
 make go-build
 make go-test
+make go-vet
 make go-check
 make go-server
 ```

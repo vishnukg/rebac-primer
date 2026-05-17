@@ -78,9 +78,12 @@ The left side is your host. The right side is the container.
 
 Common OpenFGA ports:
 
-- `8080`: API
-- `8081`: playground or auxiliary service depending on image config
-- `3000`: playground UI in common local setups
+- `8080`: HTTP API (what the SDK calls)
+- `8081`: gRPC API
+- `3000`: Playground UI — only served when `OPENFGA_PLAYGROUND_ENABLED=true` is
+  set on the container. This repo's compose file publishes the port but does
+  not enable the playground, so nothing is listening on `localhost:3000` until
+  you add that env var.
 
 ## Compose profiles
 

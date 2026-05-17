@@ -29,7 +29,8 @@ npm run coverage
 Authorization tests should be concrete. A test that only proves "the mock was
 called" does not prove the graph grants or denies the right access.
 
-This repo uses four styles:
+The repo organizes tests around layers — types, model text, ReBAC traversal,
+domain rules, HTTP mapping, client behavior, and infrastructure adapters:
 
 | Test file | What it teaches |
 |-----------|-----------------|

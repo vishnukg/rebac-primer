@@ -314,15 +314,15 @@ Go uses `errors.As`:
 ```go
 // go/internal/httpserver/handler.go
 func (h *handler) writeError(w http.ResponseWriter, err error) {
-    var forbidden *domain.ForbiddenError
-    if errors.As(err, &forbidden) {
-        writeJSON(w, http.StatusForbidden, errorBody(err.Error()))
-        return
-    }
-
     var notFound *domain.DocumentNotFoundError
     if errors.As(err, &notFound) {
         writeJSON(w, http.StatusNotFound, errorBody(err.Error()))
+        return
+    }
+
+    var forbidden *domain.ForbiddenError
+    if errors.As(err, &forbidden) {
+        writeJSON(w, http.StatusForbidden, errorBody(err.Error()))
         return
     }
 
@@ -376,23 +376,26 @@ Go would refuse to compile — unused variables are a compile error.
 ### Methods on structs
 
 TypeScript methods live on classes. Go methods live on any named type — structs
-are the most common:
+are the most common. A method's receiver can be a value or a pointer:
 
 ```go
-// Value receiver — receives a copy of s. Used for read-only methods.
-func (s InMemoryTupleStore) All() []TupleKey { ... }
+// Value receiver — sees a copy of p. Caller-side mutation cannot escape.
+func (p Point) DistanceFromOrigin() float64 { ... }
 
-// Pointer receiver — receives a pointer; can modify s.
+// Pointer receiver — sees the address; can mutate fields and shares state.
 func (s *InMemoryTupleStore) Write(key TupleKey) { ... }
+func (s *InMemoryTupleStore) All() []TupleKey   { ... } // also a pointer — needs the mutex
 ```
 
-The rule in this repo: use pointer receivers when the method modifies the struct
-(e.g. `Write`, `Delete`), and value receivers for read-only operations when the
-struct is small enough that copying is cheap. In practice, nearly all methods use
-pointer receivers — consistency matters more than the occasional copy saved.
+The rule in this repo: use pointer receivers when the method mutates state,
+holds a mutex/RWMutex, or is large enough that copying is wasteful. The
+`InMemoryTupleStore` methods all use pointer receivers because `All()`,
+`Has()`, and friends acquire `s.mu.RLock()` — and a `sync.RWMutex` must not be
+copied. Value receivers are reserved for small, immutable value types.
 
 Mixing value and pointer receivers on the same type is legal but breaks the
-addressability rules for interface satisfaction. Pick one form and stick to it.
+addressability rules for interface satisfaction. Pick one form per type and
+stick to it.
 
 ### Constructor functions
 

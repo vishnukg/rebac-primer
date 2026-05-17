@@ -40,8 +40,8 @@ each connection means.
 | Word | Meaning in plain English | Example in this repo |
 |------|--------------------------|----------------------|
 | Node | A thing | `user:alice` |
-| Edge | A connection between things | `member` |
-| Label | The name on an edge | `editor`, `viewer`, `workspace` |
+| Edge | A connection between two nodes | `user:alice → team:platformTeam` |
+| Label | The name on an edge | `member`, `editor`, `viewer`, `workspace` |
 | Direction | Which way the relationship points | document points to workspace |
 | Path | A chain of edges | user -> team -> workspace |
 | Reachability | Whether a path exists | can this user reach this permission? |

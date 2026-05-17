@@ -83,21 +83,27 @@ Most OAuth/OIDC explanations become easier if you can name the four boxes:
                                                 │ asks for login
                                                 ▼
                                          ┌──────────────┐
-                                         │ Identity     │
-                                         │ Provider     │
+                                         │ Authorization│
+                                         │ Server (IdP) │
                                          │ Auth0/GitHub │
                                          └──────┬───────┘
                                                 │ issues tokens
                                                 ▼
                                          ┌──────────────┐
-                                         │ API / Server │
-                                         │ protected by │
-                                         │ tokens       │
+                                         │ Resource     │
+                                         │ Server / API │
+                                         │ token-gated  │
                                          └──────────────┘
 ```
 
-In a small server app, "Your App" and "API / Server" may be the same process.
-They are still different roles in the mental model.
+The OAuth spec name for the token-issuing box is **Authorization Server**. When
+that same component also performs login and issues OIDC ID tokens it is also
+called an **Identity Provider** (IdP) or **OpenID Provider** (OP). In practice
+one vendor (Auth0, Okta, Entra ID, GitHub, Google) plays both roles, so the
+terms get mixed; the role names from the spec are spelled out below.
+
+In a small server app, "Your App" and the Resource Server may be the same
+process. They are still different roles in the mental model.
 
 ## What each thing proves
 

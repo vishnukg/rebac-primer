@@ -34,10 +34,15 @@ Open `typescript/Dockerfile` and `go/Dockerfile`.
 The TypeScript Dockerfile has three stages:
 
 ```text
-deps    -> install npm dependencies
-build   -> compile TypeScript
-runtime -> install production deps and run compiled JS
+deps    -> FROM node:22-slim;  install npm dependencies
+build   -> FROM deps;          add src + test, compile TypeScript
+runtime -> FROM node:22-slim;  install prod-only deps, copy /dist, run node
 ```
+
+Two things to notice: `build` extends `deps` (so it inherits `node_modules`
+without reinstalling), and `runtime` starts fresh from `node:22-slim` and
+re-installs with `--omit=dev` so the final image carries no build tools or
+test code.
 
 The runtime stage does not run `tsx`. It runs compiled JavaScript:
 

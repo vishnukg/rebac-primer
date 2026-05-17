@@ -585,23 +585,33 @@ infrastructure.
 
 ## Exercise
 
-Create a small composition module:
+Create a small composition module. Real composition often needs to seed data
+through the service layer (so domain rules run), which makes the function
+async — that is exactly the shape `typescript/src/app/create-services.ts` uses:
 
 ```ts
 // src/app/create-services.ts
-export function createServices() {
-  const store = new InMemoryTupleStore(seedRelationshipTuples());
-  const authorizer = new GraphAuthorizer(store);
-  const repository = new InMemoryDocumentRepository();
+export type AppServices = Readonly<{
+  documents: DocumentOperations;
+  authorizer: Authorizer;
+  tupleStore: TupleStore;
+}>;
 
-  return {
-    authorizer,
-    documents: new DocumentService(repository, authorizer)
-  };
+export async function createServices(): Promise<AppServices> {
+  const tupleStore = new InMemoryTupleStore(seedRelationshipTuples());
+  const authorizer = new GraphAuthorizer(tupleStore);
+  const repository = new InMemoryDocumentRepository();
+  const documents = new DocumentService(repository, authorizer);
+
+  // Seed the initial document through the service so its authz check runs.
+  await documents.create({ /* ... */ });
+
+  return { documents, authorizer, tupleStore };
 }
 ```
 
-Then update `src/main.ts` to use it.
+Then update `src/main.ts` to `await createServices()` before passing the
+services into the HTTP server.
 
 After that, ask:
 
