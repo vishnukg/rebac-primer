@@ -1,10 +1,10 @@
 // Driven port — what the documents domain needs from the authz service.
 //
 // The documents domain calls this port to:
-//   1. check  — ask "can this actor do X on this object?"
+//   1. check       — ask "can this actor do X on this object?"
 //   2. writeTuples — register new relationships (called on document creation)
 //
-// In tests this is satisfied by a fake in-memory implementation.
+// In tests this is satisfied by makeInProcessAuthzClient from test/fixtures.ts.
 // In production it is satisfied by makeAuthzServiceClient, which calls the
 // AuthZ service over HTTP.
 
@@ -12,7 +12,7 @@ import type { CheckRequest, CheckResult, TupleKey } from "../../../shared/rebac.
 
 export type { CheckRequest, CheckResult, TupleKey };
 
-export type AuthzClient = {
+export interface AuthzClient {
     check:       (request: CheckRequest) => Promise<CheckResult>;
     writeTuples: (tuples: TupleKey[]) => Promise<void>;
-};
+}

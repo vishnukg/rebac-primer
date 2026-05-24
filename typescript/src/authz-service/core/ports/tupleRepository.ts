@@ -5,6 +5,13 @@
 
 import type { Relation, RebacObject, Subject, TupleKey } from "../../../shared/rebac.ts";
 
+// Narrows which tuples findAll returns.  Defined here because TupleRepository
+// owns the query shape — domain types.ts re-exports it for convenience.
+export type TupleFilter = {
+    object?:   RebacObject;
+    relation?: Relation;
+};
+
 export interface TupleRepository {
     // Returns true if the exact (object, relation, user) tuple exists.
     has: (object: RebacObject, relation: Relation, user: Subject) => boolean;
@@ -14,7 +21,7 @@ export interface TupleRepository {
     findByObjectRelation: (object: RebacObject, relation: Relation) => TupleKey[];
 
     // Returns all tuples, optionally filtered.
-    findAll: (filter?: { object?: RebacObject; relation?: Relation }) => TupleKey[];
+    findAll: (filter?: TupleFilter) => TupleKey[];
 
     // Adds a tuple (idempotent).
     write: (tuple: TupleKey) => void;

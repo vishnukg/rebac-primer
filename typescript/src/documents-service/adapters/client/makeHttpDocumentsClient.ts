@@ -1,4 +1,4 @@
-import type { CollaborativeDocument } from "../../core/index.ts";
+import type { CollaborativeDocument } from "../../core/domain/types.ts";
 import { isJsonObject } from "../http/json.ts";
 
 export type Fetcher = (input: URL, init?: RequestInit) => Promise<Response>;

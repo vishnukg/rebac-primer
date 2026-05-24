@@ -4,13 +4,10 @@
 // tuples are stored in memory or in Postgres, or whether evaluation is done
 // in-process or via OpenFGA.
 
-import type { TupleRepository } from "../ports/tupleRepository.ts";
-import type { AuthzService, TupleFilter } from "./types.ts";
+import type { TupleRepository, TupleFilter } from "../ports/index.ts";
+import type { Evaluator } from "../ports/index.ts";
+import type { AuthzService } from "./types.ts";
 import type { CheckRequest, CheckResult, TupleKey } from "../../../shared/rebac.ts";
-
-type Evaluator = {
-    evaluate: (request: CheckRequest) => CheckResult;
-};
 
 type AuthzDomainCfg = {
     repository: TupleRepository;
@@ -18,7 +15,7 @@ type AuthzDomainCfg = {
 };
 
 const makeAuthzDomain = ({ repository, evaluator }: AuthzDomainCfg): AuthzService => {
-    const check = async (request: CheckRequest): Promise<CheckResult> =>
+    const check = (request: CheckRequest): Promise<CheckResult> =>
         evaluator.evaluate(request);
 
     const writeTuples = async (tuples: TupleKey[]): Promise<void> => {

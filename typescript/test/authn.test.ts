@@ -2,31 +2,43 @@ import { describe, expect, it } from "vitest";
 import makeDemoTokenVerifier from
     "../src/documents-service/adapters/authn/makeDemoTokenVerifier.ts";
 
+// makeDemoTokenVerifier stands in for a real OAuth2 token verifier.
+// In production this would validate a JWT against an IdP's public key and
+// return the same { subject, scopes } shape.  The port is identical; only
+// the adapter changes.
+
 describe("makeDemoTokenVerifier", () => {
-    it("turns a bearer access token into an authenticated user", async () => {
+    it("extracts subject and scopes from a valid bearer token", async () => {
+        // Arrange
         const authenticator = makeDemoTokenVerifier({
             tokens: { "token-alice": { sub: "alice", scopes: ["documents:read"] } },
         });
 
+        // Act
         const result = await authenticator.verifyAccessToken("Bearer token-alice");
 
+        // Assert
         expect(result).toEqual({
             subject: "user:alice",
             scopes:  ["documents:read"],
         });
     });
 
-    it("rejects a missing Authorization header", async () => {
+    it("throws AuthenticationError when the Authorization header is missing", async () => {
+        // Arrange
         const authenticator = makeDemoTokenVerifier({ tokens: {} });
-        await expect(authenticator.verifyAccessToken(undefined)).rejects.toMatchObject({
-            name: "AuthenticationError",
-        });
+
+        // Act + Assert
+        await expect(authenticator.verifyAccessToken(undefined))
+            .rejects.toMatchObject({ name: "AuthenticationError" });
     });
 
-    it("rejects an unknown token", async () => {
+    it("throws AuthenticationError when the token is not in the registry", async () => {
+        // Arrange
         const authenticator = makeDemoTokenVerifier({ tokens: {} });
-        await expect(authenticator.verifyAccessToken("Bearer nope")).rejects.toMatchObject({
-            name: "AuthenticationError",
-        });
+
+        // Act + Assert
+        await expect(authenticator.verifyAccessToken("Bearer nope"))
+            .rejects.toMatchObject({ name: "AuthenticationError" });
     });
 });

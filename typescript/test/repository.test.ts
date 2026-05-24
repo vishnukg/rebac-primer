@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import makeInMemoryDocumentRepository from
     "../src/documents-service/adapters/db/makeInMemoryDocumentRepository.ts";
-import { alice, productWorkspace } from "../src/demo/fixtures.ts";
+import { alice, productWorkspace } from "./fixtures.ts";
 
 describe("makeInMemoryDocumentRepository", () => {
     it("stores snapshots instead of caller-owned objects", async () => {

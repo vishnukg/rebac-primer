@@ -104,7 +104,7 @@ want `can_edit`, `can_read`, and `can_delete`, not any random string.
 
 ## Your first useful type
 
-Open `src/core/ports/authz.ts`.
+Open `src/shared/rebac.ts`.
 
 ```ts
 export type DocumentRelation =
@@ -184,7 +184,7 @@ This repo runs TypeScript source directly in development with `tsx`, so relative
 imports include `.ts`:
 
 ```ts
-import makeGraphAuthorizer from "./adapters/authz/makeGraphAuthorizer.ts";
+import makeGraphEvaluator from "./adapters/authz/makeGraphEvaluator.ts";
 ```
 
 The important rule is that ESM imports use explicit file extensions. This repo
@@ -215,7 +215,7 @@ that the program does what the domain requires.
 
 ## Exercise
 
-1. Open `src/demo/fixtures.ts`.
+1. Open `test/fixtures.ts`.
 2. Change `"editor"` to `"edtor"` in one tuple.
 3. Run `npm run build`.
 4. Read the compiler error.

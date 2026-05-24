@@ -12,7 +12,7 @@ vocabulary for ReBAC:
 - tuple keys
 - authorization checks
 
-Open `src/core/ports/authz.ts` while reading.
+Open `src/shared/rebac.ts` while reading.
 
 ## Scene
 
@@ -246,7 +246,7 @@ Then:
 
 1. add it to `DocumentRelation`
 2. decide which relationship should imply it
-3. update `makeGraphAuthorizer`
+3. update `makeGraphEvaluator`
 4. add a test
 5. run `npm run build && npm test`
 

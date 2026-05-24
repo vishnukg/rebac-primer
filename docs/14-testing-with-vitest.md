@@ -48,21 +48,21 @@ The tests double as executable documentation.
 ```ts
 import { describe, expect, it } from "vitest";
 
-describe("makeGraphAuthorizer", () => {
-  it("allows alice to edit through team membership and workspace inheritance", async () => {
+describe("makeGraphEvaluator", () => {
+  it("allows alice to edit via team → workspace → document chain", async () => {
     // Arrange
-    const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
-    const authorizer = makeGraphAuthorizer({ tupleStore });
+    const repository = makeInMemoryTupleRepository([...seedPolicyTuples(), docWorkspaceTuple]);
+    const evaluator  = makeGraphEvaluator({ repository });
 
     // Act
-    const result = await authorizer.check({
+    const { allowed } = await evaluator.evaluate({
       user: alice,
       relation: "can_edit",
-      object: roadmapDocument
+      object: roadmapDoc,
     });
 
     // Assert
-    expect(result.allowed).toBe(true);
+    expect(allowed).toBe(true);
   });
 });
 ```
@@ -106,18 +106,18 @@ Example:
 
 ```ts
 // Arrange
-const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
-const authorizer = makeGraphAuthorizer({ tupleStore });
+const repository = makeInMemoryTupleRepository([...seedPolicyTuples(), docWorkspaceTuple]);
+const evaluator  = makeGraphEvaluator({ repository });
 
 // Act
-const result = await authorizer.check({
+const { allowed } = await evaluator.evaluate({
   user: bob,
   relation: "can_edit",
-  object: roadmapDocument
+  object: roadmapDoc,
 });
 
 // Assert
-expect(result.allowed).toBe(false);
+expect(allowed).toBe(false);
 ```
 
 This is small, but it tells a story:
@@ -137,15 +137,13 @@ relationships:
 
 ```ts
 const makeDocumentService = () => {
-  const repository = makeInMemoryDocumentRepository();
-  const authorizer = makeGraphAuthorizer({
-    tupleStore: makeInMemoryTupleStore({ seed: seedRelationshipTuples() })
-  });
-  return makeDocuments({ repository, authorizer });
+  const repository  = makeInMemoryDocumentRepository();
+  const authzClient = makeInProcessAuthzClient(seedPolicyTuples());
+  return makeDocuments({ repository, authzClient });
 };
 ```
 
-Production fixtures such as `seedRelationshipTuples()` are allowed because they are part
+Production fixtures such as `seedPolicyTuples()` are allowed because they are part
 of the lesson data, not a hidden test helper.
 
 The current convention is also enforced by review:
@@ -174,7 +172,7 @@ it("rejects creation for workspace viewers", async () => {
   });
 
   // Assert
-  await expect(createPromise).rejects.toBeInstanceOf(ForbiddenError);
+  await expect(createPromise).rejects.toMatchObject({ name: "ForbiddenError" });
 });
 ```
 
@@ -185,14 +183,13 @@ Two details matter:
 
 ## Test data should be readable
 
-Open `src/demo/fixtures.ts`.
+Open `test/fixtures.ts`.
 
 ```ts
-export const seedRelationshipTuples = (): TupleKey[] => [
+export const seedPolicyTuples = (): TupleKey[] => [
   tuple(platformTeam, "member", alice),
   tuple(productWorkspace, "editor", subjectSet(platformTeam, "member")),
   tuple(productWorkspace, "viewer", bob),
-  tuple(roadmapDocument, "workspace", productWorkspace)
 ];
 ```
 
@@ -208,16 +205,16 @@ Mocks are useful when you want to isolate a unit.
 For example, a `DenyAllAuthorizer` can prove the service rejects unauthorized
 creates without caring about graph traversal.
 
-But this repo mostly uses `makeGraphAuthorizer` because the tutorial
-goal is to learn ReBAC. In that context, graph behavior is not an implementation
-detail. It is the lesson.
+But this repo mostly uses `makeGraphEvaluator` (via `makeInProcessAuthzClient`)
+because the tutorial goal is to learn ReBAC. In that context, graph behavior is
+not an implementation detail. It is the lesson.
 
 ## What not to test
 
 Avoid tests like:
 
 ```ts
-expect(authorizer.check).toHaveBeenCalled();
+expect(authzClient.check).toHaveBeenCalled();
 ```
 
 That proves a call happened, not that access control is correct.
@@ -226,7 +223,7 @@ Prefer:
 
 ```ts
 await expect(
-  authorizer.check({ user: alice, relation: "can_edit", object: roadmapDocument })
+  evaluator.evaluate({ user: alice, relation: "can_edit", object: roadmapDoc })
 ).resolves.toMatchObject({ allowed: true });
 ```
 
@@ -286,7 +283,7 @@ expect(result.allowed).toBe(false);
 than this:
 
 ```ts
-expect(authorizer.check).toHaveBeenCalled();
+expect(authzClient.check).toHaveBeenCalled();
 ```
 
 Good answer: the first checks the rule. The second only checks that a method was

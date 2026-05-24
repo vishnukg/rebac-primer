@@ -64,8 +64,8 @@ Go tracks the same foundation.
 | 01 | OAuth/OIDC authentication fundamentals | conceptual |
 | 02 | Authorization fundamentals: RBAC, ABAC, ReBAC, agentic systems | conceptual |
 | 03 | Graph theory needed for ReBAC | conceptual |
-| 04 | ReBAC concepts, relationship graphs, agentic tool calls | `typescript/src/adapters/authz/makeGraphAuthorizer.ts`, `go/internal/authz/graph.go` |
-| 05 | OpenFGA model DSL | `typescript/src/adapters/authz/model.ts`, `go/internal/authz/model.go` |
+| 04 | ReBAC concepts, relationship graphs, agentic tool calls | `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`, `go/internal/authz/graph.go` |
+| 05 | OpenFGA model DSL | `typescript/src/authz-service/adapters/graph/permissionModel.ts`, `go/internal/authz/model.go` |
 
 ## TypeScript track
 
@@ -74,19 +74,19 @@ Read these after the shared ReBAC track if TypeScript is your implementation lan
 | Doc | Topic | Code to inspect |
 |-----|-------|-----------------|
 | 10 | TypeScript mental model, `strict`, project setup | `typescript/tsconfig.json`, `typescript/package.json` |
-| 11 | Types, unions, narrowing, template literal types | `typescript/src/core/ports/authz.ts` |
-| 12 | Functions, modules, factories, interfaces | `typescript/src/core/domain/documents`, `typescript/src/adapters` |
-| 13 | Async TypeScript, errors, and boundaries | `typescript/src/core/domain/documents`, `typescript/src/adapters/http` |
+| 11 | Types, unions, narrowing, template literal types | `typescript/src/shared/rebac.ts` |
+| 12 | Functions, modules, factories, interfaces | `typescript/src/documents-service/core/domain`, `typescript/src/authz-service/adapters` |
+| 13 | Async TypeScript, errors, and boundaries | `typescript/src/documents-service/core/domain`, `typescript/src/documents-service/adapters/http` |
 | 14 | Testing TypeScript with Vitest | `typescript/test/*.test.ts` |
 | 15 | Coding style for maintainable TypeScript | `docs/15-typescript-code-style.md` |
-| 16 | Node ESM, module loading, module patterns, singletons | `typescript/package.json`, `typescript/tsconfig.json`, `typescript/src/server/index.ts` |
+| 16 | Node ESM, module loading, module patterns, singletons | `typescript/package.json`, `typescript/tsconfig.json`, `typescript/src/authz-service/index.ts` |
 
 Read these after the shared OpenFGA model chapter.
 
 | Doc | Topic | Code to inspect |
 |-----|-------|-----------------|
-| 17 | TypeScript OpenFGA implementation | `typescript/src/adapters/authz/makeOpenFgaAuthorizer.ts` |
-| 18 | TypeScript ReBAC implementation — theory to code walkthrough | `typescript/src/adapters/authz/makeGraphAuthorizer.ts`, `typescript/src/adapters/http/makeHttpHandler.ts` |
+| 17 | TypeScript AuthZ adapter pattern | `typescript/src/documents-service/adapters/authz/makeAuthzServiceClient.ts`, `typescript/test/fixtures.ts` |
+| 18 | TypeScript ReBAC implementation — theory to code walkthrough | `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`, `typescript/src/documents-service/adapters/http` |
 
 ## Go track
 
@@ -108,7 +108,7 @@ Read these after the shared ReBAC track if Go is your implementation language.
 | 30 | Docker fundamentals: images, containers, Dockerfile | `typescript/Dockerfile`, `go/Dockerfile` |
 | 31 | Docker networking: host ports, service names, Compose DNS | `deployments/docker-compose.yml` |
 | 32 | Docker Compose local services | `deployments/docker-compose.yml` |
-| 33 | Client/server ReBAC demo | `typescript/src/server/index.ts`, `typescript/src/cli/index.ts`, `go/cmd/server/main.go` |
+| 33 | Client/server ReBAC demo | `typescript/src/authz-service/index.ts`, `typescript/src/documents-service/index.ts`, `typescript/src/cli/index.ts`, `go/cmd/server/main.go` |
 
 ## Shared track: going to production
 
@@ -185,7 +185,7 @@ Checkpoint: explain why Bob can read but cannot edit.
 ### Day 3: OpenFGA model
 
 1. Read `05-openfga-model.md`.
-2. Open `typescript/src/adapters/authz/model.ts` and `go/internal/authz/model.go`.
+2. Open `typescript/src/authz-service/adapters/graph/permissionModel.ts` and `go/internal/authz/model.go`.
 3. Compare the model with the in-memory graph evaluators in both languages.
 
 Checkpoint: explain `workspace#editor from workspace` as a graph path.
@@ -196,7 +196,7 @@ TypeScript:
 
 1. Read `10-typescript-foundations.md` and `11-types-and-values.md`.
 2. Run `make ts-build`.
-3. Break one relation name in `typescript/src/core/ports/authz.ts`.
+3. Break one relation name in `typescript/src/shared/rebac.ts`.
 4. Restore the code and run `make ts-test`.
 
 Go:
@@ -231,7 +231,7 @@ TypeScript:
 
 1. Read `14-testing-with-vitest.md`.
 2. Run `make ts-test`.
-3. Change `seedRelationshipTuples()` in `typescript/src/demo/fixtures.ts` and predict which tests fail.
+3. Change `seedPolicyTuples()` in `typescript/test/fixtures.ts` and predict which tests fail.
 
 Go:
 
@@ -247,7 +247,7 @@ TypeScript:
 
 1. Read `16-node-esm-and-module-patterns.md`.
 2. Inspect the explicit `.ts` extensions in TypeScript imports.
-3. Explain why `typescript/src/server/index.ts` performs actions but `typescript/src/core/ports/authz.ts` does not.
+3. Explain why `typescript/src/authz-service/index.ts` performs actions but `typescript/src/shared/rebac.ts` does not.
 
 Go:
 
@@ -277,8 +277,8 @@ Docker Compose.
 3. Use the checklist to separate learning-only shortcuts from production
    requirements.
 
-Checkpoint: explain why the `Authorizer` interface makes it straightforward to
-swap the graph authorizer for a real OpenFGA client in a production deployment.
+Checkpoint: explain why the `AuthzClient` interface makes it straightforward to
+swap the in-process evaluator for a real AuthZ service in a production deployment.
 
 ## Repo commands
 

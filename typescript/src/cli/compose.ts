@@ -1,7 +1,7 @@
 import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "node:readline/promises";
-import makeHttpDocumentsClient from "../adapters/client/makeHttpDocumentsClient.ts";
-import makeTerminalClient from "../adapters/client/makeTerminalClient.ts";
+import makeHttpDocumentsClient from "../documents-service/adapters/client/makeHttpDocumentsClient.ts";
+import makeTerminalClient from "../documents-service/adapters/client/makeTerminalClient.ts";
 
 const makeCliApp = (env: NodeJS.ProcessEnv = process.env) => {
     const terminal = createInterface({ input, output });

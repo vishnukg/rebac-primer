@@ -16,9 +16,12 @@ import type { DocumentRepository } from "../ports/documentRepository.ts";
 import type { CreateDocumentFn } from "./types.ts";
 import { ForbiddenError } from "./types.ts";
 
-type Cfg = { repository: DocumentRepository; authzClient: AuthzClient };
+type CreateDocumentCfg = {
+    repository:  DocumentRepository;
+    authzClient: AuthzClient;
+};
 
-const makeCreateDocument = ({ repository, authzClient }: Cfg): CreateDocumentFn =>
+const makeCreateDocument = ({ repository, authzClient }: CreateDocumentCfg): CreateDocumentFn =>
     async input => {
         // 1. Authz check — can this actor create in this workspace?
         const { allowed } = await authzClient.check({

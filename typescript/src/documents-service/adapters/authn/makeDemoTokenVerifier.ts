@@ -1,10 +1,19 @@
 import { user } from "../../../shared/rebac.ts";
 import { AuthenticationError } from "../../core/ports/authenticator.ts";
-import type { Authenticator, AuthenticatedUser, TokenClaims } from "../../core/ports/authenticator.ts";
+import type { Authenticator, AuthenticatedUser } from "../../core/ports/authenticator.ts";
 
-type Cfg = { tokens: Record<string, TokenClaims> };
+// Raw shape of an entry in the demo token registry.
+// This is an implementation detail of this adapter — not part of the port contract.
+type TokenClaims = {
+    sub:    string;
+    scopes: string[];
+};
 
-const makeDemoTokenVerifier = ({ tokens }: Cfg): Authenticator => ({
+type DemoTokenVerifierCfg = {
+    tokens: Record<string, TokenClaims>;
+};
+
+const makeDemoTokenVerifier = ({ tokens }: DemoTokenVerifierCfg): Authenticator => ({
     verifyAccessToken: async (header): Promise<AuthenticatedUser> => {
         const token = extractBearer(header);
         if (!token) throw AuthenticationError("Missing or malformed Authorization header");

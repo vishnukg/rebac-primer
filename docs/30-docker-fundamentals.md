@@ -47,7 +47,7 @@ test code.
 The runtime stage does not run `tsx`. It runs compiled JavaScript:
 
 ```dockerfile
-CMD ["node", "src/server/index.ts"]
+CMD ["node", "src/authz-service/index.ts"]
 ```
 
 That is the production-shaped path. `tsx` is useful during development, but a

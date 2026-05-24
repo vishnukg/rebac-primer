@@ -4,9 +4,12 @@ import type { DocumentRepository } from "../ports/documentRepository.ts";
 import type { UpdateDocumentFn } from "./types.ts";
 import { DocumentNotFoundError, ForbiddenError } from "./types.ts";
 
-type Cfg = { repository: DocumentRepository; authzClient: AuthzClient };
+type UpdateDocumentCfg = {
+    repository:  DocumentRepository;
+    authzClient: AuthzClient;
+};
 
-const makeUpdateDocument = ({ repository, authzClient }: Cfg): UpdateDocumentFn =>
+const makeUpdateDocument = ({ repository, authzClient }: UpdateDocumentCfg): UpdateDocumentFn =>
     async ({ id, body, actor }) => {
         const existing = await repository.findById(id);
         if (!existing) throw DocumentNotFoundError(id);

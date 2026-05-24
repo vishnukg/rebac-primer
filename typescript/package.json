@@ -9,11 +9,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "demo": "node src/demo/index.ts",
-    "dev": "node --watch src/server/index.ts",
-    "server": "node src/server/index.ts",
+    "authz": "node src/authz-service/index.ts",
+    "documents": "node src/documents-service/index.ts",
+    "dev": "node --watch src/authz-service/index.ts & node --watch src/documents-service/index.ts",
     "client": "node src/cli/index.ts",
-    "start": "node src/server/index.ts",
     "check": "npm run build && npm run test"
   },
   "dependencies": {

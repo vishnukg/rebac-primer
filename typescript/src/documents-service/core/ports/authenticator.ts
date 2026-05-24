@@ -1,4 +1,4 @@
-// Authn port — "who is calling?"
+// Driven port — "who is calling?"
 // Authz is answered by AuthzClient — "what may they do?"
 
 import type { RebacObject } from "../../../shared/rebac.ts";
@@ -6,11 +6,6 @@ import type { RebacObject } from "../../../shared/rebac.ts";
 export type AuthenticatedUser = {
     subject: RebacObject<"user">;
     scopes:  string[];
-};
-
-export type TokenClaims = {
-    sub:    string;
-    scopes: string[];
 };
 
 export type VerifyAccessTokenFn = (header: string | undefined) => Promise<AuthenticatedUser>;

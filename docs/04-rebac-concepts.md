@@ -312,7 +312,7 @@ objects.
 This repo models object ids in TypeScript as branded strings:
 
 ```ts
-// typescript/src/core/ports/authz.ts
+// typescript/src/shared/rebac.ts
 export type RebacObject<TType extends ObjectType = ObjectType> =
   `${TType}:${string}`;
 ```
@@ -359,7 +359,7 @@ A tuple is one stored fact:
 In TypeScript:
 
 ```ts
-// typescript/src/demo/fixtures.ts
+// typescript/test/fixtures.ts
 tuple(workspace("productWorkspace"), "editor", subjectSet(team("platformTeam"), "member"))
 ```
 
@@ -465,7 +465,7 @@ Check(user:alice, can_edit, document:roadmapDocument)
 
 The graph evaluator tries to prove the relation.
 
-In this repo, `makeGraphAuthorizer` produces a trace:
+In this repo, `makeGraphEvaluator` produces a trace:
 
 ```text
 Check whether user:alice has can_edit on document:roadmapDocument
@@ -614,7 +614,7 @@ make ts-server   # start the server
 # or inside the container: npm run dev
 ```
 
-Then change `typescript/src/demo/fixtures.ts` so Bob is an editor instead of
+Then change `typescript/test/fixtures.ts` so Bob is an editor instead of
 a viewer:
 
 ```ts

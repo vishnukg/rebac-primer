@@ -34,7 +34,7 @@ application code can stay boring.
 
 The model is defined in both implementations — the DSL is identical:
 
-- TypeScript: `typescript/src/adapters/authz/model.ts`
+- TypeScript: `typescript/src/authz-service/adapters/graph/permissionModel.ts`
 - Go: `go/internal/authz/model.go`
 
 Open either one.
@@ -365,8 +365,8 @@ define can_archive: archiver
 
 **TypeScript** — mirror the model change in code:
 
-1. Add `"archiver"` and `"can_archive"` to `DocumentRelation` in `typescript/src/core/ports/authz.ts`
-2. Add the expansion rule to `makeGraphAuthorizer` in `typescript/src/adapters/authz/makeGraphAuthorizer.ts`
+1. Add `"archiver"` and `"can_archive"` to `DocumentRelation` in `typescript/src/shared/rebac.ts`
+2. Add the expansion rule to `makeGraphEvaluator` in `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`
 3. Add tests: owner is allowed, viewer is denied
 
 **Go** — mirror the same change:

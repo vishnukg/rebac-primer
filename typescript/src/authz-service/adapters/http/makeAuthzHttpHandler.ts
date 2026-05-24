@@ -14,7 +14,8 @@
 import type { AuthzService } from "../../core/index.ts";
 import { isTupleValidationError } from "../../core/index.ts";
 import { isJsonObject, stringField, optionalStringField } from "./json.ts";
-import type { TupleKey } from "../../../shared/rebac.ts";
+import type { Relation, RebacObject, Subject, TupleKey } from "../../../shared/rebac.ts";
+import type { TupleFilter } from "../../core/ports/index.ts";
 
 export type HttpRequest = {
     method:        string;
@@ -42,9 +43,9 @@ const makeAuthzHttpHandler = (authz: AuthzService): AuthzHttpHandler => {
             if (request.method === "POST" && request.path === "/check") {
                 const body   = requireBody(request.body);
                 const result = await authz.check({
-                    user:     stringField(body, "user") as `user:${string}`,
-                    relation: stringField(body, "relation") as never,
-                    object:   stringField(body, "object") as `${string}:${string}`,
+                    user:     stringField(body, "user")     as RebacObject<"user">,
+                    relation: stringField(body, "relation") as Relation,
+                    object:   stringField(body, "object")   as RebacObject,
                 });
                 return json(200, { allowed: result.allowed, trace: result.trace });
             }
@@ -69,10 +70,10 @@ const makeAuthzHttpHandler = (authz: AuthzService): AuthzHttpHandler => {
             if (request.method === "GET" && request.path === "/tuples") {
                 const object   = optionalStringField(request.query, "object");
                 const relation = optionalStringField(request.query, "relation");
-                const tuples   = await authz.listTuples({
-                    object:   object   as `${string}:${string}` | undefined,
-                    relation: relation as never,
-                });
+                const filter: TupleFilter = {};
+                if (object   !== undefined) filter.object   = object   as RebacObject;
+                if (relation !== undefined) filter.relation = relation as Relation;
+                const tuples   = await authz.listTuples(filter);
                 return json(200, { tuples });
             }
 
@@ -98,9 +99,9 @@ const parseTuples = (body: Record<string, unknown>): TupleKey[] => {
     return raw.map((item, i) => {
         if (!isJsonObject(item)) throw new Error(`tuples[${i}] must be an object`);
         return {
-            object:   stringField(item, "object")   as `${string}:${string}`,
-            relation: stringField(item, "relation") as never,
-            user:     stringField(item, "user")     as `${string}:${string}`,
+            object:   stringField(item, "object")   as RebacObject,
+            relation: stringField(item, "relation") as Relation,
+            user:     stringField(item, "user")     as Subject,
         };
     });
 };

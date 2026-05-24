@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import makeHttpDocumentsClient from "../src/adapters/client/makeHttpDocumentsClient.ts";
-import makeTerminalClient from "../src/adapters/client/makeTerminalClient.ts";
-import type { DocumentsClient, Fetcher } from "../src/adapters/client/makeHttpDocumentsClient.ts";
-import type { QuestionTerminal } from "../src/adapters/client/makeTerminalClient.ts";
+import makeHttpDocumentsClient from "../src/documents-service/adapters/client/makeHttpDocumentsClient.ts";
+import makeTerminalClient from "../src/documents-service/adapters/client/makeTerminalClient.ts";
+import type { DocumentsClient, Fetcher } from "../src/documents-service/adapters/client/makeHttpDocumentsClient.ts";
+import type { QuestionTerminal } from "../src/documents-service/adapters/client/makeTerminalClient.ts";
 
 describe("makeHttpDocumentsClient", () => {
     it("reads a document using a bearer token", async () => {

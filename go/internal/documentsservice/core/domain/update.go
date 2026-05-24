@@ -28,7 +28,7 @@ func (s *documentService) Update(ctx context.Context, input UpdateDocumentInput)
 	updated.Body = input.Body
 	updated.UpdatedBy = input.Actor
 
-	if err := s.repo.Save(ctx, updated.toPort()); err != nil {
+	if err := s.repo.Save(ctx, updated); err != nil {
 		return nil, err
 	}
 	return &updated, nil

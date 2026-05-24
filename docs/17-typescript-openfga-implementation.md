@@ -1,12 +1,13 @@
-# TypeScript OpenFGA implementation
+# TypeScript AuthZ adapter pattern
 
-The application does not talk to OpenFGA directly from the document domain.
+The document domain does not talk to the AuthZ service directly.
 
 Instead, it depends on a small interface:
 
 ```ts
-export interface Authorizer {
-  check(request: CheckRequest): Promise<CheckResult>;
+export interface AuthzClient {
+    check:       (request: CheckRequest) => Promise<CheckResult>;
+    writeTuples: (tuples: TupleKey[]) => Promise<void>;
 }
 ```
 
@@ -15,19 +16,19 @@ infrastructure.
 
 ## Scene
 
-The service needs one answer: allowed or denied. OpenFGA has stores, model ids,
-SDK request shapes, network errors, and tuple writes. The adapter keeps those
-details from spilling into the domain.
+The documents service needs one answer: allowed or denied. The AuthZ service
+has its own HTTP API, response shapes, error formats, and network latency. The
+adapter keeps those details from spilling into the document domain.
 
 ## Why the interface matters
 
 The document use cases should not know about:
 
-- OpenFGA API URLs
-- store ids
-- authorization model ids
-- SDK response shapes
-- HTTP retries
+- AuthZ service URLs
+- HTTP request/response shapes
+- JSON parsing
+- network retries
+- in-process vs remote evaluation
 
 It should know the business rule:
 
@@ -38,205 +39,206 @@ to update a document, the actor must have can_edit on that document
 That rule appears in code as:
 
 ```ts
-const decision = await authorizer.check({
-  user: input.actor,
-  relation: "can_edit",
-  object: document(input.id)
+const { allowed } = await authzClient.check({
+    user:     input.actor,
+    relation: "can_edit",
+    object:   document(input.id),
 });
 ```
 
-The implementation behind `Authorizer` can change without rewriting the service.
+The implementation behind `AuthzClient` can change without rewriting the domain.
 
 Architecture:
 
 ```text
-┌─────────────────┐
-│ Documents       │
-│ business rules  │
-└────────┬────────┘
-         │ depends on interface
-         ▼
-┌─────────────────┐
-│ Authorizer      │
-│ check(...)      │
-└───────┬─────────┘
-        │
-        ├─────────────────────┐
-        ▼                     ▼
-┌─────────────────┐   ┌─────────────────┐
-│ makeGraphAuthorizer │ │ makeOpenFgaAuthorizer │
-│ local teaching  │   │ SDK adapter      │
-└─────────────────┘   └────────┬────────┘
-                               │
-                               ▼
-                       ┌─────────────────┐
-                       │ OpenFGA Server  │
-                       └─────────────────┘
+┌──────────────────────────┐
+│  Documents domain        │
+│  business rules          │
+└───────────┬──────────────┘
+            │ depends on interface
+            ▼
+┌──────────────────────────┐
+│  AuthzClient             │
+│  check(...)              │
+│  writeTuples(...)        │
+└────────────┬─────────────┘
+             │
+    ┌────────┴────────────┐
+    ▼                     ▼
+┌───────────────┐  ┌─────────────────────┐
+│ In-process    │  │ HTTP adapter        │
+│ (tests only)  │  │ makeAuthzServiceClient │
+└───────────────┘  └──────────┬──────────┘
+                              │
+                              ▼
+                   ┌─────────────────────┐
+                   │ AuthZ service :4100 │
+                   │ makeGraphEvaluator  │
+                   └─────────────────────┘
 ```
 
-This is composition through interfaces. The domain service does not change when
-you swap the implementation.
+This is composition through interfaces. The document domain does not change when
+you swap the `AuthzClient` implementation.
 
 ## Two implementations
 
-This repo has two implementations:
+This repo has two implementations of `AuthzClient`:
 
 ```text
-makeGraphAuthorizer    -> local evaluator for learning and unit tests
-makeOpenFgaAuthorizer  -> SDK adapter for real OpenFGA
+makeAuthzServiceClient   -> HTTP adapter for the real AuthZ service (production path)
+makeInProcessAuthzClient -> in-process stub used in domain tests
 ```
 
-They share the same interface.
+They share the same interface. That is why domain tests run fast without a
+server, while the running services use real HTTP.
 
-That is why the domain code is easy to test and still has a production path.
+## The HTTP adapter
 
-## The teaching implementation
-
-`makeGraphAuthorizer` is not trying to be OpenFGA.
-
-It is a readable evaluator for this repo's model. It exists so you can see the
-graph traversal in plain TypeScript and run tests without infrastructure.
-
-This is the useful part:
+Open `src/documents-service/adapters/authz/makeAuthzServiceClient.ts`.
 
 ```ts
-const result = await authorizer.check({
-  user: alice,
-  relation: "can_edit",
-  object: roadmapDocument
-});
-
-console.log(result.trace);
-```
-
-The trace explains why access was allowed or denied.
-
-## The real OpenFGA adapter
-
-Open `typescript/src/adapters/authz/makeOpenFgaAuthorizer.ts`.
-
-```ts
-const makeOpenFgaAuthorizer = (cfg: OpenFgaAuthorizerCfg): OpenFgaAuthorizer => {
-  const client = new OpenFgaClient(cfg);
-  // ...
+const makeAuthzServiceClient = ({
+    baseUrl,
+    fetcher = fetch,
+}: AuthzServiceClientCfg): AuthzClient => {
+    const check = async (request: CheckRequest): Promise<CheckResult> => {
+        const response = await fetcher(new URL("/check", baseUrl), {
+            method:  "POST",
+            headers: { "content-type": "application/json" },
+            body:    JSON.stringify(request),
+        });
+        const json = await response.json();
+        return { allowed: json.allowed === true };
+    };
+    // ...
 };
 ```
 
-The adapter owns the SDK client. The rest of the app does not.
+The adapter owns the HTTP details. The document domain owns nothing about
+how the request travels over the wire.
 
-The `check` method converts from this repo's request shape:
+## The `check` conversion
+
+The adapter converts from this repo's request shape:
 
 ```ts
-// typescript/src/core/ports/authz.ts
+// src/shared/rebac.ts
 export type CheckRequest = {
-  user: RebacObject<"user">;
-  relation: Relation;
-  object: RebacObject;
+    user:     RebacObject<"user">;
+    relation: Relation;
+    object:   RebacObject;
 };
 ```
 
-to the SDK call:
-
-```ts
-await client.check({
-  user: request.user,
-  relation: request.relation,
-  object: request.object
-});
-```
-
-Then it converts the SDK response back into this repo's `CheckResult`.
+to the HTTP call and converts the response back into `CheckResult`.
 
 That conversion is the adapter pattern in its simplest form.
 
 ## Writing tuples
 
-The adapter also has:
+The adapter also implements `writeTuples`:
 
 ```ts
-async writeTuples(tuples: readonly TupleKey[]): Promise<void>
+async writeTuples(tuples: TupleKey[]): Promise<void>
 ```
 
-The app can write relationship facts without leaking SDK tuple shapes
-everywhere.
+The documents service calls this at document-creation time to write the
+workspace relationship for the new document — without leaking HTTP shapes
+into the domain.
 
-Example tuple:
+## The in-process stub (for tests)
+
+Open `test/fixtures.ts`.
 
 ```ts
-tuple(workspace("productWorkspace"), "editor", subjectSet(team("platformTeam"), "member"))
+export const makeInProcessAuthzClient = (seed: TupleKey[] = []): AuthzClient => {
+    const repository = makeInMemoryTupleRepository(seed);
+    const evaluator  = makeGraphEvaluator({ repository });
+    return {
+        check:       req  => evaluator.evaluate(req),
+        writeTuples: async tpls => { for (const t of tpls) repository.write(t); },
+    };
+};
 ```
 
-This becomes an OpenFGA write request.
+This runs the real graph evaluator in-process. Tests do not need a running AuthZ
+service. The same graph traversal logic is exercised without a network hop.
 
-## Running OpenFGA locally
+This is also why the `Evaluator` interface uses `Promise<CheckResult>`:
 
-Start OpenFGA:
+```ts
+export interface Evaluator {
+    evaluate: (request: CheckRequest) => Promise<CheckResult>;
+}
+```
+
+The in-process call resolves immediately, but the interface is async to allow
+real-world implementations (the AuthZ service over HTTP) to use the same port.
+
+## Running services locally
+
+Start both services:
 
 ```bash
-make openfga-up
+npm run dev
 ```
 
-You then need to:
+Or separately:
 
-1. create a store
-2. write the model from `typescript/src/adapters/authz/model.ts`
-3. write tuples
-4. configure `makeOpenFgaAuthorizer` with `apiUrl`, `storeId`, and optionally
-   `authorizationModelId`
+```bash
+npm run authz       # port 4100
+npm run documents   # port 4000
+```
 
-This repo does not hide those concepts because learning them is part of the
-point.
+The documents service reads `AUTHZ_URL` (default: `http://127.0.0.1:4100`) and
+calls `makeAuthzServiceClient({ baseUrl: authzUrl })`.
 
 Local runtime architecture:
 
 ```text
-┌──────────────┐       HTTP        ┌──────────────┐
-│ terminal     │ ────────────────► │ app server   │
-│ client       │                   │ :4000        │
-└──────────────┘                   └──────┬───────┘
-                                          │ Authorizer.check
-                                          ▼
-                                  ┌──────────────┐
-                                  │ makeGraphAuthorizer
-                                  │ or OpenFGA   │
-                                  └──────┬───────┘
-                                         │
-                                         ▼
-                                  ┌──────────────┐
-                                  │ tuples/model │
-                                  └──────────────┘
+┌──────────────┐       HTTP        ┌──────────────────┐
+│ terminal     │ ────────────────► │ documents :4000  │
+│ client       │                   └────────┬─────────┘
+└──────────────┘                            │ AuthzClient.check (HTTP)
+                                            ▼
+                                   ┌──────────────────┐
+                                   │ authz    :4100   │
+                                   │ GraphEvaluator   │
+                                   └──────────────────┘
 ```
 
-Today the demo server uses `makeGraphAuthorizer` so it runs without infrastructure.
-The adapter is ready for the OpenFGA-backed version.
+The documents service always talks to the AuthZ service over HTTP in production.
+In tests, `makeInProcessAuthzClient` short-circuits the network entirely.
 
 ## TypeScript lesson
 
-The OpenFGA SDK is an external dependency. External dependencies should have a
-small contact surface with your domain code.
+An HTTP adapter is just an external dependency. External dependencies should
+have a small contact surface with your domain code.
 
 That gives you:
 
-- easier tests
-- less churn when SDK types change
+- fast tests (no HTTP in unit tests)
+- less churn when the API shape changes
 - clearer business logic
-- one place for infrastructure error handling later
+- one place for HTTP error handling
 
-This is a general TypeScript backend habit, not only an OpenFGA habit.
+This is a general TypeScript backend habit, not only an AuthZ habit.
 
 ## Exercise
 
-Add a `deleteTuples` method to the object returned by `makeOpenFgaAuthorizer`.
+Add a `deleteTuples` method to `makeAuthzServiceClient`.
 
 Guidelines:
 
-1. accept `readonly TupleKey[]`
-2. map from repo tuple shape to SDK tuple shape inside the adapter
-3. do not expose SDK-specific types in the document domain
-4. add a focused unit test around the tuple mapping if you introduce a helper
+1. add `deleteTuples: (tuples: TupleKey[]) => Promise<void>` to the `AuthzClient` interface
+2. implement the HTTP call inside `makeAuthzServiceClient`
+3. update `makeInProcessAuthzClient` in `test/fixtures.ts` to implement the new method
+4. do not expose HTTP-specific types in the document domain
 
 ## Checkpoint
 
-Why does the document domain depend on `Authorizer` instead of `OpenFgaClient`?
+Why does the document domain depend on `AuthzClient` instead of calling `fetch`
+directly?
 
-Good answer: the service owns business rules; the adapter owns SDK details.
+Good answer: the domain owns business rules; the adapter owns HTTP details. When
+the AuthZ service URL or API shape changes, only the adapter changes.

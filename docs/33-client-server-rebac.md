@@ -22,12 +22,19 @@ graph, and only then does the action happen.
 
 This demo makes that boundary visible.
 
-## Run the server
+## Run the services
 
-TypeScript:
+TypeScript (starts both authz :4100 and documents :4000):
 
 ```bash
-make ts-server
+npm run dev
+```
+
+Or start each individually:
+
+```bash
+npm run authz       # AuthZ service on port 4100
+npm run documents   # Documents service on port 4000
 ```
 
 Go:
@@ -39,8 +46,9 @@ make go-server
 The servers listen on:
 
 ```text
-TypeScript: http://127.0.0.1:4000
-Go:         http://127.0.0.1:4001
+TypeScript AuthZ:      http://127.0.0.1:4100
+TypeScript Documents:  http://127.0.0.1:4000
+Go:                    http://127.0.0.1:4001
 ```
 
 Health check:
@@ -52,10 +60,10 @@ curl http://127.0.0.1:4001/health
 
 ## Run the client
 
-In another terminal:
+In another terminal (after services are running):
 
 ```bash
-make ts-client
+npm run cli
 ```
 
 The client is a simple interactive terminal UI. It lets you:
@@ -121,10 +129,10 @@ The document domain enforces authorization.
 TypeScript:
 
 ```ts
-const decision = await authorizer.check({
-  user: input.actor,
-  relation: "can_edit",
-  object: document(input.id)
+const { allowed } = await authzClient.check({
+    user:     input.actor,
+    relation: "can_edit",
+    object:   document(input.id),
 });
 ```
 
@@ -138,10 +146,10 @@ That is the important boundary.
 
 The client does not decide whether Bob can edit. The server
 decides. The server uses the document domain. The document domain uses the
-authorizer.
+authz client, which calls the AuthZ service.
 
 ```text
-client -> HTTP server -> Documents -> Authorizer -> relationship graph
+client -> documents :4000 -> Documents -> AuthzClient -> authz :4100 -> graph
 ```
 
 ## Composition roots in this demo
@@ -149,26 +157,29 @@ client -> HTTP server -> Documents -> Authorizer -> relationship graph
 The executable files stay intentionally thin:
 
 ```text
-src/server/index.ts -> makeServerApp(), then listen()
-src/cli/index.ts    -> makeCliApp(), then run()
-go/cmd/server/main.go -> app.New(), then ListenAndServe()
+src/authz-service/index.ts     -> makeAuthzService(), then listen()
+src/documents-service/index.ts -> makeDocumentsService(), then listen()
+src/cli/index.ts               -> makeCliApp(), then run()
+go/cmd/server/main.go          -> app.New(), then ListenAndServe()
 ```
 
 The object graphs are assembled in the composition roots:
 
 ```text
-makeServerApp
-  -> makeDocuments
-  -> makeHttpHandler
-  -> makeHttpServer
+makeAuthzService (authz-service/compose.ts)
+  -> makeInMemoryTupleRepository (seeded with policy tuples)
+  -> makeGraphEvaluator
+  -> makeAuthzDomain
+  -> makeAuthzHttpHandler + makeAuthzHttpServer
 
-server/index.ts
-  -> makeInMemoryTupleStore
-  -> makeGraphAuthorizer
-  -> makeInMemoryDocumentRepository
+makeDocumentsService (documents-service/compose.ts)
+  -> makeAuthzServiceClient (HTTP to authz :4100)
   -> makeDemoTokenVerifier
+  -> makeInMemoryDocumentRepository
+  -> makeDocuments
+  -> makeDocumentsHttpHandler + makeDocumentsHttpServer
 
-makeCliApp
+makeCliApp (cli/compose.ts)
   -> makeHttpDocumentsClient
   -> Node readline terminal
   -> makeTerminalClient
@@ -183,8 +194,8 @@ go app.New
 
 That split matters because ReBAC code is easier to reason about when business
 rules do not create their own infrastructure. The document domain asks an
-`Authorizer` interface for a decision; the composition root decides that the
-teaching implementation is `makeGraphAuthorizer`.
+`AuthzClient` interface for a decision; the composition root wires
+`makeAuthzServiceClient` as the concrete implementation.
 
 ```text
 entrypoint -> composition root -> interfaces + concrete adapters
@@ -213,17 +224,17 @@ client/server boundary is clear.
 Some restricted execution environments block opening local listening sockets.
 That is why the default test suite focuses on domain and graph behavior.
 
-You can still run the server normally on your machine:
+You can still run the services normally on your machine:
 
 ```bash
-make ts-server
-make go-server
+npm run dev     # starts both TypeScript services
+make go-server  # starts the Go server
 ```
 
 and exercise it with:
 
 ```bash
-make ts-client
+npm run cli
 ```
 
 ## Checkpoint

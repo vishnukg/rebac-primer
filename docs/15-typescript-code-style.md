@@ -17,7 +17,7 @@ relearning the whole system.
 - Prefer plain functions, factories, and interfaces before adding libraries.
 - Use ports and adapters for service boundaries.
 - Use `type` aliases for data shapes, unions, and computed types.
-- Use `interface` for behavior contracts such as `Authorizer`.
+- Use `interface` for behavior contracts such as `AuthzClient`.
 - Keep `strict` TypeScript enabled.
 - Avoid `as` casts in application code.
 - Validate strings at boundaries.
@@ -73,14 +73,15 @@ This repo uses simple factories where they improve maintainability:
 Good:
 
 ```ts
-const documents = makeDocuments({ repository, authorizer });
+const documents = makeDocuments({ repository, authzClient });
 ```
 
 Also good:
 
 ```ts
-interface Authorizer {
+interface AuthzClient {
   check: (request: CheckRequest) => Promise<CheckResult>;
+  writeTuples: (tuples: TupleKey[]) => Promise<void>;
 }
 ```
 
@@ -90,7 +91,7 @@ Avoid deep class hierarchies unless the domain truly has stable specialization.
 Most backend code is easier to maintain with composition:
 
 ```text
-Documents has an Authorizer
+Documents has an AuthzClient
 Documents has a DocumentRepository
 ```
 
@@ -110,9 +111,9 @@ Use names that match the domain:
 - `TupleKey`
 - `Relation`
 - `SubjectSet`
-- `Authorizer`
+- `AuthzClient`
 - `Documents`
-- `makeInMemoryTupleStore`
+- `makeInMemoryTupleRepository`
 
 Avoid names that describe implementation mechanics without domain meaning:
 
@@ -249,7 +250,7 @@ Library modules should export capabilities. Entrypoints should perform actions.
 Good:
 
 ```ts
-export default makeGraphAuthorizer;
+export default makeGraphEvaluator;
 ```
 
 Good:

@@ -30,17 +30,15 @@ Promise<CheckResult>
 But the runtime behavior is JavaScript:
 
 ```ts
-const check: Authorizer["check"] = async request => {
-  const response = await client.check({
-    user: request.user,
-    relation: request.relation,
-    object: request.object
+const check: AuthzClient["check"] = async request => {
+  const response = await fetch(new URL("/check", baseUrl), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
   });
 
-  return {
-    allowed: response.allowed === true,
-    trace: ["OpenFGA evaluated the relationship graph remotely"]
-  };
+  const result = await response.json();
+  return { allowed: result.allowed === true };
 };
 ```
 
@@ -124,13 +122,13 @@ const update = async (input: UpdateDocumentInput): Promise<CollaborativeDocument
   const existing = await repository.findById(input.id);
   if (!existing) throw new DocumentNotFoundError(input.id);
 
-  const decision = await authorizer.check({
-    user: input.actor,
+  const { allowed } = await authzClient.check({
+    user:     input.actor,
     relation: "can_edit",
-    object: document(input.id)
+    object:   document(input.id)
   });
-  if (!decision.allowed) {
-    throw new ForbiddenError(`${input.actor} cannot edit document:${input.id}`);
+  if (!allowed) {
+    throw ForbiddenError(`${input.actor} cannot edit document:${input.id}`);
   }
 
   const updated = { ...existing, body: input.body, updatedBy: input.actor };
@@ -228,10 +226,10 @@ Sequential code is easiest to read when each step depends on the previous one.
 
 ```ts
 const existing = await repository.findById(input.id);
-const decision = await authorizer.check({
-  user: input.actor,
+const { allowed } = await authzClient.check({
+  user:     input.actor,
   relation: "can_edit",
-  object: document(input.id)
+  object:   document(input.id),
 });
 await repository.save(updated);
 ```
@@ -249,9 +247,9 @@ Sequential awaits are not a problem when they represent real business order.
 If operations are independent, start them together:
 
 ```ts
-const [document, decision] = await Promise.all([
+const [doc, { allowed }] = await Promise.all([
   repository.findById(id),
-  authorizer.check({ user: actor, relation: "can_read", object: document(id) })
+  authzClient.check({ user: actor, relation: "can_read", object: document(id) }),
 ]);
 ```
 
@@ -324,54 +322,50 @@ promise rejects.
 
 ## Domain errors
 
-The domain layer defines its own errors:
+The domain layer defines its own errors using the tagged factory pattern:
 
 ```ts
-export class DocumentNotFoundError extends Error {
-  constructor(id: DocumentId) {
-    super(`Document not found: ${id}`);
-  }
-}
+export type ForbiddenError = Error & { readonly name: "ForbiddenError" };
+export const ForbiddenError = (message: string): ForbiddenError =>
+    Object.assign(new Error(message), { name: "ForbiddenError" as const });
+export const isForbiddenError = (e: unknown): e is ForbiddenError =>
+    e instanceof Error && e.name === "ForbiddenError";
 ```
 
 ```ts
-export class ForbiddenError extends Error {
-  constructor(message: string) {
-    super(message);
-  }
-}
+export type DocumentNotFoundError = Error & { readonly name: "DocumentNotFoundError" };
+export const DocumentNotFoundError = (id: DocumentId): DocumentNotFoundError =>
+    Object.assign(new Error(`Document not found: ${id}`), { name: "DocumentNotFoundError" as const });
 ```
 
-These are small, but useful. A future HTTP layer can map them cleanly:
+No `class` keyword needed. These are small, but useful. The HTTP layer maps them cleanly:
 
 - `DocumentNotFoundError` -> `404`
 - `ForbiddenError` -> `403` or intentionally masked `404`
 
-Do not throw generic strings. Throw errors that communicate intent.
+Do not throw generic strings. Throw errors that communicate intent. See doc 12
+for the complete tagged error pattern.
 
-## SDK adapters
+## HTTP adapters
 
-Open `src/adapters/authz/makeOpenFgaAuthorizer.ts`.
+Open `src/documents-service/adapters/authz/makeAuthzServiceClient.ts`.
 
-The OpenFGA SDK is useful, but the rest of the app should not be covered in SDK
-details. The adapter keeps those details in one place:
+The AuthZ service is a separate process. The documents service should not be
+covered in HTTP details. The adapter keeps those details in one place:
 
 ```ts
-const check: Authorizer["check"] = async request => {
-  const response = await client.check({
-    user: request.user,
-    relation: request.relation,
-    object: request.object
-  });
-
-  return {
-    allowed: response.allowed === true,
-    trace: ["OpenFGA evaluated the relationship graph remotely"]
-  };
+const check: AuthzClient["check"] = async request => {
+    const response = await fetcher(new URL("/check", baseUrl), {
+        method:  "POST",
+        headers: { "content-type": "application/json" },
+        body:    JSON.stringify(request),
+    });
+    const json = await response.json();
+    return { allowed: json.allowed === true };
 };
 ```
 
-The document domain depends on `Authorizer`, not `OpenFgaClient`.
+The document domain depends on `AuthzClient`, not on `fetch` or HTTP details.
 
 That is the maintainable boundary.
 
@@ -380,21 +374,21 @@ That is the maintainable boundary.
 Without an adapter, service code tends to become noisy:
 
 ```ts
-await openFgaClient.check({
-  user,
-  relation,
-  object,
-  authorization_model_id: process.env.FGA_MODEL_ID,
-  store_id: process.env.FGA_STORE_ID
+const response = await fetch(new URL("/check", process.env.AUTHZ_URL), {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ user, relation, object }),
 });
+const json = await response.json();
+if (!response.ok) throw new Error(`AuthZ error: ${json.message}`);
 ```
 
-That mixes business rules with infrastructure details.
+That mixes business rules with HTTP details.
 
 With an adapter, the service stays focused:
 
 ```ts
-await authorizer.check({ user: actor, relation: "can_edit", object: document(id) });
+await authzClient.check({ user: actor, relation: "can_edit", object: document(id) });
 ```
 
 The code now says what the business action needs.
@@ -506,8 +500,9 @@ with them.
 Write a small fake authorizer for a test:
 
 ```ts
-const denyAllAuthorizer: Authorizer = {
-  check: async () => ({ allowed: false, trace: ["test deny"] })
+const denyAllAuthzClient: AuthzClient = {
+  check:       async () => ({ allowed: false }),
+  writeTuples: async () => {},
 };
 ```
 

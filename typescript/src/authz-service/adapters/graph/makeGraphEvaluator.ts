@@ -28,7 +28,7 @@ type GraphEvaluatorCfg = {
 type VisitKey = `${RebacObject}#${Relation}`;
 
 const makeGraphEvaluator = ({ repository }: GraphEvaluatorCfg) => {
-    const evaluate = (request: CheckRequest): CheckResult => {
+    const evaluate = async (request: CheckRequest): Promise<CheckResult> => {
         const trace = [
             `Check whether ${request.user} has ${request.relation} on ${request.object}`,
         ];

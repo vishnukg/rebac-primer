@@ -79,7 +79,7 @@ modules. The TypeScript source follows the same ESM rules.
 This repo uses imports like:
 
 ```ts
-import makeGraphAuthorizer from "./adapters/authz/makeGraphAuthorizer.ts";
+import makeGraphEvaluator from "./adapters/graph/makeGraphEvaluator.ts";
 ```
 
 The key rule is not the exact extension. The key rule is that ESM imports are
@@ -90,7 +90,7 @@ This repo executes TypeScript source directly in development and tests, and
 `tsconfig.json` enables `allowImportingTsExtensions`. So this is correct here:
 
 ```ts
-import { tuple } from "./core/index.ts";
+import { tuple } from "../shared/rebac.ts";
 ```
 
 This is usually wrong for this repo:
@@ -125,7 +125,7 @@ the annoying class of bugs where code type-checks but cannot be loaded by Node.
 When Node sees:
 
 ```ts
-import makeGraphAuthorizer from "./adapters/authz/makeGraphAuthorizer.ts";
+import makeGraphEvaluator from "./adapters/graph/makeGraphEvaluator.ts";
 ```
 
 it roughly does this:
@@ -139,18 +139,18 @@ it roughly does this:
 
 The "once" part matters.
 
-If three files import `src/adapters/authz/model.ts`, the module body is
-evaluated once. All importers share the same module instance.
+If three files import `src/authz-service/adapters/graph/permissionModel.ts`,
+the module body is evaluated once. All importers share the same module instance.
 
 ## Module evaluation order
 
 Suppose you have this graph:
 
 ```text
-demo/index.ts
-  imports demo/compose.ts
-    imports adapters/authz/makeGraphAuthorizer.ts
-    imports core/ports/authz.ts
+src/authz-service/index.ts
+  imports src/authz-service/compose.ts
+    imports src/authz-service/adapters/graph/makeGraphEvaluator.ts
+    imports src/shared/rebac.ts
 ```
 
 Node must evaluate dependencies before the importer can use them.
@@ -229,7 +229,7 @@ import { makeService } from "./service.js";
 ```
 
 This repo uses named exports for shared core APIs and default exports for
-single factory functions such as `makeGraphAuthorizer`.
+single factory functions such as `makeGraphEvaluator` and `makeDocuments`.
 
 Named exports are easier to search, easier to refactor, and harder to rename
 accidentally at the import site.
@@ -239,7 +239,7 @@ accidentally at the import site.
 TypeScript has imports that exist only for type checking:
 
 ```ts
-import type { Authorizer, RebacObject, Relation } from "../core/index.ts";
+import type { AuthzClient, DocumentRepository } from "../core/index.ts";
 ```
 
 At runtime, this import disappears from the emitted JavaScript.
@@ -257,20 +257,21 @@ This is a small habit that keeps module dependencies honest.
 A barrel file re-exports from many files:
 
 ```ts
-// src/core/index.ts
-export * from "./domain/documents/index.ts";
+// src/documents-service/core/index.ts
+export * from "./domain/index.ts";
 export * from "./ports/index.ts";
 ```
 
 Then callers import from one place:
 
 ```ts
-import { makeDocuments, user } from "../core/index.ts";
+import type { AuthzClient, Documents } from "../core/index.ts";
+import { isForbiddenError, isAuthenticationError } from "../core/index.ts";
 ```
 
 Barrels can be useful when they are small and intentional. This repo has a core
-barrel for the public domain API. Adapters are imported directly so the concrete
-infrastructure choice remains visible.
+barrel per service for the public domain API. Adapters are imported directly so
+the concrete infrastructure choice remains visible.
 
 ## Module side effects
 
@@ -287,15 +288,12 @@ Side effects are not always wrong, but they should be obvious.
 This is fine for an application entrypoint:
 
 ```ts
-// src/demo/index.ts
-const app = createDemoApp();
-
-for (const actor of app.actors) {
-  // print the demo authorization result
-}
+// src/authz-service/index.ts
+const authz = makeAuthzService({ seedTuples: seedPolicyTuples() });
+authz.server.listen(authz.port, "127.0.0.1", () => { /* log */ });
 ```
 
-This would be a poor surprise inside `src/core/ports/authz.ts`:
+This would be a poor surprise inside `src/shared/rebac.ts`:
 
 ```ts
 startHttpServer();
@@ -313,9 +311,9 @@ The repo keeps the wiring in small composition roots. That gives each entrypoint
 a clear job:
 
 ```text
-src/demo/index.ts    -> create demo app, print demo checks
-src/server/index.ts  -> create server app, listen on the configured port
-src/cli/index.ts     -> create terminal client, run it, close the terminal
+src/authz-service/index.ts     -> create authz service, listen on port 4100
+src/documents-service/index.ts -> create documents service, listen on port 4000
+src/cli/index.ts               -> create terminal client, run it, close the terminal
 ```
 
 That keeps imports predictable. Importing a domain module does not start a
@@ -329,9 +327,9 @@ That means this module creates one shared store per process:
 
 ```ts
 // singleton-store.ts
-import makeInMemoryTupleStore from "./makeInMemoryTupleStore.ts";
+import makeInMemoryTupleRepository from "./makeInMemoryTupleRepository.ts";
 
-export const tupleStore = makeInMemoryTupleStore();
+export const tupleStore = makeInMemoryTupleRepository();
 ```
 
 Every importer gets the same `tupleStore` instance.
@@ -345,8 +343,8 @@ That is the simplest singleton pattern in Node ESM.
 ## Singleton pattern 1: exported instance
 
 ```ts
-export const authorizer = makeGraphAuthorizer({
-  tupleStore: makeInMemoryTupleStore()
+export const evaluator = makeGraphEvaluator({
+  repository: makeInMemoryTupleRepository()
 });
 ```
 
@@ -371,13 +369,13 @@ Avoid it for tutorial domain state.
 ## Singleton pattern 2: lazy getter
 
 ```ts
-let authorizer: Authorizer | undefined;
+let evaluator: Evaluator | undefined;
 
-export function getAuthorizer(): Authorizer {
-  authorizer ??= makeGraphAuthorizer({
-    tupleStore: makeInMemoryTupleStore()
+export function getEvaluator(): Evaluator {
+  evaluator ??= makeGraphEvaluator({
+    repository: makeInMemoryTupleRepository()
   });
-  return authorizer;
+  return evaluator;
 }
 ```
 
@@ -400,10 +398,17 @@ the default for everything.
 This repo usually prefers explicit composition:
 
 ```ts
-const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
-const authorizer = makeGraphAuthorizer({ tupleStore });
-const repository = makeInMemoryDocumentRepository();
-const documents = makeDocuments({ repository, authorizer });
+const repository  = makeInMemoryTupleRepository(seedPolicyTuples());
+const evaluator   = makeGraphEvaluator({ repository });
+const domain      = makeAuthzDomain({ repository, evaluator });
+```
+
+Or on the documents side:
+
+```ts
+const authzClient = makeAuthzServiceClient({ baseUrl: "http://127.0.0.1:4100" });
+const docRepo     = makeInMemoryDocumentRepository();
+const documents   = makeDocuments({ repository: docRepo, authzClient });
 ```
 
 Pros:
@@ -428,20 +433,20 @@ implementations for its interfaces.
 In this repo:
 
 ```text
-server/compose.ts  -> domain services plus HTTP server
-demo/compose.ts    -> demo authorizer and demo actors
-cli/compose.ts     -> HTTP API client plus terminal client
+src/authz-service/compose.ts     -> graph evaluator + authz domain + HTTP server
+src/documents-service/compose.ts -> authz HTTP client + document domain + HTTP server
+src/cli/compose.ts               -> HTTP API client + terminal client
 ```
 
 Notice the direction:
 
 ```text
-Documents depends on Authorizer
-makeGraphAuthorizer implements Authorizer
-server/compose.ts receives the chosen Authorizer
+Documents depends on AuthzClient
+makeAuthzServiceClient implements AuthzClient
+documents-service/compose.ts receives the chosen AuthzClient
 ```
 
-The domain does not know which authorizer was chosen. That is the point. The
+The domain does not know which `AuthzClient` was chosen. That is the point. The
 composition root owns the decision, and the rest of the app talks through
 interfaces.
 
@@ -454,18 +459,17 @@ Larger apps sometimes build a small container:
 
 ```ts
 export type AppServices = {
-  authorizer: Authorizer;
-  documents: Documents;
+  authzClient: AuthzClient;
+  documents:   Documents;
 };
 
 export function createServices(): AppServices {
-  const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
-  const authorizer = makeGraphAuthorizer({ tupleStore });
-  const repository = makeInMemoryDocumentRepository();
+  const authzClient = makeAuthzServiceClient({ baseUrl: "http://127.0.0.1:4100" });
+  const repository  = makeInMemoryDocumentRepository();
 
   return {
-    authorizer,
-    documents: makeDocuments({ repository, authorizer })
+    authzClient,
+    documents: makeDocuments({ repository, authzClient }),
   };
 }
 ```
@@ -504,9 +508,9 @@ entrypoint         -> wires everything together
 In this repo:
 
 ```text
-Documents depends on Authorizer
-makeOpenFgaAuthorizer implements Authorizer
-core/domain/documents does not import makeOpenFgaAuthorizer
+Documents depends on AuthzClient
+makeAuthzServiceClient implements AuthzClient
+core/domain/documents does not import makeAuthzServiceClient
 ```
 
 That is deliberate.
@@ -516,13 +520,13 @@ That is deliberate.
 Most imports should be static:
 
 ```ts
-import makeGraphAuthorizer from "./adapters/authz/makeGraphAuthorizer.ts";
+import makeGraphEvaluator from "./adapters/graph/makeGraphEvaluator.ts";
 ```
 
 Dynamic import loads a module at runtime:
 
 ```ts
-const { default: makeGraphAuthorizer } = await import("./adapters/authz/makeGraphAuthorizer.ts");
+const { default: makeGraphEvaluator } = await import("./adapters/graph/makeGraphEvaluator.ts");
 ```
 
 Use dynamic import when:
@@ -582,36 +586,33 @@ infrastructure.
 
 Create a small composition module. Real composition often needs to seed data
 through the domain service (so domain rules run), which makes the function
-async. Try extracting the setup from `typescript/src/server/index.ts`:
+async. Try writing a `createDocumentsServices()` helper:
 
 ```ts
-export type AppServices = Readonly<{
-  documents: Documents;
-  authorizer: Authorizer;
-  tupleStore: TupleStore;
+export type DocumentsServices = Readonly<{
+  documents:   Documents;
+  authzClient: AuthzClient;
 }>;
 
-export async function createServices(): Promise<AppServices> {
-  const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
-  const authorizer = makeGraphAuthorizer({ tupleStore });
-  const repository = makeInMemoryDocumentRepository();
-  const documents = makeDocuments({ repository, authorizer });
+export async function createDocumentsServices(authzUrl: string): Promise<DocumentsServices> {
+  const authzClient = makeAuthzServiceClient({ baseUrl: authzUrl });
+  const repository  = makeInMemoryDocumentRepository();
+  const documents   = makeDocuments({ repository, authzClient });
 
   // Seed the initial document through the service so its authz check runs.
   await documents.create({ /* ... */ });
 
-  return { documents, authorizer, tupleStore };
+  return { documents, authzClient };
 }
 ```
 
-Then update `src/server/index.ts` to `await createServices()` before passing the
-services into `makeServerApp`.
+Then update `src/documents-service/index.ts` to `await createDocumentsServices(authzUrl)`.
 
 After that, ask:
 
 - Did the entrypoint become easier to read?
 - Did any module start doing work just because it was imported?
-- Can tests still create fresh services?
+- Can tests still create fresh services without calling `createDocumentsServices`?
 
 The right answer is the one that keeps dependencies visible.
 
@@ -624,6 +625,7 @@ library modules export capabilities
 entrypoints perform actions
 ```
 
-Good answer: importing `types.ts` should define helpers, not start servers or
-open network connections. `src/server/index.ts` is allowed to perform actions
-because it is an entrypoint.
+Good answer: importing `shared/rebac.ts` should define helpers, not start
+servers or open network connections. `src/authz-service/index.ts` and
+`src/documents-service/index.ts` are allowed to perform actions because they
+are entrypoints.

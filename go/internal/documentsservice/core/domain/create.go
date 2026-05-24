@@ -29,7 +29,7 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 		Workspace: input.Workspace,
 		UpdatedBy: input.Actor,
 	}
-	if err := s.repo.Save(ctx, doc.toPort()); err != nil {
+	if err := s.repo.Save(ctx, doc); err != nil {
 		return nil, err
 	}
 

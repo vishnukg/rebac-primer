@@ -7,10 +7,15 @@
 //   GET  /documents/:id  Bearer token
 //   PATCH /documents/:id Bearer token + body { body }
 
-import type { Authenticator } from "../../core/ports/authenticator.ts";
-import { isAuthenticationError } from "../../core/ports/authenticator.ts";
-import type { Documents } from "../../core/domain/types.ts";
-import { isForbiddenError, isDocumentNotFoundError } from "../../core/domain/types.ts";
+import type {
+    Authenticator,
+    Documents,
+} from "../../core/index.ts";
+import {
+    isAuthenticationError,
+    isForbiddenError,
+    isDocumentNotFoundError,
+} from "../../core/index.ts";
 import { workspace } from "../../../shared/rebac.ts";
 import { isJsonObject, stringField } from "./json.ts";
 
@@ -29,13 +34,15 @@ export type HttpResponse = {
 
 export type DocumentsHttpHandler = (req: HttpRequest) => Promise<HttpResponse>;
 
+type DocumentsHttpHandlerCfg = {
+    authenticator: Authenticator;
+    documents:     Documents;
+};
+
 const makeDocumentsHttpHandler = ({
     authenticator,
     documents,
-}: {
-    authenticator: Authenticator;
-    documents:     Documents;
-}): DocumentsHttpHandler => {
+}: DocumentsHttpHandlerCfg): DocumentsHttpHandler => {
     const handle: DocumentsHttpHandler = async request => {
         try {
             if (request.method === "GET" && request.path === "/health") {
@@ -99,9 +106,9 @@ const matchDocumentPath = (pathname: string): string | undefined =>
     /^\/documents\/([^/]+)$/.exec(pathname)?.[1];
 
 const toErrorResponse = (error: unknown): HttpResponse => {
-    if (isAuthenticationError(error))    return json(401, { error: error.message });
-    if (isForbiddenError(error))         return json(403, { error: error.message });
-    if (isDocumentNotFoundError(error))  return json(404, { error: error.message });
+    if (isAuthenticationError(error))   return json(401, { error: error.message });
+    if (isForbiddenError(error))        return json(403, { error: error.message });
+    if (isDocumentNotFoundError(error)) return json(404, { error: error.message });
     const message = error instanceof Error ? error.message : "Unknown error";
     return json(400, { error: message });
 };

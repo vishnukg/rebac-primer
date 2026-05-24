@@ -1,32 +1,28 @@
 // AuthZ service domain types.
 //
-// The domain owns three operations:
-//   check       — traverse the graph, return allowed/denied
-//   writeTuples — add relationship assertions
-//   deleteTuples— remove relationship assertions
-//   listTuples  — read back stored tuples (for audit/debugging)
+// The domain owns four operations:
+//   check        — traverse the graph, return allowed/denied
+//   writeTuples  — add relationship assertions
+//   deleteTuples — remove relationship assertions
+//   listTuples   — read back stored tuples (for audit/debugging)
 
-import type { CheckRequest, CheckResult, Relation, RebacObject, TupleKey } from "../../../shared/rebac.ts";
+import type { CheckRequest, CheckResult, TupleKey } from "../../../shared/rebac.ts";
+import type { TupleFilter } from "../ports/tupleRepository.ts";
 
 export type { CheckRequest, CheckResult, TupleKey };
 
-// ── Tuple filter ──────────────────────────────────────────────────────────────
-
-// Narrows which tuples listTuples returns.
-export type TupleFilter = {
-    object?:   RebacObject;
-    relation?: Relation;
-};
+// Re-export so consumers can import everything from core/index.ts.
+export type { TupleFilter };
 
 // ── Driving port ──────────────────────────────────────────────────────────────
 
 // This is what the HTTP adapter calls into.  It is also what an SDK would wrap.
-export type AuthzService = {
+export interface AuthzService {
     check:        (request: CheckRequest) => Promise<CheckResult>;
     writeTuples:  (tuples: TupleKey[]) => Promise<void>;
     deleteTuples: (tuples: TupleKey[]) => Promise<void>;
     listTuples:   (filter?: TupleFilter) => Promise<TupleKey[]>;
-};
+}
 
 // ── Domain errors ─────────────────────────────────────────────────────────────
 

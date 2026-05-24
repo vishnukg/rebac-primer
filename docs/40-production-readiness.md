@@ -23,8 +23,8 @@ over directly:
 
 - The three-layer separation: HTTP parses -> domain service decides authz is
   required -> authorizer answers allow/deny
-- Factory/constructor injection with an `Authorizer` interface: swapping
-  `makeGraphAuthorizer` or `NewGraphAuthorizer` for a real OpenFGA client
+- Factory/constructor injection with an `AuthzClient` interface: swapping
+  `makeAuthzServiceClient` or `NewGraphAuthorizer` for a real OpenFGA client
   requires one change, in one place
 - The tuple model: objects, relations, subject sets, inheritance via `from`
 - The OpenFGA DSL: types, type restrictions, computed permissions
@@ -119,7 +119,7 @@ should receive typed dependencies, not `process.env` or `os.Getenv` directly.
 The tutorial seeds a static fixture at startup:
 
 ```ts
-const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+const repository = makeInMemoryTupleRepository(seedPolicyTuples());
 ```
 
 In production, tuples are written in response to domain events:
@@ -462,7 +462,7 @@ There is no universally correct answer. The default should be **fail closed**
 for write operations and privileged reads. Use circuit breakers and timeouts to
 avoid cascading latency from a slow authorization service.
 
-The `Authorizer` interface in this repo makes this easy to handle in one place:
+The `AuthzClient` interface in this repo makes this easy to handle in one place:
 
 ```ts
 async check(request: CheckRequest): Promise<CheckResult> {

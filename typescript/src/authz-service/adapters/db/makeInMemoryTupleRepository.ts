@@ -3,7 +3,7 @@
 // Backed by a Map keyed on "object|relation|user".  A production adapter
 // would use a relational DB with indexes on (object, relation).
 
-import type { TupleRepository } from "../../core/ports/tupleRepository.ts";
+import type { TupleFilter, TupleRepository } from "../../core/ports/index.ts";
 import type { Relation, RebacObject, Subject, TupleKey } from "../../../shared/rebac.ts";
 
 const makeInMemoryTupleRepository = (seed: TupleKey[] = []): TupleRepository => {
@@ -20,7 +20,7 @@ const makeInMemoryTupleRepository = (seed: TupleKey[] = []): TupleRepository => 
     const findByObjectRelation = (object: RebacObject, relation: Relation): TupleKey[] =>
         [...store.values()].filter(t => t.object === object && t.relation === relation);
 
-    const findAll = (filter?: { object?: RebacObject; relation?: Relation }): TupleKey[] => {
+    const findAll = (filter?: TupleFilter): TupleKey[] => {
         if (!filter) return [...store.values()];
         return [...store.values()].filter(t =>
             (!filter.object   || t.object   === filter.object) &&
