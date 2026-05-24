@@ -104,7 +104,7 @@ want `can_edit`, `can_read`, and `can_delete`, not any random string.
 
 ## Your first useful type
 
-Open `src/authz/types.ts`.
+Open `src/core/ports/authz.ts`.
 
 ```ts
 export type DocumentRelation =
@@ -180,14 +180,16 @@ Every `.ts` file in this repo is an ES module because `package.json` includes:
 }
 ```
 
-That is why imports include `.js`:
+This repo runs TypeScript source directly in development with `tsx`, so relative
+imports include `.ts`:
 
 ```ts
-import { InMemoryTupleStore } from "./memory-store.js";
+import makeGraphAuthorizer from "./adapters/authz/makeGraphAuthorizer.ts";
 ```
 
-This looks strange at first. The source file is `.ts`, but the emitted runtime
-file is `.js`, so Node-style ESM imports use the runtime extension.
+The important rule is that ESM imports use explicit file extensions. This repo
+also sets `allowImportingTsExtensions` because it type-checks source files
+without emitting JavaScript from `tsc`.
 
 ## Build vs test
 
@@ -197,8 +199,8 @@ Run:
 npm run build
 ```
 
-This runs the TypeScript compiler. It checks types and writes JavaScript to
-`dist`.
+This runs the TypeScript compiler. In this repo `tsc` checks types only; the
+dev/test commands execute the `.ts` files directly.
 
 Run:
 
@@ -213,7 +215,7 @@ that the program does what the domain requires.
 
 ## Exercise
 
-1. Open `src/testing/fixtures.ts`.
+1. Open `src/demo/fixtures.ts`.
 2. Change `"editor"` to `"edtor"` in one tuple.
 3. Run `npm run build`.
 4. Read the compiler error.

@@ -57,7 +57,7 @@ The TypeScript implementation uses template literal types to make strings carry
 type information:
 
 ```ts
-// typescript/src/authz/types.ts
+// typescript/src/core/ports/authz.ts
 type RebacObject<TType extends ObjectType = ObjectType> = `${TType}:${string}`;
 ```
 
@@ -197,8 +197,14 @@ type TupleReader interface {
 (all three). But `GraphAuthorizer` only sees `TupleReader` — it cannot call
 `Write` or `Delete` even if they exist on the concrete type.
 
-TypeScript equivalent: `GraphAuthorizer` accepts `TupleReader` in its
-constructor, not the full `InMemoryTupleStore`.
+TypeScript equivalent: `makeGraphAuthorizer` accepts only the tuple-read
+methods it needs:
+
+```ts
+type GraphAuthorizerCfg = {
+  tupleStore: Pick<TupleStore, "has" | "findByObjectRelation">;
+};
+```
 
 ### Thread-safe map with `sync.RWMutex`
 
@@ -240,10 +246,9 @@ func keyFor(k TupleKey) string {
 ```
 
 ```ts
-// typescript/src/authz/memory-store.ts
-function keyFor(tupleKey: TupleKey): string {
-  return `${tupleKey.object}|${tupleKey.relation}|${tupleKey.user}`;
-}
+// typescript/src/adapters/authz/makeInMemoryTupleStore.ts
+const keyFor = (tupleKey: TupleKey): string =>
+  `${tupleKey.object}|${tupleKey.relation}|${tupleKey.user}`;
 ```
 
 Identical logic, different syntax.
@@ -253,7 +258,7 @@ Identical logic, different syntax.
 ## The graph authorizer
 
 Open `go/internal/authz/graph.go`. This is the most important file to read side
-by side with the TypeScript `GraphAuthorizer`.
+by side with TypeScript's `makeGraphAuthorizer`.
 
 The algorithm is identical. The structure looks different because of Go idioms.
 
@@ -339,16 +344,15 @@ Open `go/internal/domain/service.go`.
 
 ### Unexported struct, exported interface
 
-TypeScript uses a class with private fields:
+TypeScript uses factories that return a `Documents` interface:
 
 ```ts
-// typescript/src/domain/service.ts
-export class DocumentService implements DocumentOperations {
-  constructor(
-    private readonly repository: DocumentRepository,
-    private readonly authorizer: Authorizer
-  ) {}
-}
+// typescript/src/core/domain/documents/makeDocuments.ts
+const makeDocuments = ({ repository, authorizer }: DocumentsCfg): Documents => ({
+  create: makeCreateDocument({ repository, authorizer }),
+  read: makeReadDocument({ repository, authorizer }),
+  update: makeUpdateDocument({ repository, authorizer })
+});
 ```
 
 Go uses an unexported struct and an exported constructor that returns an interface:
@@ -369,7 +373,8 @@ func NewDocumentService(repo DocumentRepository, auth authz.Authorizer) Document
 `*documentService`. Callers can only call methods declared on the interface.
 They cannot inspect or mutate the struct's fields, and they cannot construct one
 without going through the constructor. This is Go's equivalent of TypeScript's
-`private readonly` constructor parameters.
+factory boundary: callers get the interface they need, while dependencies stay
+inside the constructed operations.
 
 ### JSON tags on the domain type
 
@@ -419,7 +424,7 @@ Open `go/internal/httpserver/server.go` and `handler.go`.
 TypeScript uses Node's `http` module with manual path matching:
 
 ```ts
-// typescript/src/http/handler.ts
+// typescript/src/adapters/http/makeHttpHandler.ts
 const documentId = matchDocumentPath(request.path);
 if (documentId && request.method === "GET") { ... }
 ```
@@ -715,10 +720,10 @@ The same HTTP API as the TypeScript server (`make ts-server`), just on port 4001
 |-----------------------|----------------------------------------|------------------------------------------|
 | Branded types         | Template literal types                 | Named types (`type Object string`)       |
 | Relation constants    | Union type `"can_edit" \| "viewer"…`   | `const` block with named `Relation` type |
-| Interface satisfaction| `implements Authorizer`                | Implicit — method set must match         |
+| Interface satisfaction| object shape must match                | Implicit — method set must match         |
 | Error signalling      | `throw new ForbiddenError(...)`        | `return &ForbiddenError{...}`            |
 | Error dispatch        | `instanceof`                           | `errors.As`                              |
-| Constructor injection | `constructor(private repo: ...)`       | `NewDocumentService(repo, auth)`         |
+| Dependency injection  | `makeDocuments({ repo, auth })`        | `NewDocumentService(repo, auth)`         |
 | Immutable copy        | `{ ...existing, body: newBody }`       | `updated := *existing; updated.Body = …` |
 | Async / cancellation  | `async`/`await`, `Promise`             | Synchronous + `context.Context`          |
 | JSON serialization    | Automatic                              | Struct tags: `json:"fieldName"`          |

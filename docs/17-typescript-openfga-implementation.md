@@ -1,6 +1,6 @@
 # TypeScript OpenFGA implementation
 
-The application does not talk to OpenFGA directly from the domain service.
+The application does not talk to OpenFGA directly from the document domain.
 
 Instead, it depends on a small interface:
 
@@ -21,7 +21,7 @@ details from spilling into the domain.
 
 ## Why the interface matters
 
-`DocumentService` should not know about:
+The document use cases should not know about:
 
 - OpenFGA API URLs
 - store ids
@@ -38,7 +38,11 @@ to update a document, the actor must have can_edit on that document
 That rule appears in code as:
 
 ```ts
-await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "edit");
+const decision = await authorizer.check({
+  user: input.actor,
+  relation: "can_edit",
+  object: document(input.id)
+});
 ```
 
 The implementation behind `Authorizer` can change without rewriting the service.
@@ -47,7 +51,7 @@ Architecture:
 
 ```text
 ┌─────────────────┐
-│ DocumentService │
+│ Documents       │
 │ business rules  │
 └────────┬────────┘
          │ depends on interface
@@ -60,7 +64,7 @@ Architecture:
         ├─────────────────────┐
         ▼                     ▼
 ┌─────────────────┐   ┌─────────────────┐
-│ GraphAuthorizer │   │ OpenFgaAuthorizer│
+│ makeGraphAuthorizer │ │ makeOpenFgaAuthorizer │
 │ local teaching  │   │ SDK adapter      │
 └─────────────────┘   └────────┬────────┘
                                │
@@ -78,8 +82,8 @@ you swap the implementation.
 This repo has two implementations:
 
 ```text
-GraphAuthorizer   -> local evaluator for learning and unit tests
-OpenFgaAuthorizer -> SDK adapter for real OpenFGA
+makeGraphAuthorizer    -> local evaluator for learning and unit tests
+makeOpenFgaAuthorizer  -> SDK adapter for real OpenFGA
 ```
 
 They share the same interface.
@@ -88,7 +92,7 @@ That is why the domain code is easy to test and still has a production path.
 
 ## The teaching implementation
 
-`GraphAuthorizer` is not trying to be OpenFGA.
+`makeGraphAuthorizer` is not trying to be OpenFGA.
 
 It is a readable evaluator for this repo's model. It exists so you can see the
 graph traversal in plain TypeScript and run tests without infrastructure.
@@ -109,16 +113,13 @@ The trace explains why access was allowed or denied.
 
 ## The real OpenFGA adapter
 
-Open `typescript/src/authz/openfga-client.ts`.
+Open `typescript/src/adapters/authz/makeOpenFgaAuthorizer.ts`.
 
 ```ts
-export class OpenFgaAuthorizer implements Authorizer {
-  private readonly client: OpenFgaClient;
-
-  constructor(config: OpenFgaConfig) {
-    this.client = new OpenFgaClient(config);
-  }
-}
+const makeOpenFgaAuthorizer = (cfg: OpenFgaAuthorizerCfg): OpenFgaAuthorizer => {
+  const client = new OpenFgaClient(cfg);
+  // ...
+};
 ```
 
 The adapter owns the SDK client. The rest of the app does not.
@@ -126,18 +127,18 @@ The adapter owns the SDK client. The rest of the app does not.
 The `check` method converts from this repo's request shape:
 
 ```ts
-// typescript/src/authz/types.ts
-export type CheckRequest = Readonly<{
+// typescript/src/core/ports/authz.ts
+export type CheckRequest = {
   user: RebacObject<"user">;
   relation: Relation;
   object: RebacObject;
-}>;
+};
 ```
 
 to the SDK call:
 
 ```ts
-await this.client.check({
+await client.check({
   user: request.user,
   relation: request.relation,
   object: request.object
@@ -178,9 +179,9 @@ make openfga-up
 You then need to:
 
 1. create a store
-2. write the model from `typescript/src/authz/model.ts`
+2. write the model from `typescript/src/adapters/authz/model.ts`
 3. write tuples
-4. configure `OpenFgaAuthorizer` with `apiUrl`, `storeId`, and optionally
+4. configure `makeOpenFgaAuthorizer` with `apiUrl`, `storeId`, and optionally
    `authorizationModelId`
 
 This repo does not hide those concepts because learning them is part of the
@@ -196,7 +197,7 @@ Local runtime architecture:
                                           │ Authorizer.check
                                           ▼
                                   ┌──────────────┐
-                                  │ GraphAuthorizer
+                                  │ makeGraphAuthorizer
                                   │ or OpenFGA   │
                                   └──────┬───────┘
                                          │
@@ -206,7 +207,7 @@ Local runtime architecture:
                                   └──────────────┘
 ```
 
-Today the demo server uses `GraphAuthorizer` so it runs without infrastructure.
+Today the demo server uses `makeGraphAuthorizer` so it runs without infrastructure.
 The adapter is ready for the OpenFGA-backed version.
 
 ## TypeScript lesson
@@ -225,17 +226,17 @@ This is a general TypeScript backend habit, not only an OpenFGA habit.
 
 ## Exercise
 
-Add a `deleteTuples` method to `OpenFgaAuthorizer`.
+Add a `deleteTuples` method to the object returned by `makeOpenFgaAuthorizer`.
 
 Guidelines:
 
 1. accept `readonly TupleKey[]`
 2. map from repo tuple shape to SDK tuple shape inside the adapter
-3. do not expose SDK-specific types in `DocumentService`
+3. do not expose SDK-specific types in the document domain
 4. add a focused unit test around the tuple mapping if you introduce a helper
 
 ## Checkpoint
 
-Why does `DocumentService` depend on `Authorizer` instead of `OpenFgaClient`?
+Why does the document domain depend on `Authorizer` instead of `OpenFgaClient`?
 
 Good answer: the service owns business rules; the adapter owns SDK details.

@@ -21,10 +21,11 @@ Production-ready does not mean "more complicated for its own sake." It means:
 Before listing what is missing, it is worth being explicit about what carries
 over directly:
 
-- The three-layer separation: HTTP parses → domain service decides authz is
-  required → authorizer answers allow/deny
-- Constructor injection with an `Authorizer` interface — swapping
-  `GraphAuthorizer` for a real OpenFGA client requires one change, in one place
+- The three-layer separation: HTTP parses -> domain service decides authz is
+  required -> authorizer answers allow/deny
+- Factory/constructor injection with an `Authorizer` interface: swapping
+  `makeGraphAuthorizer` or `NewGraphAuthorizer` for a real OpenFGA client
+  requires one change, in one place
 - The tuple model: objects, relations, subject sets, inheritance via `from`
 - The OpenFGA DSL: types, type restrictions, computed permissions
 - Testing authorization behavior rather than mocks
@@ -76,7 +77,7 @@ Use this map when you turn the tutorial into a service.
 | Area | Tutorial version | Production version |
 |------|------------------|--------------------|
 | Identity | actor passed in request field | verified OAuth/OIDC token or session |
-| Authorization engine | in-memory `GraphAuthorizer` | OpenFGA service via SDK |
+| Authorization engine | in-memory graph authorizer | OpenFGA service via SDK |
 | Domain data | in-memory repository | database with migrations and backups |
 | Relationship tuples | seeded fixture | written/deleted from domain events |
 | Config | local defaults | environment variables and secret manager |
@@ -118,7 +119,7 @@ should receive typed dependencies, not `process.env` or `os.Getenv` directly.
 The tutorial seeds a static fixture at startup:
 
 ```ts
-const tupleStore = new InMemoryTupleStore(seedRelationshipTuples());
+const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
 ```
 
 In production, tuples are written in response to domain events:
@@ -174,7 +175,7 @@ systems recover from partial failures, deploy bugs, and manual data repairs.
 
 ## Gap 2: OpenFGA deployment
 
-The tutorial uses `GraphAuthorizer`, an in-process implementation that is
+The tutorial uses graph authorizers, in-process implementations that are
 deliberately educational. The production path is to install the SDK for the
 language track you are using:
 
@@ -358,7 +359,7 @@ Client sends:   Authorization: Bearer <JWT>
 Server verifies JWT signature and expiry
 Server extracts `sub` claim: "user-uuid-123"
 Server maps sub to OpenFGA user ID: "user:user-uuid-123"
-Domain service calls authorizer with that ID
+Document domain calls authorizer with that ID
 ```
 
 Never trust a request field for the acting user. The JWT must be verified by
@@ -793,7 +794,7 @@ Use this as a final review before calling a ReBAC service production-ready.
 - [OpenFGA documentation](https://openfga.dev/docs) — the authoritative source
   for deployment, model design, and API reference
 - [OpenFGA SDK for Node.js](https://github.com/openfga/js-sdk) — the production
-  client that replaces `GraphAuthorizer`
+  client used by the TypeScript OpenFGA adapter
 - [OpenFGA SDK for Go](https://github.com/openfga/go-sdk) — the production
   client used by the Go adapter
 - [OpenFGA sample stores](https://github.com/openfga/sample-stores) — worked

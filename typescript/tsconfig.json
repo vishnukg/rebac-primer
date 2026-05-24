@@ -21,12 +21,7 @@
     "types": ["node", "vitest/globals"]
   },
   "include": [
-    "src/modules/**/*.ts",
-    "src/server/**/*.ts",
-    "src/cli/**/*.ts",
-    "src/demo/**/*.ts",
-    "src/main.ts",
-    "src/server.ts",
+    "src/**/*.ts",
     "test/**/*.ts"
   ]
 }

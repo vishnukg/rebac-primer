@@ -697,12 +697,12 @@ ReBAC check
 allow or deny → handler runs business logic
 ```
 
-Your `DocumentService` should receive an already-verified actor id. It should
-not parse JWTs or call the IdP.
+Your document domain should receive an already-verified actor id. It should not
+parse JWTs or call the IdP.
 
 ```text
-Clean:  auth middleware → "user:github:12345" → DocumentService.check()
-Messy:  DocumentService parses Authorization header, calls OpenFGA
+Clean:  auth middleware -> "user:github:12345" -> documents.update()
+Messy:  document domain parses Authorization header, calls OpenFGA directly
 ```
 
 Keep authentication, authorization, and business logic as three separate layers.

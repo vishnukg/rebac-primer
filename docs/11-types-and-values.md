@@ -12,7 +12,7 @@ vocabulary for ReBAC:
 - tuple keys
 - authorization checks
 
-Open `src/authz/types.ts` while reading.
+Open `src/core/ports/authz.ts` while reading.
 
 ## Scene
 
@@ -130,9 +130,7 @@ a useful escape hatch at boundaries, but a poor habit in application code.
 This repo uses helper functions:
 
 ```ts
-export function user(id: string): RebacObject<"user"> {
-  return object("user", id);
-}
+export const user = (id: string): RebacObject<"user"> => makeObject("user", id);
 ```
 
 Now calling code is readable:
@@ -149,18 +147,18 @@ The helper also validates empty ids at runtime.
 Use `type` when you are naming data shapes, unions, or computed types:
 
 ```ts
-export type CheckRequest = Readonly<{
+export type CheckRequest = {
   user: RebacObject<"user">;
   relation: Relation;
   object: RebacObject;
-}>;
+};
 ```
 
 Use `interface` when you are describing behavior:
 
 ```ts
 export interface Authorizer {
-  check(request: CheckRequest): Promise<CheckResult>;
+  check: (request: CheckRequest) => Promise<CheckResult>;
 }
 ```
 
@@ -173,9 +171,8 @@ Narrowing means TypeScript starts with a broad type and refines it after a check
 Example from this repo:
 
 ```ts
-export function isSubjectSet(subject: Subject): subject is SubjectSet {
-  return subject.includes("#");
-}
+export const isSubjectSet = (subject: Subject): subject is SubjectSet =>
+  subject.includes("#");
 ```
 
 The return type `subject is SubjectSet` is a type predicate. It tells the
@@ -197,15 +194,16 @@ Types are erased at runtime, so any string that comes from outside your code
 needs validation.
 
 ```ts
-export function parseObject(value: string): { type: ObjectType; id: string } {
+export const parseObject = (value: string): { type: ObjectType; id: string } => {
   const [type, ...idParts] = value.split(":");
+  const id = idParts.join(":");
 
-  if (!isObjectType(type) || idParts.length === 0 || idParts.join(":").length === 0) {
-    throw new Error(`Invalid OpenFGA object id: ${value}`);
+  if (!isObjectType(type) || id.length === 0) {
+    throw new Error(`Invalid ReBAC object id: ${value}`);
   }
 
-  return { type, id: idParts.join(":") };
-}
+  return { type, id };
+};
 ```
 
 Notice the shape:
@@ -248,7 +246,7 @@ Then:
 
 1. add it to `DocumentRelation`
 2. decide which relationship should imply it
-3. update `GraphAuthorizer`
+3. update `makeGraphAuthorizer`
 4. add a test
 5. run `npm run build && npm test`
 

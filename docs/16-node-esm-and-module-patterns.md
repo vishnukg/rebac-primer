@@ -5,7 +5,7 @@ Modules are one of the most important parts of modern TypeScript backend code.
 They answer practical questions:
 
 - How does Node find and load files?
-- Why do imports in this repo end with `.js`?
+- Why do imports in this repo include file extensions?
 - What is the difference between ESM and CommonJS?
 - When is a module evaluated?
 - How do singleton values work?
@@ -71,35 +71,26 @@ You can see that in `package.json`:
 }
 ```
 
-With `"type": "module"`, Node treats `.js` files in this package as ES modules.
-Since TypeScript compiles `.ts` to `.js`, the emitted code runs as ESM.
+With `"type": "module"`, Node treats JavaScript files in this package as ES
+modules. The TypeScript source follows the same ESM rules.
 
-## Why imports use `.js` in `.ts` files
+## Why imports include `.ts`
 
 This repo uses imports like:
 
 ```ts
-import { InMemoryTupleStore } from "./memory-store.js";
+import makeGraphAuthorizer from "./adapters/authz/makeGraphAuthorizer.ts";
 ```
 
-The source file is `memory-store.ts`, so why not import `./memory-store.ts`?
+The key rule is not the exact extension. The key rule is that ESM imports are
+explicit. Node-style ESM does not guess relative file extensions the way
+CommonJS historically did.
 
-Because Node runs the compiled JavaScript, not the TypeScript source.
-
-At runtime the file is:
-
-```text
-dist/src/authz/memory-store.js
-```
-
-Node ESM expects the runtime extension in relative imports. TypeScript with
-`moduleResolution: "NodeNext"` understands this pattern and maps the `.js`
-specifier back to the `.ts` source during type checking.
-
-So this is correct in a Node ESM TypeScript project:
+This repo executes TypeScript source directly in development and tests, and
+`tsconfig.json` enables `allowImportingTsExtensions`. So this is correct here:
 
 ```ts
-import { tuple } from "./types.js";
+import { tuple } from "./core/index.ts";
 ```
 
 This is usually wrong for this repo:
@@ -117,11 +108,14 @@ Open `tsconfig.json`.
 ```json
 {
   "module": "NodeNext",
-  "moduleResolution": "NodeNext"
+  "moduleResolution": "NodeNext",
+  "allowImportingTsExtensions": true,
+  "noEmit": true
 }
 ```
 
-These options tell TypeScript to follow modern Node module rules.
+These options tell TypeScript to follow modern Node module rules while checking
+source files without emitting JavaScript.
 
 That means TypeScript checks imports the way Node will load them. This reduces
 the annoying class of bugs where code type-checks but cannot be loaded by Node.
@@ -131,7 +125,7 @@ the annoying class of bugs where code type-checks but cannot be loaded by Node.
 When Node sees:
 
 ```ts
-import { GraphAuthorizer } from "./authz/graph-authorizer.js";
+import makeGraphAuthorizer from "./adapters/authz/makeGraphAuthorizer.ts";
 ```
 
 it roughly does this:
@@ -145,18 +139,18 @@ it roughly does this:
 
 The "once" part matters.
 
-If three files import `src/authz/model.ts`, the module body is evaluated once.
-All importers share the same module instance.
+If three files import `src/adapters/authz/model.ts`, the module body is
+evaluated once. All importers share the same module instance.
 
 ## Module evaluation order
 
 Suppose you have this graph:
 
 ```text
-main.ts
-  imports graph-authorizer.ts
-    imports memory-store.ts
-    imports types.ts
+demo/index.ts
+  imports demo/compose.ts
+    imports adapters/authz/makeGraphAuthorizer.ts
+    imports core/ports/authz.ts
 ```
 
 Node must evaluate dependencies before the importer can use them.
@@ -198,7 +192,7 @@ export function increment(): void {
 ```
 
 ```ts
-// main.ts
+// app.ts
 import { count, increment } from "./counter.js";
 
 increment();
@@ -213,7 +207,7 @@ Prefer exporting functions, constants, classes, or factory functions.
 Default export:
 
 ```ts
-export default class DocumentService {}
+export default function makeService() {}
 ```
 
 Import:
@@ -225,16 +219,17 @@ import AnythingYouWant from "./service.js";
 Named export:
 
 ```ts
-export class DocumentService {}
+export function makeService() {}
 ```
 
 Import:
 
 ```ts
-import { DocumentService } from "./service.js";
+import { makeService } from "./service.js";
 ```
 
-This repo prefers named exports.
+This repo uses named exports for shared core APIs and default exports for
+single factory functions such as `makeGraphAuthorizer`.
 
 Named exports are easier to search, easier to refactor, and harder to rename
 accidentally at the import site.
@@ -244,7 +239,7 @@ accidentally at the import site.
 TypeScript has imports that exist only for type checking:
 
 ```ts
-import type { Authorizer, RebacObject, Relation } from "../authz/types.js";
+import type { Authorizer, RebacObject, Relation } from "../core/index.ts";
 ```
 
 At runtime, this import disappears from the emitted JavaScript.
@@ -262,23 +257,20 @@ This is a small habit that keeps module dependencies honest.
 A barrel file re-exports from many files:
 
 ```ts
-// src/authz/index.ts
-export * from "./types.js";
-export * from "./memory-store.js";
-export * from "./graph-authorizer.js";
+// src/core/index.ts
+export * from "./domain/documents/index.ts";
+export * from "./ports/index.ts";
 ```
 
 Then callers import from one place:
 
 ```ts
-import { GraphAuthorizer, InMemoryTupleStore } from "../authz/index.js";
+import { makeDocuments, user } from "../core/index.ts";
 ```
 
-Barrels can be useful in libraries. They can also hide dependencies and create
-accidental import cycles.
-
-This repo mostly avoids barrels because it is a teaching project. Direct imports
-make ownership clearer.
+Barrels can be useful when they are small and intentional. This repo has a core
+barrel for the public domain API. Adapters are imported directly so the concrete
+infrastructure choice remains visible.
 
 ## Module side effects
 
@@ -295,7 +287,7 @@ Side effects are not always wrong, but they should be obvious.
 This is fine for an application entrypoint:
 
 ```ts
-// src/main.ts
+// src/demo/index.ts
 const app = createDemoApp();
 
 for (const actor of app.actors) {
@@ -303,7 +295,7 @@ for (const actor of app.actors) {
 }
 ```
 
-This would be a poor surprise inside `src/authz/types.ts`:
+This would be a poor surprise inside `src/core/ports/authz.ts`:
 
 ```ts
 startHttpServer();
@@ -317,13 +309,13 @@ composition roots wire dependencies
 entrypoints perform actions
 ```
 
-The repo keeps the wiring in `src/app/*` composition roots. That gives each
-entrypoint a clear job:
+The repo keeps the wiring in small composition roots. That gives each entrypoint
+a clear job:
 
 ```text
-src/main.ts       -> create demo app, print demo checks
-src/server.ts     -> create server app, listen on the configured port
-src/client/tui.ts -> create client app, run it, close the terminal
+src/demo/index.ts    -> create demo app, print demo checks
+src/server/index.ts  -> create server app, listen on the configured port
+src/cli/index.ts     -> create terminal client, run it, close the terminal
 ```
 
 That keeps imports predictable. Importing a domain module does not start a
@@ -337,15 +329,15 @@ That means this module creates one shared store per process:
 
 ```ts
 // singleton-store.ts
-import { InMemoryTupleStore } from "./memory-store.js";
+import makeInMemoryTupleStore from "./makeInMemoryTupleStore.ts";
 
-export const tupleStore = new InMemoryTupleStore();
+export const tupleStore = makeInMemoryTupleStore();
 ```
 
 Every importer gets the same `tupleStore` instance.
 
 ```ts
-import { tupleStore } from "./singleton-store.js";
+import { tupleStore } from "./singleton-store.ts";
 ```
 
 That is the simplest singleton pattern in Node ESM.
@@ -353,7 +345,9 @@ That is the simplest singleton pattern in Node ESM.
 ## Singleton pattern 1: exported instance
 
 ```ts
-export const authorizer = new GraphAuthorizer(new InMemoryTupleStore());
+export const authorizer = makeGraphAuthorizer({
+  tupleStore: makeInMemoryTupleStore()
+});
 ```
 
 Pros:
@@ -377,10 +371,12 @@ Avoid it for tutorial domain state.
 ## Singleton pattern 2: lazy getter
 
 ```ts
-let authorizer: GraphAuthorizer | undefined;
+let authorizer: Authorizer | undefined;
 
-export function getAuthorizer(): GraphAuthorizer {
-  authorizer ??= new GraphAuthorizer(new InMemoryTupleStore());
+export function getAuthorizer(): Authorizer {
+  authorizer ??= makeGraphAuthorizer({
+    tupleStore: makeInMemoryTupleStore()
+  });
   return authorizer;
 }
 ```
@@ -404,10 +400,10 @@ the default for everything.
 This repo usually prefers explicit composition:
 
 ```ts
-const store = new InMemoryTupleStore(seedRelationshipTuples());
-const authorizer = new GraphAuthorizer(store);
-const repository = new InMemoryDocumentRepository();
-const service = new DocumentService(repository, authorizer);
+const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+const authorizer = makeGraphAuthorizer({ tupleStore });
+const repository = makeInMemoryDocumentRepository();
+const documents = makeDocuments({ repository, authorizer });
 ```
 
 Pros:
@@ -432,26 +428,25 @@ implementations for its interfaces.
 In this repo:
 
 ```text
-createServices()   -> InMemoryTupleStore, GraphAuthorizer, repository, service
-createDemoApp()    -> demo authorizer and demo actors
-createServerApp()  -> domain services plus HTTP server
-createClientApp()  -> HTTP API client plus terminal client
+server/compose.ts  -> domain services plus HTTP server
+demo/compose.ts    -> demo authorizer and demo actors
+cli/compose.ts     -> HTTP API client plus terminal client
 ```
 
 Notice the direction:
 
 ```text
-DocumentService depends on Authorizer
-GraphAuthorizer implements Authorizer
-createServices chooses GraphAuthorizer
+Documents depends on Authorizer
+makeGraphAuthorizer implements Authorizer
+server/compose.ts receives the chosen Authorizer
 ```
 
-The service does not know which authorizer was chosen. That is the point. The
+The domain does not know which authorizer was chosen. That is the point. The
 composition root owns the decision, and the rest of the app talks through
 interfaces.
 
-This pattern also avoids accidental singletons. Instead of exporting a global
-`DocumentService`, tests and entrypoints ask a factory to create a fresh graph.
+This pattern also avoids accidental singletons. Instead of exporting global
+document services, tests and entrypoints ask factories to create a fresh graph.
 
 ## Singleton pattern 4: dependency container
 
@@ -460,17 +455,17 @@ Larger apps sometimes build a small container:
 ```ts
 export type AppServices = {
   authorizer: Authorizer;
-  documents: DocumentService;
+  documents: Documents;
 };
 
 export function createServices(): AppServices {
-  const store = new InMemoryTupleStore(seedRelationshipTuples());
-  const authorizer = new GraphAuthorizer(store);
-  const repository = new InMemoryDocumentRepository();
+  const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+  const authorizer = makeGraphAuthorizer({ tupleStore });
+  const repository = makeInMemoryDocumentRepository();
 
   return {
     authorizer,
-    documents: new DocumentService(repository, authorizer)
+    documents: makeDocuments({ repository, authorizer })
   };
 }
 ```
@@ -509,9 +504,9 @@ entrypoint         -> wires everything together
 In this repo:
 
 ```text
-DocumentService depends on Authorizer
-OpenFgaAuthorizer implements Authorizer
-DocumentService does not import OpenFgaAuthorizer
+Documents depends on Authorizer
+makeOpenFgaAuthorizer implements Authorizer
+core/domain/documents does not import makeOpenFgaAuthorizer
 ```
 
 That is deliberate.
@@ -521,13 +516,13 @@ That is deliberate.
 Most imports should be static:
 
 ```ts
-import { GraphAuthorizer } from "./authz/graph-authorizer.js";
+import makeGraphAuthorizer from "./adapters/authz/makeGraphAuthorizer.ts";
 ```
 
 Dynamic import loads a module at runtime:
 
 ```ts
-const { GraphAuthorizer } = await import("./authz/graph-authorizer.js");
+const { default: makeGraphAuthorizer } = await import("./adapters/authz/makeGraphAuthorizer.ts");
 ```
 
 Use dynamic import when:
@@ -561,7 +556,7 @@ Use these defaults:
 
 - ESM only
 - named exports
-- explicit `.js` extensions for relative imports
+- explicit file extensions for relative imports
 - `import type` for type-only dependencies
 - direct imports instead of barrels
 - no top-level infrastructure side effects
@@ -586,22 +581,21 @@ infrastructure.
 ## Exercise
 
 Create a small composition module. Real composition often needs to seed data
-through the service layer (so domain rules run), which makes the function
-async — that is exactly the shape `typescript/src/app/create-services.ts` uses:
+through the domain service (so domain rules run), which makes the function
+async. Try extracting the setup from `typescript/src/server/index.ts`:
 
 ```ts
-// src/app/create-services.ts
 export type AppServices = Readonly<{
-  documents: DocumentOperations;
+  documents: Documents;
   authorizer: Authorizer;
   tupleStore: TupleStore;
 }>;
 
 export async function createServices(): Promise<AppServices> {
-  const tupleStore = new InMemoryTupleStore(seedRelationshipTuples());
-  const authorizer = new GraphAuthorizer(tupleStore);
-  const repository = new InMemoryDocumentRepository();
-  const documents = new DocumentService(repository, authorizer);
+  const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+  const authorizer = makeGraphAuthorizer({ tupleStore });
+  const repository = makeInMemoryDocumentRepository();
+  const documents = makeDocuments({ repository, authorizer });
 
   // Seed the initial document through the service so its authz check runs.
   await documents.create({ /* ... */ });
@@ -610,8 +604,8 @@ export async function createServices(): Promise<AppServices> {
 }
 ```
 
-Then update `src/main.ts` to `await createServices()` before passing the
-services into the HTTP server.
+Then update `src/server/index.ts` to `await createServices()` before passing the
+services into `makeServerApp`.
 
 After that, ask:
 
@@ -631,5 +625,5 @@ entrypoints perform actions
 ```
 
 Good answer: importing `types.ts` should define helpers, not start servers or
-open network connections. `server.ts` is allowed to perform actions because it is
-an entrypoint.
+open network connections. `src/server/index.ts` is allowed to perform actions
+because it is an entrypoint.

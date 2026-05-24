@@ -178,7 +178,7 @@ Mistake 4: making the HTTP handler own the policy.
 
 ```text
 Bad:  every route knows graph rules
-Good: domain service asks Authorizer for an allow/deny decision
+Good: document domain asks Authorizer for an allow/deny decision
 ```
 
 ## DAC, MAC, RBAC, ABAC, ReBAC
@@ -374,7 +374,7 @@ Now team membership is the source of truth.
        │ Check(user, relation, object)
        ▼
 ┌──────────────┐
-│ Authorizer   │ GraphAuthorizer or OpenFgaAuthorizer
+│ Authorizer   │ graph authorizer or OpenFGA adapter
 └──────┬───────┘
        │ relationship graph
        ▼

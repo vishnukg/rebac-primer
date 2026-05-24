@@ -34,13 +34,12 @@ domain rules, HTTP mapping, client behavior, and infrastructure adapters:
 
 | Test file | What it teaches |
 |-----------|-----------------|
-| `test/types-and-store.test.ts` | helper functions and tuple storage |
-| `test/model.test.ts` | model text contains required relationships |
-| `test/graph-authorizer.test.ts` | ReBAC traversal behavior |
-| `test/document-service.test.ts` | business actions enforce authorization |
-| `test/http-handler.test.ts` | HTTP mapping without opening sockets |
-| `test/api-client.test.ts` | client behavior with an injected fetcher |
-| `test/openfga-client.test.ts` | SDK adapter behavior at the infrastructure boundary |
+| `test/authz.test.ts` | ReBAC helpers and traversal behavior |
+| `test/documents.test.ts` | business actions enforce authorization |
+| `test/http.test.ts` | HTTP mapping without opening sockets |
+| `test/client.test.ts` | client behavior with injected dependencies |
+| `test/authn.test.ts` | bearer-token verification behavior |
+| `test/repository.test.ts` | document repository copy semantics |
 
 The tests double as executable documentation.
 
@@ -49,10 +48,11 @@ The tests double as executable documentation.
 ```ts
 import { describe, expect, it } from "vitest";
 
-describe("GraphAuthorizer", () => {
-  it("given_team_member_workspace_editor_when_checking_document_edit_then_access_is_allowed", async () => {
+describe("makeGraphAuthorizer", () => {
+  it("allows alice to edit through team membership and workspace inheritance", async () => {
     // Arrange
-    const authorizer = new GraphAuthorizer(new InMemoryTupleStore(seedRelationshipTuples()));
+    const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+    const authorizer = makeGraphAuthorizer({ tupleStore });
 
     // Act
     const result = await authorizer.check({
@@ -74,24 +74,23 @@ Good test names are not cute. They say what behavior matters.
 
 ## Test naming convention
 
-Every unit test should use this name shape:
+Every unit test should state the behavior in plain language:
 
 ```text
-given_<starting_state>_when_<action>_then_<expected_result>
+allows alice to edit through team membership and workspace inheritance
 ```
 
 Examples:
 
 ```ts
-it("given_workspace_viewer_when_checking_document_permissions_then_read_is_allowed_and_edit_is_denied", async () => {});
+it("lets bob read as a workspace viewer but denies editing", async () => {});
 ```
 
 ```ts
-it("given_missing_document_when_updating_then_not_found_error_is_thrown", async () => {});
+it("returns 403 when ReBAC denies the action", async () => {});
 ```
 
-This convention is intentionally a little verbose. It makes test output read
-like a behavior list.
+Test output should read like a behavior list.
 
 ## Arrange, act, assert
 
@@ -107,7 +106,8 @@ Example:
 
 ```ts
 // Arrange
-const authorizer = new GraphAuthorizer(new InMemoryTupleStore(seedRelationshipTuples()));
+const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+const authorizer = makeGraphAuthorizer({ tupleStore });
 
 // Act
 const result = await authorizer.check({
@@ -128,27 +128,30 @@ This is small, but it tells a story:
 
 That is more valuable than a test that asserts an internal method was called.
 
-## No shared test helper methods
+## Small shared setup is okay
 
-Tests in this repo should keep setup inside the test body.
+Tests in this repo keep setup close to the behavior being tested.
 
-Avoid local helpers like:
+Small local helpers are fine when they remove noise without hiding the important
+relationships:
 
 ```ts
-function serviceWithTuples() {}
+const makeDocumentService = () => {
+  const repository = makeInMemoryDocumentRepository();
+  const authorizer = makeGraphAuthorizer({
+    tupleStore: makeInMemoryTupleStore({ seed: seedRelationshipTuples() })
+  });
+  return makeDocuments({ repository, authorizer });
+};
 ```
-
-The repetition is acceptable because this is a teaching repo. A reader should
-see the whole setup, action, and assertion without jumping around the file.
 
 Production fixtures such as `seedRelationshipTuples()` are allowed because they are part
 of the lesson data, not a hidden test helper.
 
 The current convention is also enforced by review:
 
-- test names use `given_when_then`
+- test names describe behavior
 - tests use visible Arrange / Act / Assert sections
-- test files do not define local setup helper functions
 - socket and TUI entrypoints are excluded from coverage; their core logic is
   tested behind interfaces
 
@@ -157,16 +160,12 @@ The current convention is also enforced by review:
 Vitest works naturally with `async` tests:
 
 ```ts
-it("given_workspace_viewer_when_creating_document_then_forbidden_error_is_thrown", async () => {
+it("rejects creation for workspace viewers", async () => {
   // Arrange
-  const store = new InMemoryTupleStore(seedRelationshipTuples());
-  const service = new DocumentService(
-    new InMemoryDocumentRepository(),
-    new GraphAuthorizer(store)
-  );
+  const documents = makeDocumentService();
 
   // Act
-  const createPromise = service.create({
+  const createPromise = documents.create({
     id: "incident-plan",
     title: "Incident Plan",
     body: "Draft",
@@ -186,17 +185,15 @@ Two details matter:
 
 ## Test data should be readable
 
-Open `src/testing/fixtures.ts`.
+Open `src/demo/fixtures.ts`.
 
 ```ts
-export function seedRelationshipTuples(): readonly TupleKey[] {
-  return [
-    tuple(platformTeam, "member", alice),
-    tuple(productWorkspace, "editor", subjectSet(platformTeam, "member")),
-    tuple(productWorkspace, "viewer", bob),
-    tuple(roadmapDocument, "workspace", productWorkspace)
-  ];
-}
+export const seedRelationshipTuples = (): TupleKey[] => [
+  tuple(platformTeam, "member", alice),
+  tuple(productWorkspace, "editor", subjectSet(platformTeam, "member")),
+  tuple(productWorkspace, "viewer", bob),
+  tuple(roadmapDocument, "workspace", productWorkspace)
+];
 ```
 
 This fixture is intentionally tiny. You can hold the whole graph in your head.
@@ -211,7 +208,7 @@ Mocks are useful when you want to isolate a unit.
 For example, a `DenyAllAuthorizer` can prove the service rejects unauthorized
 creates without caring about graph traversal.
 
-But this repo mostly uses the in-memory `GraphAuthorizer` because the tutorial
+But this repo mostly uses `makeGraphAuthorizer` because the tutorial
 goal is to learn ReBAC. In that context, graph behavior is not an implementation
 detail. It is the lesson.
 

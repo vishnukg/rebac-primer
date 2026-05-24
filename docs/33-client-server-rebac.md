@@ -9,7 +9,7 @@ The TypeScript version is intentionally modest:
 - interactive terminal client
 - no Express
 - no TUI framework
-- ReBAC enforced in the service layer
+- ReBAC enforced in the document domain
 
 The Go version exposes the same HTTP shape with the standard library. The goal
 is to show the pattern before adding more libraries.
@@ -116,12 +116,16 @@ curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
 
 The HTTP layer parses requests and maps errors to responses.
 
-The domain service enforces authorization.
+The document domain enforces authorization.
 
 TypeScript:
 
 ```ts
-await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "edit");
+const decision = await authorizer.check({
+  user: input.actor,
+  relation: "can_edit",
+  object: document(input.id)
+});
 ```
 
 Go:
@@ -133,11 +137,11 @@ err := s.requireAllowed(ctx, input.Actor, authz.RelationDocumentCanEdit, authz.D
 That is the important boundary.
 
 The client does not decide whether Bob can edit. The server
-decides. The server uses the domain service. The domain service uses the
+decides. The server uses the document domain. The document domain uses the
 authorizer.
 
 ```text
-client -> HTTP server -> DocumentService -> Authorizer -> relationship graph
+client -> HTTP server -> Documents -> Authorizer -> relationship graph
 ```
 
 ## Composition roots in this demo
@@ -145,39 +149,42 @@ client -> HTTP server -> DocumentService -> Authorizer -> relationship graph
 The executable files stay intentionally thin:
 
 ```text
-src/server.ts     -> createServerApp(), then listen()
-src/client/tui.ts -> createClientApp(), then run()
+src/server/index.ts -> makeServerApp(), then listen()
+src/cli/index.ts    -> makeCliApp(), then run()
 go/cmd/server/main.go -> app.New(), then ListenAndServe()
 ```
 
 The object graphs are assembled in the composition roots:
 
 ```text
-createServerApp
-  -> createServices
-    -> InMemoryTupleStore
-    -> GraphAuthorizer
-    -> InMemoryDocumentRepository
-    -> DocumentService
-  -> createHttpServer
+makeServerApp
+  -> makeDocuments
+  -> makeHttpHandler
+  -> makeHttpServer
 
-createClientApp
-  -> HttpDocumentsClient
+server/index.ts
+  -> makeInMemoryTupleStore
+  -> makeGraphAuthorizer
+  -> makeInMemoryDocumentRepository
+  -> makeDemoTokenVerifier
+
+makeCliApp
+  -> makeHttpDocumentsClient
   -> Node readline terminal
-  -> TerminalClient
+  -> makeTerminalClient
 
 go app.New
-  -> InMemoryTupleStore
-  -> GraphAuthorizer
-  -> InMemoryDocumentRepository
-  -> DocumentService
+  -> NewInMemoryTupleStore
+  -> NewGraphAuthorizer
+  -> NewInMemoryDocumentRepository
+  -> NewDocumentService
   -> httpserver.NewServer
 ```
 
 That split matters because ReBAC code is easier to reason about when business
-rules do not create their own infrastructure. The document service asks an
+rules do not create their own infrastructure. The document domain asks an
 `Authorizer` interface for a decision; the composition root decides that the
-teaching implementation is `GraphAuthorizer`.
+teaching implementation is `makeGraphAuthorizer`.
 
 ```text
 entrypoint -> composition root -> interfaces + concrete adapters

@@ -75,14 +75,14 @@ consistent.
 
 ## What the current apps use
 
-The current HTTP servers use the in-memory `GraphAuthorizer` so the
+The current HTTP servers use in-memory graph authorizers so the
 client/server demos work without a live OpenFGA store.
 
 That is deliberate for the primer:
 
 - you can learn client/server ReBAC first
 - you can start OpenFGA separately
-- later you can swap `GraphAuthorizer` for `OpenFgaAuthorizer`
+- later you can swap the graph authorizer for the OpenFGA adapter
 
 The interface boundary is already there:
 

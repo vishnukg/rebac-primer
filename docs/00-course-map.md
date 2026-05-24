@@ -64,8 +64,8 @@ Go tracks the same foundation.
 | 01 | OAuth/OIDC authentication fundamentals | conceptual |
 | 02 | Authorization fundamentals: RBAC, ABAC, ReBAC, agentic systems | conceptual |
 | 03 | Graph theory needed for ReBAC | conceptual |
-| 04 | ReBAC concepts, relationship graphs, agentic tool calls | `typescript/src/authz/graph-authorizer.ts`, `go/internal/authz/graph.go` |
-| 05 | OpenFGA model DSL | `typescript/src/authz/model.ts`, `go/internal/authz/model.go` |
+| 04 | ReBAC concepts, relationship graphs, agentic tool calls | `typescript/src/adapters/authz/makeGraphAuthorizer.ts`, `go/internal/authz/graph.go` |
+| 05 | OpenFGA model DSL | `typescript/src/adapters/authz/model.ts`, `go/internal/authz/model.go` |
 
 ## TypeScript track
 
@@ -74,18 +74,18 @@ Read these after the shared ReBAC track if TypeScript is your implementation lan
 | Doc | Topic | Code to inspect |
 |-----|-------|-----------------|
 | 10 | TypeScript mental model, `strict`, project setup | `typescript/tsconfig.json`, `typescript/package.json` |
-| 11 | Types, unions, narrowing, template literal types | `typescript/src/authz/types.ts` |
-| 12 | Functions, modules, classes, interfaces | `typescript/src/domain/service.ts`, `typescript/src/domain/repository.ts` |
-| 13 | Async TypeScript, errors, and service boundaries | `typescript/src/domain/service.ts`, `typescript/src/authz/openfga-client.ts` |
+| 11 | Types, unions, narrowing, template literal types | `typescript/src/core/ports/authz.ts` |
+| 12 | Functions, modules, factories, interfaces | `typescript/src/core/domain/documents`, `typescript/src/adapters` |
+| 13 | Async TypeScript, errors, and boundaries | `typescript/src/core/domain/documents`, `typescript/src/adapters/http` |
 | 14 | Testing TypeScript with Vitest | `typescript/test/*.test.ts` |
 | 15 | Coding style for maintainable TypeScript | `docs/15-typescript-code-style.md` |
-| 16 | Node ESM, module loading, module patterns, singletons | `typescript/package.json`, `typescript/tsconfig.json`, `typescript/src/main.ts` |
+| 16 | Node ESM, module loading, module patterns, singletons | `typescript/package.json`, `typescript/tsconfig.json`, `typescript/src/server/index.ts` |
 
 Read this after the shared OpenFGA model chapter.
 
 | Doc | Topic | Code to inspect |
 |-----|-------|-----------------|
-| 17 | TypeScript OpenFGA implementation | `typescript/src/authz/openfga-client.ts` |
+| 17 | TypeScript OpenFGA implementation | `typescript/src/adapters/authz/makeOpenFgaAuthorizer.ts` |
 
 ## Go track
 
@@ -107,7 +107,7 @@ Read these after the shared ReBAC track if Go is your implementation language.
 | 30 | Docker fundamentals: images, containers, Dockerfile | `typescript/Dockerfile`, `go/Dockerfile` |
 | 31 | Docker networking: host ports, service names, Compose DNS | `deployments/docker-compose.yml` |
 | 32 | Docker Compose local services | `deployments/docker-compose.yml` |
-| 33 | Client/server ReBAC demo | `typescript/src/server.ts`, `typescript/src/client/tui.ts`, `go/cmd/server/main.go` |
+| 33 | Client/server ReBAC demo | `typescript/src/server/index.ts`, `typescript/src/cli/index.ts`, `go/cmd/server/main.go` |
 
 ## Shared track: going to production
 
@@ -184,7 +184,7 @@ Checkpoint: explain why Bob can read but cannot edit.
 ### Day 3: OpenFGA model
 
 1. Read `05-openfga-model.md`.
-2. Open `typescript/src/authz/model.ts` and `go/internal/authz/model.go`.
+2. Open `typescript/src/adapters/authz/model.ts` and `go/internal/authz/model.go`.
 3. Compare the model with the in-memory graph evaluators in both languages.
 
 Checkpoint: explain `workspace#editor from workspace` as a graph path.
@@ -195,7 +195,7 @@ TypeScript:
 
 1. Read `10-typescript-foundations.md` and `11-types-and-values.md`.
 2. Run `make ts-build`.
-3. Break one relation name in `typescript/src/authz/types.ts`.
+3. Break one relation name in `typescript/src/core/ports/authz.ts`.
 4. Restore the code and run `make ts-test`.
 
 Go:
@@ -212,7 +212,7 @@ Checkpoint: explain the same tuple in both languages.
 TypeScript:
 
 1. Read `12-functions-modules-classes.md` and `13-async-errors-and-boundaries.md`.
-2. Inspect `DocumentService` in `typescript/src/domain/service.ts`.
+2. Inspect `typescript/src/core/domain/documents`.
 3. Trace how an update request becomes an authorization check.
 
 Go:
@@ -229,7 +229,7 @@ TypeScript:
 
 1. Read `14-testing-with-vitest.md`.
 2. Run `make ts-test`.
-3. Change `seedRelationshipTuples()` in `typescript/src/testing/fixtures.ts` and predict which tests fail.
+3. Change `seedRelationshipTuples()` in `typescript/src/demo/fixtures.ts` and predict which tests fail.
 
 Go:
 
@@ -244,8 +244,8 @@ Checkpoint: explain why Bob can read but cannot edit.
 TypeScript:
 
 1. Read `16-node-esm-and-module-patterns.md`.
-2. Inspect the `.js` extensions in TypeScript imports.
-3. Explain why `typescript/src/main.ts` performs actions but `typescript/src/authz/types.ts` does not.
+2. Inspect the explicit `.ts` extensions in TypeScript imports.
+3. Explain why `typescript/src/server/index.ts` performs actions but `typescript/src/core/ports/authz.ts` does not.
 
 Go:
 
@@ -253,7 +253,7 @@ Go:
 2. Inspect `go/internal/authz/parallel.go`, `go/internal/authz/result.go`, and `go/internal/authz/middleware.go`.
 3. Run `make go-test` and explain which tests document each language feature.
 
-Checkpoint: explain why relative ESM imports use `.js` in TypeScript source, or
+Checkpoint: explain why relative ESM imports use explicit extensions, or
 why Go passes `context.Context` through the authorization boundary.
 
 ### Day 8+: Local services and client/server
@@ -276,7 +276,7 @@ Docker Compose.
    requirements.
 
 Checkpoint: explain why the `Authorizer` interface makes it straightforward to
-swap `GraphAuthorizer` for a real OpenFGA client in a production deployment.
+swap the graph authorizer for a real OpenFGA client in a production deployment.
 
 ## Repo commands
 

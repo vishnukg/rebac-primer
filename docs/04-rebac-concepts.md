@@ -183,8 +183,8 @@ In an application, ReBAC usually sits behind a small authorization interface:
        │
        ▼
 ┌──────────────┐
-│ Domain       │ knows when authorization is required
-│ Service      │
+│ Document     │ knows when authorization is required
+│ Domain       │
 └──────┬───────┘
        │ Check(user, relation, object)
        ▼
@@ -201,11 +201,11 @@ In an application, ReBAC usually sits behind a small authorization interface:
 In this repo:
 
 ```text
-HTTP handler -> DocumentService -> Authorizer -> InMemoryTupleStore/OpenFGA
+HTTP handler -> Documents -> Authorizer -> TupleStore/OpenFGA
 ```
 
 That separation matters. The HTTP layer should not know graph traversal rules.
-The domain service should not know SDK details. The authorizer should answer one
+The document domain should not know SDK details. The authorizer should answer one
 question: allowed or denied.
 
 ## End-To-End Request Example
@@ -226,7 +226,7 @@ HTTP handler
   parses document id and actor id
   |
   v
-DocumentService.Update
+documents.update
   knows editing a document requires can_edit
   |
   v
@@ -312,7 +312,7 @@ objects.
 This repo models object ids in TypeScript as branded strings:
 
 ```ts
-// typescript/src/authz/types.ts
+// typescript/src/core/ports/authz.ts
 export type RebacObject<TType extends ObjectType = ObjectType> =
   `${TType}:${string}`;
 ```
@@ -359,7 +359,7 @@ A tuple is one stored fact:
 In TypeScript:
 
 ```ts
-// typescript/src/testing/fixtures.ts
+// typescript/src/demo/fixtures.ts
 tuple(workspace("productWorkspace"), "editor", subjectSet(team("platformTeam"), "member"))
 ```
 
@@ -465,7 +465,7 @@ Check(user:alice, can_edit, document:roadmapDocument)
 
 The graph evaluator tries to prove the relation.
 
-In this repo, `GraphAuthorizer` produces a trace:
+In this repo, `makeGraphAuthorizer` produces a trace:
 
 ```text
 Check whether user:alice has can_edit on document:roadmapDocument
@@ -482,7 +482,7 @@ remotely, but the mental model is the same.
 Check as a sequence diagram:
 
 ```text
-DocumentService        Authorizer          Tuple graph
+Documents              Authorizer          Tuple graph
       │                    │                    │
       │ can_edit?          │                    │
       ├───────────────────►│                    │
@@ -614,7 +614,7 @@ make ts-server   # start the server
 # or inside the container: npm run dev
 ```
 
-Then change `typescript/src/testing/fixtures.ts` so Bob is an editor instead of
+Then change `typescript/src/demo/fixtures.ts` so Bob is an editor instead of
 a viewer:
 
 ```ts

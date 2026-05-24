@@ -1,4 +1,4 @@
-# Functions, modules, classes, and interfaces
+# Functions, modules, factories, and interfaces
 
 TypeScript does not require a heavy object-oriented style. Good TypeScript often
 looks like clear JavaScript with better boundaries.
@@ -6,47 +6,42 @@ looks like clear JavaScript with better boundaries.
 ## Scene
 
 You are deciding where behavior belongs. Should everything be a class? Should
-everything be a pure function? This repo chooses a middle path: object-oriented
-boundaries for services and adapters, simple functions for small value work.
+everything be a pure function? This repo uses a factory-based ports-and-adapters
+style:
 
-This repo uses:
-
-- functions for small transformations and constructors
+- functions for small transformations and typed id constructors
 - modules for ownership
-- interfaces for dependencies
-- classes where state and behavior belong together
-
-That is a hybrid style. It is not "functional programming" in the academic
-sense, and it is not classic Java/C# style object orientation either. It is
-plain TypeScript: classes for services, stores, and adapters; functions for
-small value constructors and parsing helpers.
+- interfaces for ports
+- factories for services and adapters
+- classes only for domain errors
 
 The guiding rule is:
 
 ```text
-Use objects when behavior and state belong together.
-Use functions when transforming values is the whole job.
+Use the smallest construct that makes the dependency boundary obvious.
 ```
 
 ## Functions should say what they need
 
-From `src/authz/types.ts`:
+From `src/core/ports/authz.ts`:
 
 ```ts
-export function tuple(objectId: RebacObject, relation: Relation, subject: Subject): TupleKey {
-  return { object: objectId, relation, user: subject };
-}
+export const tuple = (
+  objectId: RebacObject,
+  relation: Relation,
+  subject: Subject
+): TupleKey => ({ object: objectId, relation, user: subject });
 ```
 
-This function is intentionally boring. It takes three values and returns a tuple
-key.
+This function is intentionally boring. It takes three values and returns a
+relationship tuple.
 
 The useful part is the signature:
 
 - `objectId` must be an OpenFGA-style object id
 - `relation` must be a known relation
 - `subject` must be an allowed subject
-- the return value is immutable
+- the return value has the shape the authorizers expect
 
 Readable code often comes from boring functions with precise types.
 
@@ -55,12 +50,17 @@ Readable code often comes from boring functions with precise types.
 Each folder has a job:
 
 ```text
-src/authz    authorization model, tuple vocabulary, authorizer implementations
-src/app      composition roots that assemble concrete object graphs
-src/client   terminal client and HTTP API client adapters
-src/domain   document domain model and service logic
-src/http     HTTP request/response adapter code
-src/testing  shared fixtures for tests and demos
+src/core/ports              interfaces and ReBAC value helpers
+src/core/domain/documents   document use cases and domain errors
+src/adapters/authn          token verification adapter
+src/adapters/authz          graph and OpenFGA authorizer adapters
+src/adapters/db             document repository adapter
+src/adapters/http           HTTP request/response adapter
+src/adapters/client         HTTP and terminal client adapters
+src/server                  server entrypoint and composition root
+src/cli                     terminal-client entrypoint and composition root
+src/demo                    local graph demo entrypoint and composition root
+src/demo/fixtures.ts        shared demo data
 ```
 
 Good module boundaries answer this question:
@@ -70,21 +70,17 @@ Good module boundaries answer this question:
 If the answer is "a little bit of everything," the module is probably doing too
 much.
 
-This chapter focuses on modules as design boundaries. For the deeper Node
-runtime model, including ESM loading, `.js` import extensions, module caching,
-and singleton patterns, read `16-node-esm-and-module-patterns.md`.
-
 ## Interfaces describe behavior
 
-From `src/authz/types.ts`:
+From `src/core/ports/authz.ts`:
 
 ```ts
 export interface Authorizer {
-  check(request: CheckRequest): Promise<CheckResult>;
+  check: (request: CheckRequest) => Promise<CheckResult>;
 }
 ```
 
-This says the domain service does not care whether authorization is handled by:
+The document domain does not care whether authorization is handled by:
 
 - the in-memory teaching evaluator
 - the real OpenFGA SDK
@@ -94,234 +90,74 @@ It only cares that the dependency can answer `check`.
 
 ## Dependency injection without a framework
 
-From `src/domain/service.ts`:
+From `src/core/domain/documents/makeDocuments.ts`:
 
 ```ts
-export class DocumentService {
-  constructor(
-    private readonly repository: DocumentRepository,
-    private readonly authorizer: Authorizer
-  ) {}
-}
+const makeDocuments = ({ repository, authorizer }: DocumentsCfg): Documents => {
+  const create = makeCreateDocument({ repository, authorizer });
+  const read = makeReadDocument({ repository, authorizer });
+  const update = makeUpdateDocument({ repository, authorizer });
+
+  return { create, read, update };
+};
 ```
 
-This is dependency injection in plain TypeScript.
-
-No container is required. No decorators are required. The constructor simply
-receives the dependencies the service needs.
+This is dependency injection in plain TypeScript. No container is required. No
+decorators are required. The factory simply receives the dependencies the domain
+needs.
 
 That keeps tests simple:
 
 ```ts
-const service = new DocumentService(
-  new InMemoryDocumentRepository(),
-  new GraphAuthorizer(store)
-);
+const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+const authorizer = makeGraphAuthorizer({ tupleStore });
+const repository = makeInMemoryDocumentRepository();
+const documents = makeDocuments({ repository, authorizer });
 ```
 
-## Classes are useful when they own state
+## Factories are enough for stateful adapters
 
-`InMemoryTupleStore` is a class because it owns a private map of tuples:
+The in-memory tuple store owns a private map, but it does not need a class:
 
 ```ts
-export class InMemoryTupleStore {
-  private readonly tuples = new Map<string, TupleKey>();
-}
+const makeInMemoryTupleStore = ({ seed = [] } = {}): TupleStore => {
+  const tuples = new Map<string, TupleKey>();
+
+  const write = (tupleKey: TupleKey): void => {
+    tuples.set(keyFor(tupleKey), tupleKey);
+  };
+
+  seed.forEach(write);
+
+  return { has, findByObjectRelation };
+};
 ```
 
-The map should not be exposed directly. The class gives callers a small API:
+The closure hides the map. The returned object exposes a small port:
 
-- `write`
-- `delete`
 - `has`
 - `findByObjectRelation`
-- `all`
 
-That is a good reason to use a class.
+That gives the same encapsulation benefit people often reach for classes to get,
+with less syntax for this tutorial.
 
-## Classes are useful at service boundaries
-
-`DocumentService` is a class because it coordinates dependencies and exposes
-business actions:
-
-```ts
-export class DocumentService {
-  constructor(
-    private readonly repository: DocumentRepository,
-    private readonly authorizer: Authorizer
-  ) {}
-
-  async update(input: UpdateDocumentInput): Promise<CollaborativeDocument> {
-    const existing = await this.requireDocument(input.id);
-    await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "edit");
-
-    const updated = { ...existing, body: input.body, updatedBy: input.actor };
-    await this.repository.save(updated);
-    return updated;
-  }
-}
-```
-
-This is a good object-oriented shape:
-
-- dependencies are injected once in the constructor
-- public methods map to business actions
-- private methods hide repeated mechanics
-- stateful collaborators are explicit
-- tests can create a fresh service per test
-
-`OpenFgaAuthorizer` follows the same pattern. It owns an SDK client and exposes
-the smaller `Authorizer` interface to the rest of the app.
-
-## Classes are not required for everything
-
-These are plain functions:
-
-```ts
-user("alice");
-team("platformTeam");
-workspace("productWorkspace");
-document("roadmapDocument");
-```
-
-They do not need classes because they do not own state. They are small
-constructors for typed ids.
-
-Do not turn every noun into a class. Use the simplest construct that expresses
-the idea.
-
-For example, these could become classes:
-
-```ts
-class UserId {}
-class TeamId {}
-class WorkspaceId {}
-class DocumentId {}
-```
-
-That may be useful in a larger domain with rich validation and behavior. In this
-primer, it would add ceremony without teaching much. Template literal types and
-small constructor functions keep the ReBAC vocabulary visible with less code.
-
-## What a more OO version would look like
-
-A more object-oriented tuple model might look like this:
-
-```ts
-class TupleKey {
-  constructor(
-    readonly object: RebacObject,
-    readonly relation: Relation,
-    readonly user: Subject
-  ) {}
-
-  toString(): string {
-    return `${this.object}|${this.relation}|${this.user}`;
-  }
-}
-```
-
-That is not wrong. It becomes attractive if tuples gain behavior:
-
-- canonical serialization
-- validation rules
-- comparison methods
-- conversion to SDK request types
-
-But if the class only stores data, a `Readonly` object is usually simpler:
-
-```ts
-export type TupleKey = Readonly<{
-  user: Subject;
-  relation: Relation;
-  object: RebacObject;
-}>;
-```
-
-The maintainability question is not "class or function?" The question is
-"where does the behavior live most clearly?"
-
-## The style used in this repo
-
-This repo leans object-oriented for application structure:
-
-- `DocumentService` coordinates domain actions.
-- `InMemoryTupleStore` owns mutable tuple state.
-- `GraphAuthorizer` owns graph traversal behavior over a store.
-- `OpenFgaAuthorizer` adapts the OpenFGA SDK behind an interface.
-- `InMemoryDocumentRepository` owns document persistence state.
-
-It uses functions and type aliases for value-level vocabulary:
-
-- `user("alice")`
-- `workspace("productWorkspace")`
-- `document("roadmapDocument")`
-- `tuple(...)`
-- `parseObject(...)`
-- `isObjectOfType(...)`
-
-That split is deliberate. It keeps the architecture familiar to OO developers
-without wrapping every small value in a class.
-
-## My recommendation
-
-For maintainable TypeScript backend code, prefer **object-oriented boundaries
-with simple value types inside them**.
-
-That means:
-
-- services, repositories, and infrastructure adapters are classes
-- behavior contracts are interfaces
-- domain values are type aliases or small immutable objects until they need
-  behavior
-- pure parsing and construction helpers stay as functions
-- avoid inheritance-first designs
-- prefer composition over inheritance
-
-Inheritance is rarely the first tool this repo should reach for. Most of the
-time, an interface plus a class implementation is clearer:
-
-```ts
-interface Authorizer {
-  check(request: CheckRequest): Promise<CheckResult>;
-}
-
-class OpenFgaAuthorizer implements Authorizer {}
-class GraphAuthorizer implements Authorizer {}
-```
-
-That is object-oriented enough to give you polymorphism and encapsulation,
-without creating a deep class hierarchy.
-
-## Clean composition model
+## The ports-and-adapters direction
 
 The dependency direction in this repo is:
 
 ```text
-domain service -> interfaces
-infrastructure -> implements interfaces
-entrypoints    -> compose concrete objects
+adapters -> core <- composition roots
 ```
 
 Concrete examples:
 
-- `DocumentService` depends on `DocumentRepository` and `Authorizer`.
-- `GraphAuthorizer` implements `Authorizer`.
-- `OpenFgaAuthorizer` implements `Authorizer`.
-- `InMemoryDocumentRepository` implements `DocumentRepository`.
-- `createServices()` wires the document service graph together.
-- `createDemoApp()`, `createServerApp()`, and `createClientApp()` are
-  composition roots for executable entrypoints.
-- HTTP handlers depend on `DocumentOperations`, not `DocumentService` internals.
-
-That separation keeps code testable:
-
-```text
-HTTP handler test -> uses DocumentOperations
-service test      -> uses Authorizer interface
-authorizer test   -> uses TupleReader interface
-SDK adapter test  -> mocks SDK boundary
-```
+- `makeCreateDocument` depends on `DocumentRepository` and `Authorizer`.
+- `makeGraphAuthorizer` implements `Authorizer`.
+- `makeOpenFgaAuthorizer` implements `Authorizer`.
+- `makeInMemoryDocumentRepository` implements `DocumentRepository`.
+- `makeServerApp` wires document services to the HTTP server.
+- `makeCliApp` wires the terminal client to the HTTP client.
+- HTTP handlers depend on `Documents`, not document implementation details.
 
 The rule is simple:
 
@@ -330,112 +166,66 @@ High-level policy should not import low-level infrastructure.
 The composition root is where concrete choices are made.
 ```
 
-## App entrypoints and composition roots
+## Entry points and composition roots
 
-An app entrypoint is the file Node runs directly:
+An entrypoint is the file Node runs directly:
 
 ```text
-src/main.ts
-src/server.ts
-src/client/tui.ts
+src/server/index.ts
+src/cli/index.ts
+src/demo/index.ts
 ```
 
 These files should be boring. They should start the app, print output, listen on
-a port, or close a terminal. They should not contain a pile of `new` calls.
+a port, or close a terminal.
 
 A composition root is the small module that builds the object graph for an
 entrypoint:
 
 ```text
-src/app/create-demo.ts    -> demo authorizer, actors, document
-src/app/create-server.ts  -> service graph plus HTTP server
-src/app/create-client.ts  -> API client plus terminal client
-src/app/create-services.ts -> reusable domain service graph
-```
-
-The shape is:
-
-```ts
-const app = await createServerApp();
-
-app.server.listen(app.port);
+src/server/compose.ts -> document service plus HTTP server
+src/cli/compose.ts    -> API client plus terminal client
+src/demo/compose.ts   -> graph authorizer plus demo actors
 ```
 
 The entrypoint performs the action. The composition root chooses concrete
-implementations. The domain code still depends on interfaces.
-
-This gives you three practical wins:
-
-- startup wiring is easy to find
-- business code avoids infrastructure imports
-- tests can exercise behavior with fresh object graphs
-
-Think of the composition root as the cast list for the program. It says which
-actors are playing which interface roles in this run.
-
-The server composition root also reads environment configuration such as `PORT`
-and validates it before the server starts. That is the 12-factor shape: config
-comes from the environment, but business code receives ordinary typed values and
-interfaces.
-
-## Private methods can improve reading flow
-
-`DocumentService` exposes public business actions:
-
-- `create`
-- `read`
-- `update`
-
-It hides repetitive implementation details:
-
-```ts
-private async requireAllowed(
-  actor: RebacObject<"user">,
-  relation: Relation,
-  object: RebacObject,
-  action: string
-): Promise<void>
-```
-
-This helper is worth having because it removes repeated check/throw code while
-keeping authorization visible in each public method.
-
-If a helper makes callers harder to understand, do not extract it.
+implementations. The domain code still depends on ports.
 
 ## Import style
 
 This repo separates runtime imports from type-only imports:
 
 ```ts
-import { document as documentObject } from "../authz/types.js";
-import type { Authorizer, RebacObject, Relation } from "../authz/types.js";
+import { document } from "../../ports/authz.ts";
+import type { Authorizer } from "../../ports/authz.ts";
 ```
 
 `import type` is a good habit. It tells readers and tooling that the import is
-used only by TypeScript and does not need to exist at runtime.
+used only by TypeScript.
 
 ## Exercise
 
-Add a `delete` method to `DocumentService`.
+Add a `delete` operation to the document domain.
 
 Requirements:
 
 1. the actor must have `can_delete` on the document
 2. the repository should expose a delete method
-3. tests should cover owner allowed and viewer denied
+3. `makeDocuments` should return the new operation
+4. tests should cover owner allowed and viewer denied
 
-Keep the shape consistent with `read` and `update`. The goal is not novelty; the
-goal is making the new behavior feel like it belongs.
+Keep the shape consistent with `read` and `update`. The goal is making the new
+behavior feel like it belongs.
 
 ## Checkpoint
 
 Explain this design in one sentence:
 
 ```text
-DocumentService has an Authorizer.
-OpenFgaAuthorizer implements Authorizer.
-DocumentService does not import OpenFgaAuthorizer.
+makeUpdateDocument has an Authorizer.
+makeOpenFgaAuthorizer implements Authorizer.
+makeUpdateDocument does not import makeOpenFgaAuthorizer.
 ```
 
-Good answer: the service depends on behavior, not infrastructure, so it stays
+Good answer: the domain depends on behavior, not infrastructure, so it stays
 testable and easy to swap from the teaching graph to real OpenFGA.

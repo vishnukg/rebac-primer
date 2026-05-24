@@ -14,8 +14,8 @@ relearning the whole system.
 ## The house style in one page
 
 - Keep modules small and named after the domain concept they own.
-- Prefer plain functions, classes, and interfaces before adding libraries.
-- Use object-oriented boundaries for services, stores, and adapters.
+- Prefer plain functions, factories, and interfaces before adding libraries.
+- Use ports and adapters for service boundaries.
 - Use `type` aliases for data shapes, unions, and computed types.
 - Use `interface` for behavior contracts such as `Authorizer`.
 - Keep `strict` TypeScript enabled.
@@ -42,7 +42,11 @@ Simple means:
 This is simple:
 
 ```ts
-await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "edit");
+await authorizer.check({
+  user: input.actor,
+  relation: "can_edit",
+  object: document(input.id)
+});
 ```
 
 It says who needs what relation on which object.
@@ -56,32 +60,27 @@ await policyEngine.evaluate(ctx, Action.DocumentUpdate, Resource.from(input));
 That style might be fine in a larger system, but it hides the ReBAC vocabulary
 this repo is trying to teach.
 
-## Object-oriented style
+## Ports-and-adapters style
 
-This repo uses object-oriented structure where it improves maintainability:
+This repo uses simple factories where they improve maintainability:
 
-- service classes coordinate business actions
-- repository classes own persistence state
-- authorizer classes implement a shared behavior contract
-- private methods keep repeated mechanics local
-- constructor injection makes dependencies visible
+- domain factories coordinate business actions
+- repository adapters own persistence state
+- authorizer adapters implement a shared behavior contract
+- closures keep repeated mechanics local
+- factory arguments make dependencies visible
 
 Good:
 
 ```ts
-class DocumentService {
-  constructor(
-    private readonly repository: DocumentRepository,
-    private readonly authorizer: Authorizer
-  ) {}
-}
+const documents = makeDocuments({ repository, authorizer });
 ```
 
 Also good:
 
 ```ts
 interface Authorizer {
-  check(request: CheckRequest): Promise<CheckResult>;
+  check: (request: CheckRequest) => Promise<CheckResult>;
 }
 ```
 
@@ -91,8 +90,8 @@ Avoid deep class hierarchies unless the domain truly has stable specialization.
 Most backend code is easier to maintain with composition:
 
 ```text
-DocumentService has an Authorizer
-DocumentService has a DocumentRepository
+Documents has an Authorizer
+Documents has a DocumentRepository
 ```
 
 Rather than inheritance:
@@ -101,8 +100,8 @@ Rather than inheritance:
 AuthorizedDocumentService extends BaseDocumentService extends ServiceBase
 ```
 
-Use classes when they own state, dependencies, or meaningful behavior. Use plain
-types and functions for small immutable values.
+Use factories when they can express state, dependencies, or meaningful behavior
+clearly. Use classes when they buy something concrete.
 
 ## Naming
 
@@ -112,8 +111,8 @@ Use names that match the domain:
 - `Relation`
 - `SubjectSet`
 - `Authorizer`
-- `DocumentService`
-- `InMemoryTupleStore`
+- `Documents`
+- `makeInMemoryTupleStore`
 
 Avoid names that describe implementation mechanics without domain meaning:
 
@@ -223,10 +222,10 @@ For ReBAC graph logic, test the graph:
 expect(result.allowed).toBe(true);
 ```
 
-For service logic, test the business action:
+For document domain logic, test the business action:
 
 ```ts
-await expect(service.update(input)).rejects.toBeInstanceOf(ForbiddenError);
+await expect(documents.update(input)).rejects.toBeInstanceOf(ForbiddenError);
 ```
 
 Avoid testing private methods directly. Private methods are implementation
@@ -250,7 +249,7 @@ Library modules should export capabilities. Entrypoints should perform actions.
 Good:
 
 ```ts
-export class GraphAuthorizer {}
+export default makeGraphAuthorizer;
 ```
 
 Good:

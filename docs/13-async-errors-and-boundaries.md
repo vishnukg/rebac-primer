@@ -30,8 +30,8 @@ Promise<CheckResult>
 But the runtime behavior is JavaScript:
 
 ```ts
-async check(request: CheckRequest): Promise<CheckResult> {
-  const response = await this.client.check({
+const check: Authorizer["check"] = async request => {
+  const response = await client.check({
     user: request.user,
     relation: request.relation,
     object: request.object
@@ -41,7 +41,7 @@ async check(request: CheckRequest): Promise<CheckResult> {
     allowed: response.allowed === true,
     trace: ["OpenFGA evaluated the relationship graph remotely"]
   };
-}
+};
 ```
 
 The type tells readers and the compiler what will eventually be produced. Node
@@ -69,9 +69,10 @@ this async operation eventually returns a document, returns undefined, or fails
 In this repo:
 
 ```ts
-async findById(id: DocumentId): Promise<CollaborativeDocument | undefined> {
-  return this.documents.get(id);
-}
+const findById = async (id: DocumentId): Promise<CollaborativeDocument | undefined> => {
+  const found = store.get(id);
+  return found ? { ...found } : undefined;
+};
 ```
 
 Even though the in-memory repository returns immediately, the interface is async
@@ -119,14 +120,23 @@ It does not block the whole Node process.
 This service method:
 
 ```ts
-async update(input: UpdateDocumentInput): Promise<CollaborativeDocument> {
-  const existing = await this.requireDocument(input.id);
-  await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "edit");
+const update = async (input: UpdateDocumentInput): Promise<CollaborativeDocument> => {
+  const existing = await repository.findById(input.id);
+  if (!existing) throw new DocumentNotFoundError(input.id);
+
+  const decision = await authorizer.check({
+    user: input.actor,
+    relation: "can_edit",
+    object: document(input.id)
+  });
+  if (!decision.allowed) {
+    throw new ForbiddenError(`${input.actor} cannot edit document:${input.id}`);
+  }
 
   const updated = { ...existing, body: input.body, updatedBy: input.actor };
-  await this.repository.save(updated);
+  await repository.save(updated);
   return updated;
-}
+};
 ```
 
 reads like a checklist:
@@ -217,9 +227,13 @@ calls.
 Sequential code is easiest to read when each step depends on the previous one.
 
 ```ts
-const existing = await this.requireDocument(input.id);
-await this.requireAllowed(input.actor, "can_edit", documentObject(input.id), "edit");
-await this.repository.save(updated);
+const existing = await repository.findById(input.id);
+const decision = await authorizer.check({
+  user: input.actor,
+  relation: "can_edit",
+  object: document(input.id)
+});
+await repository.save(updated);
 ```
 
 This order is intentional:
@@ -237,7 +251,7 @@ If operations are independent, start them together:
 ```ts
 const [document, decision] = await Promise.all([
   repository.findById(id),
-  authorizer.check({ user: actor, relation: "can_read", object: documentObject(id) })
+  authorizer.check({ user: actor, relation: "can_read", object: document(id) })
 ]);
 ```
 
@@ -337,29 +351,27 @@ Do not throw generic strings. Throw errors that communicate intent.
 
 ## SDK adapters
 
-Open `src/authz/openfga-client.ts`.
+Open `src/adapters/authz/makeOpenFgaAuthorizer.ts`.
 
 The OpenFGA SDK is useful, but the rest of the app should not be covered in SDK
 details. The adapter keeps those details in one place:
 
 ```ts
-export class OpenFgaAuthorizer implements Authorizer {
-  async check(request: CheckRequest): Promise<CheckResult> {
-    const response = await this.client.check({
-      user: request.user,
-      relation: request.relation,
-      object: request.object
-    });
+const check: Authorizer["check"] = async request => {
+  const response = await client.check({
+    user: request.user,
+    relation: request.relation,
+    object: request.object
+  });
 
-    return {
-      allowed: response.allowed === true,
-      trace: ["OpenFGA evaluated the relationship graph remotely"]
-    };
-  }
-}
+  return {
+    allowed: response.allowed === true,
+    trace: ["OpenFGA evaluated the relationship graph remotely"]
+  };
+};
 ```
 
-The service depends on `Authorizer`, not `OpenFgaClient`.
+The document domain depends on `Authorizer`, not `OpenFgaClient`.
 
 That is the maintainable boundary.
 
@@ -382,7 +394,7 @@ That mixes business rules with infrastructure details.
 With an adapter, the service stays focused:
 
 ```ts
-await this.requireAllowed(actor, "can_edit", documentObject(id), "edit");
+await authorizer.check({ user: actor, relation: "can_edit", object: document(id) });
 ```
 
 The code now says what the business action needs.
@@ -494,14 +506,12 @@ with them.
 Write a small fake authorizer for a test:
 
 ```ts
-class DenyAllAuthorizer implements Authorizer {
-  async check(): Promise<CheckResult> {
-    return { allowed: false, trace: ["test deny"] };
-  }
-}
+const denyAllAuthorizer: Authorizer = {
+  check: async () => ({ allowed: false, trace: ["test deny"] })
+};
 ```
 
-Use it to prove `DocumentService.create` rejects unauthorized actors.
+Use it to prove `documents.create` rejects unauthorized actors.
 
 Then compare that test with the existing graph-based tests. Which one teaches
 more about ReBAC? Which one isolates the service more tightly?

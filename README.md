@@ -13,10 +13,11 @@ to demonstrate the core ideas in both languages.
 
 ```
 typescript/       TypeScript implementation
-  src/modules/    Module-pattern code: authn, authz, documents, db, http, client
+  src/core/       Ports, ReBAC value helpers, and document domain rules
+  src/adapters/   Authn, authz, db, HTTP, and client adapters
   src/server/     Server composition root and entry point
   src/cli/        Terminal client composition root and entry point
-  src/demo/       Small graph-tracing demo
+  src/demo/       Small graph-tracing demo and shared demo fixtures
   test/           Vitest tests
 
 go/               Go implementation
@@ -113,14 +114,19 @@ Casey has no path through the graph — access is denied.
 Both implementations answer the same question with the same graph traversal
 algorithm. Reading them side by side is the lesson.
 
-## TypeScript module pattern
+## TypeScript ports and adapters
 
-The TypeScript project is organized around small modules that expose factory
-functions through `index.ts` barrel files.
+The TypeScript project is organized around a small ports-and-adapters shape:
 
 ```text
-make*(dependencies) -> operation(runtimeArgs) -> result
+adapters -> core <- composition roots
 ```
+
+`src/core` contains the domain language and ports: ReBAC objects, relations,
+tuples, `Authorizer`, `Authenticator`, `DocumentRepository`, and the document
+operations. `src/adapters` contains concrete details: demo token verification,
+the graph/OpenFGA authorizers, in-memory persistence, HTTP, and terminal/HTTP
+clients.
 
 Domain code does not import concrete infrastructure. For example, document
 operations receive a repository and authorizer. The server entry point chooses
@@ -130,7 +136,7 @@ the in-memory repository, demo OAuth2 token verifier, and graph authorizer, then
 Good files to read first:
 
 1. `typescript/src/server/compose.ts`
-2. `typescript/src/modules/documents/index.ts`
-3. `typescript/src/modules/authn/makeDemoTokenVerifier.ts`
-4. `typescript/src/modules/authz/makeGraphAuthorizer.ts`
-5. `typescript/src/modules/http/makeHttpHandler.ts`
+2. `typescript/src/core/ports/authz.ts`
+3. `typescript/src/core/domain/documents/makeDocuments.ts`
+4. `typescript/src/adapters/authz/makeGraphAuthorizer.ts`
+5. `typescript/src/adapters/http/makeHttpHandler.ts`

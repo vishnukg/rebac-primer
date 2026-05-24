@@ -451,7 +451,7 @@ A -> B -> C -> A
 Cycles can happen in relationship graphs. A traversal algorithm must avoid
 walking forever.
 
-This repo's `GraphAuthorizer` keeps a `visited` set:
+This repo's `makeGraphAuthorizer` keeps a `visited` set:
 
 ```ts
 const visitKey: VisitKey = `${object}#${relation}`;
