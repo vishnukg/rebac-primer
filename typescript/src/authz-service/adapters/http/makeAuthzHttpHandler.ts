@@ -31,7 +31,11 @@ export type HttpResponse = {
 
 export type AuthzHttpHandler = (request: HttpRequest) => Promise<HttpResponse>;
 
-const makeAuthzHttpHandler = (authz: AuthzService): AuthzHttpHandler => {
+type AuthzHttpHandlerCfg = {
+    authz: AuthzService;
+};
+
+const makeAuthzHttpHandler = ({ authz }: AuthzHttpHandlerCfg) => {
     const handle: AuthzHttpHandler = async request => {
         try {
             // ── Health ────────────────────────────────────────────────────────
@@ -83,7 +87,7 @@ const makeAuthzHttpHandler = (authz: AuthzService): AuthzHttpHandler => {
         }
     };
 
-    return handle;
+    return { handler: handle };
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

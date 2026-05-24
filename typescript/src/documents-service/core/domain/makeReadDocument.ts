@@ -9,8 +9,8 @@ type ReadDocumentCfg = {
     authzClient: AuthzClient;
 };
 
-const makeReadDocument = ({ repository, authzClient }: ReadDocumentCfg): ReadDocumentFn =>
-    async ({ id, actor }) => {
+const makeReadDocument = ({ repository, authzClient }: ReadDocumentCfg) => {
+    const read: ReadDocumentFn = async ({ id, actor }) => {
         const doc = await repository.findById(id);
         if (!doc) throw DocumentNotFoundError(id);
 
@@ -23,5 +23,8 @@ const makeReadDocument = ({ repository, authzClient }: ReadDocumentCfg): ReadDoc
 
         return doc;
     };
+
+    return { read };
+};
 
 export default makeReadDocument;

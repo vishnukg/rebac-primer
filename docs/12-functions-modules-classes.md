@@ -274,3 +274,7 @@ makeUpdateDocument does not import makeAuthzServiceClient.
 Good answer: the domain depends on behavior (the port), not infrastructure (the
 adapter), so it stays testable and the backing AuthZ service can be swapped
 without touching document logic.
+
+For the formal name of this factory pattern, its FP connections (partial
+application, Reader monad), and known trade-offs, see
+[19-factory-function-pattern.md](./19-factory-function-pattern.md).

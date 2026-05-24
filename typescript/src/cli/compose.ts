@@ -3,7 +3,11 @@ import { createInterface } from "node:readline/promises";
 import makeHttpDocumentsClient from "../documents-service/adapters/client/makeHttpDocumentsClient.ts";
 import makeTerminalClient from "../documents-service/adapters/client/makeTerminalClient.ts";
 
-const makeCliApp = (env: NodeJS.ProcessEnv = process.env) => {
+type CliAppCfg = {
+    env?: NodeJS.ProcessEnv;
+};
+
+const makeCliApp = ({ env = process.env }: CliAppCfg = {}) => {
     const terminal = createInterface({ input, output });
     const client   = makeHttpDocumentsClient({
         baseUrl: env.REBAC_API_URL ?? "http://127.0.0.1:4000",

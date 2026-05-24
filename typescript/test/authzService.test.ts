@@ -16,10 +16,11 @@ const q            = new URLSearchParams();
 
 // Builds a fully wired handler, optionally pre-seeded with extra tuples.
 const makeHandler = (extra: ReturnType<typeof seedPolicyTuples> = []): AuthzHttpHandler => {
-    const repository = makeInMemoryTupleRepository([...seedPolicyTuples(), ...extra]);
-    const evaluator  = makeGraphEvaluator({ repository });
-    const domain     = makeAuthzDomain({ repository, evaluator });
-    return makeAuthzHttpHandler(domain);
+    const repository      = makeInMemoryTupleRepository({ seed: [...seedPolicyTuples(), ...extra] });
+    const evaluator       = makeGraphEvaluator({ repository });
+    const domain          = makeAuthzDomain({ repository, evaluator });
+    const { handler }     = makeAuthzHttpHandler({ authz: domain });
+    return handler;
 };
 
 describe("AuthZ service — GET /health", () => {

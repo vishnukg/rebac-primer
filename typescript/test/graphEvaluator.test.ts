@@ -7,7 +7,7 @@ import { seedPolicyTuples, productWorkspace, alice, bob, casey } from "./fixture
 
 // Helper: builds an evaluator pre-seeded with policy tuples plus any extras.
 const makeEvaluator = (extra: ReturnType<typeof seedPolicyTuples> = []) => {
-    const repository = makeInMemoryTupleRepository([...seedPolicyTuples(), ...extra]);
+    const repository = makeInMemoryTupleRepository({ seed: [...seedPolicyTuples(), ...extra] });
     return makeGraphEvaluator({ repository });
 };
 

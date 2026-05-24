@@ -87,6 +87,7 @@ Read these after the shared OpenFGA model chapter.
 |-----|-------|-----------------|
 | 17 | TypeScript AuthZ adapter pattern | `typescript/src/documents-service/adapters/authz/makeAuthzServiceClient.ts`, `typescript/test/fixtures.ts` |
 | 18 | TypeScript ReBAC implementation — theory to code walkthrough | `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`, `typescript/src/documents-service/adapters/http` |
+| 19 | Factory function pattern — closure-based DI, pattern names, trade-offs | `typescript/src/documents-service/core/domain`, `typescript/src/authz-service/compose.ts` |
 
 ## Go track
 

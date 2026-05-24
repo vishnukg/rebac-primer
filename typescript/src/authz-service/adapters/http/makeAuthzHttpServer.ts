@@ -1,8 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AuthzHttpHandler } from "./makeAuthzHttpHandler.ts";
 
-const makeAuthzHttpServer = (handler: AuthzHttpHandler) =>
-    createServer(async (req: IncomingMessage, res: ServerResponse) => {
+type AuthzHttpServerCfg = {
+    handler: AuthzHttpHandler;
+};
+
+const makeAuthzHttpServer = ({ handler }: AuthzHttpServerCfg) => {
+    const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
         const url    = new URL(req.url ?? "/", `http://localhost`);
         const body   = await readBody(req);
         const method = req.method ?? "GET";
@@ -17,6 +21,9 @@ const makeAuthzHttpServer = (handler: AuthzHttpHandler) =>
         res.writeHead(response.statusCode, { "content-type": "application/json" });
         res.end(JSON.stringify(response.body));
     });
+
+    return { server };
+};
 
 const readBody = (req: IncomingMessage): Promise<string> =>
     new Promise(resolve => {

@@ -51,7 +51,7 @@ export const seedPolicyTuples = (): TupleKey[] => [
 // visible to subsequent domain.read() calls — same behaviour as the real service.
 
 export const makeInProcessAuthzClient = (seed: TupleKey[] = []): AuthzClient => {
-    const repository = makeInMemoryTupleRepository(seed);
+    const repository = makeInMemoryTupleRepository({ seed });
     const evaluator  = makeGraphEvaluator({ repository });
     return {
         check:       req  => evaluator.evaluate(req),

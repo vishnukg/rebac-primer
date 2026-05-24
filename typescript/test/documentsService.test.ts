@@ -13,27 +13,28 @@ import makeInMemoryDocumentRepository from
 import makeDemoTokenVerifier from
     "../src/documents-service/adapters/authn/makeDemoTokenVerifier.ts";
 import makeDocuments from "../src/documents-service/core/domain/makeDocuments.ts";
+import type { DocumentsHttpHandler } from
+    "../src/documents-service/adapters/http/makeDocumentsHttpHandler.ts";
 import {
     demoTokens, seedPolicyTuples,
     makeInProcessAuthzClient,
 } from "./fixtures.ts";
 
-type Handler = ReturnType<typeof makeDocumentsHttpHandler>;
-
 const q = new URLSearchParams();
 
 // Builds a fresh handler (and fresh in-memory stores) for each test.
-const makeHandler = (): Handler => {
+const makeHandler = (): DocumentsHttpHandler => {
     const authzClient   = makeInProcessAuthzClient(seedPolicyTuples());
     const authenticator = makeDemoTokenVerifier({ tokens: demoTokens });
     const repository    = makeInMemoryDocumentRepository();
     const documents     = makeDocuments({ repository, authzClient });
-    return makeDocumentsHttpHandler({ authenticator, documents });
+    const { handler }   = makeDocumentsHttpHandler({ authenticator, documents });
+    return handler;
 };
 
 // Builds a handler that already has a seeded document (alice as owner).
 // Used by read/update tests that need a document to exist first.
-const makeHandlerWithDocument = async (): Promise<Handler> => {
+const makeHandlerWithDocument = async (): Promise<DocumentsHttpHandler> => {
     const handler = makeHandler();
     await handler({
         method: "POST", path: "/documents", query: q,

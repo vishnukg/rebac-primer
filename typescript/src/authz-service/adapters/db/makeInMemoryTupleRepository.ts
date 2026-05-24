@@ -6,7 +6,11 @@
 import type { TupleFilter, TupleRepository } from "../../core/ports/index.ts";
 import type { Relation, RebacObject, Subject, TupleKey } from "../../../shared/rebac.ts";
 
-const makeInMemoryTupleRepository = (seed: TupleKey[] = []): TupleRepository => {
+type InMemoryTupleRepositoryCfg = {
+    seed?: TupleKey[];
+};
+
+const makeInMemoryTupleRepository = ({ seed = [] }: InMemoryTupleRepositoryCfg = {}): TupleRepository => {
     const store = new Map<string, TupleKey>();
 
     const keyFor = (t: TupleKey): string => `${t.object}|${t.relation}|${t.user}`;

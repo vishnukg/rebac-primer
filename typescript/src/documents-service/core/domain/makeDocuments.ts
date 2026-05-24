@@ -10,10 +10,11 @@ type DocumentsCfg = {
     authzClient: AuthzClient;
 };
 
-const makeDocuments = ({ repository, authzClient }: DocumentsCfg): Documents => ({
-    create: makeCreateDocument({ repository, authzClient }),
-    read:   makeReadDocument({ repository, authzClient }),
-    update: makeUpdateDocument({ repository, authzClient }),
-});
+const makeDocuments = ({ repository, authzClient }: DocumentsCfg): Documents => {
+    const { create } = makeCreateDocument({ repository, authzClient });
+    const { read }   = makeReadDocument({ repository, authzClient });
+    const { update } = makeUpdateDocument({ repository, authzClient });
+    return { create, read, update };
+};
 
 export default makeDocuments;

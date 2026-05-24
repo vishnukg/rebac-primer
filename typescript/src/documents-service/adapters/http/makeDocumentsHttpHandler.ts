@@ -42,7 +42,7 @@ type DocumentsHttpHandlerCfg = {
 const makeDocumentsHttpHandler = ({
     authenticator,
     documents,
-}: DocumentsHttpHandlerCfg): DocumentsHttpHandler => {
+}: DocumentsHttpHandlerCfg) => {
     const handle: DocumentsHttpHandler = async request => {
         try {
             if (request.method === "GET" && request.path === "/health") {
@@ -94,7 +94,7 @@ const makeDocumentsHttpHandler = ({
         }
     };
 
-    return handle;
+    return { handler: handle };
 };
 
 const requireBody = (body: unknown): Record<string, unknown> => {

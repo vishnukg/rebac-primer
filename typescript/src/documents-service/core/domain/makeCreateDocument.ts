@@ -21,8 +21,8 @@ type CreateDocumentCfg = {
     authzClient: AuthzClient;
 };
 
-const makeCreateDocument = ({ repository, authzClient }: CreateDocumentCfg): CreateDocumentFn =>
-    async input => {
+const makeCreateDocument = ({ repository, authzClient }: CreateDocumentCfg) => {
+    const create: CreateDocumentFn = async input => {
         // 1. Authz check — can this actor create in this workspace?
         const { allowed } = await authzClient.check({
             user:     input.actor,
@@ -53,5 +53,8 @@ const makeCreateDocument = ({ repository, authzClient }: CreateDocumentCfg): Cre
 
         return doc;
     };
+
+    return { create };
+};
 
 export default makeCreateDocument;
