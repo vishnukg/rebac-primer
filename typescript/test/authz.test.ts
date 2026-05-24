@@ -47,6 +47,9 @@ describe("makeGraphAuthorizer", () => {
         expect(result.trace).toContain(
             "Resolve subject set team:platformTeam#member: does it contain user:alice?",
         );
+        expect(result.trace).toContain(
+            "document:roadmapDocument editor can inherit editor from workspace:productWorkspace",
+        );
     });
 
     it("lets bob read as a workspace viewer but denies editing", async () => {
@@ -77,6 +80,26 @@ describe("makeGraphAuthorizer", () => {
         });
 
         expect(result.allowed).toBe(true);
-        expect(result.trace).toContain("team.member includes team.admin");
+        expect(result.trace).toContain("team:platformTeam member includes admin");
+    });
+
+    it("stops cycles without denying unrelated direct grants", async () => {
+        const cyclicDocument = document("cyclic");
+        const authorizer = makeGraphAuthorizer({
+            tupleStore: makeInMemoryTupleStore({
+                seed: [
+                    tuple(cyclicDocument, "workspace", cyclicDocument),
+                    tuple(cyclicDocument, "viewer", bob),
+                ],
+            }),
+        });
+
+        const result = await authorizer.check({
+            user:     bob,
+            relation: "can_read",
+            object:   cyclicDocument,
+        });
+
+        expect(result.allowed).toBe(true);
     });
 });

@@ -7,7 +7,7 @@ describe("makeDemoTokenVerifier", () => {
             tokens: { "token-alice": { sub: "alice", scopes: ["documents:read"] } },
         });
 
-        const result = await authenticator.verifyAccessToken("Bearer token-alice");
+        const result = await authenticator.verifyAccessToken("bearer   token-alice");
 
         expect(result).toEqual({
             subject: "user:alice",

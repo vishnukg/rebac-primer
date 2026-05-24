@@ -6,6 +6,8 @@ type DemoTokenVerifierCfg = {
     tokens: Record<string, TokenClaims>;
 };
 
+const BEARER_AUTH_HEADER = /^Bearer\s+(.+)$/i;
+
 const makeDemoTokenVerifier = ({ tokens }: DemoTokenVerifierCfg): Authenticator => {
     const verifyAccessToken: Authenticator["verifyAccessToken"] = async authorizationHeader => {
         const token = readBearerToken(authorizationHeader);
@@ -23,13 +25,16 @@ const makeDemoTokenVerifier = ({ tokens }: DemoTokenVerifierCfg): Authenticator 
 };
 
 const readBearerToken = (authorizationHeader: string | undefined): string => {
-    if (!authorizationHeader) {
+    if (!authorizationHeader?.trim()) {
         throw new AuthenticationError("Missing Authorization header");
     }
-    const [scheme, token] = authorizationHeader.split(" ");
-    if (scheme !== "Bearer" || !token) {
+
+    const match = BEARER_AUTH_HEADER.exec(authorizationHeader.trim());
+    const token = match?.[1]?.trim();
+    if (!token) {
         throw new AuthenticationError("Authorization header must be Bearer <token>");
     }
+
     return token;
 };
 

@@ -1,11 +1,12 @@
-// ── Object types ──────────────────────────────────────────────────────────────
+// This file is the public authz boundary for the core application.
+// It deliberately contains only stable ReBAC concepts and ports. Concrete
+// implementations live in adapters/authz.
 
 export type ObjectType = "user" | "team" | "workspace" | "document";
 
-// A ReBAC object is a typed string: "type:id", e.g. "user:alice", "document:roadmap"
+// A ReBAC object is an OpenFGA-style typed id: "type:id".
+// Examples: "user:alice", "document:roadmap".
 export type RebacObject<TType extends ObjectType = ObjectType> = `${TType}:${string}`;
-
-// ── Relations ─────────────────────────────────────────────────────────────────
 
 export type TeamRelation      = "admin" | "member";
 export type WorkspaceRelation = "owner" | "editor" | "viewer";
@@ -21,24 +22,20 @@ export type DocumentRelation  =
 
 export type Relation = TeamRelation | WorkspaceRelation | DocumentRelation;
 
-// ── Subject sets ──────────────────────────────────────────────────────────────
-
 // A subject set references everyone who holds a relation on an object.
 // "team:platform#member" means "everyone who is a member of team:platform".
 export type TeamSubjectSet = `${RebacObject<"team">}#${TeamRelation}`;
 export type SubjectSet     = TeamSubjectSet;
 export type Subject        = RebacObject | SubjectSet;
 
-// ── Relationship tuple ────────────────────────────────────────────────────────
-
-// Asserts that `user` has `relation` on `object`.
+// A relationship tuple asserts that `user` has `relation` on `object`.
+// The field is named `user` to match OpenFGA's tuple API. It can be either a
+// concrete user/object or a subject set such as "team:platform#member".
 export type TupleKey = {
     object:   RebacObject;
     relation: Relation;
     user:     Subject;
 };
-
-// ── Authorizer port ───────────────────────────────────────────────────────────
 
 export type CheckRequest = {
     user:     RebacObject<"user">;
@@ -53,22 +50,18 @@ export type CheckResult = {
 
 export type CheckFn = (request: CheckRequest) => Promise<CheckResult>;
 
-// Driven port — the domain calls this to check whether an action is allowed.
-// makeGraphAuthorizer and makeOpenFgaAuthorizer are the adapters that implement it.
+// Driven port: the domain calls this to ask "is this action allowed?"
+// Adapters decide how to answer: in-process graph traversal, OpenFGA, etc.
 export interface Authorizer {
     check: CheckFn;
 }
 
-// ── Tuple store port ──────────────────────────────────────────────────────────
-
-// Driven port — used by graph-based authorizers to look up stored relationships.
-// makeInMemoryTupleStore is the adapter.
+// Driven port used by graph-based authorizers to read stored relationships.
+// Production adapters can back this with SQL, OpenFGA exports, or another store.
 export interface TupleStore {
     has:                  (object: RebacObject, relation: Relation, user: Subject) => boolean;
     findByObjectRelation: (object: RebacObject, relation: Relation) => TupleKey[];
 }
-
-// ── Object constructors ───────────────────────────────────────────────────────
 
 export const user      = (id: string): RebacObject<"user">      => makeObject("user", id);
 export const team      = (id: string): RebacObject<"team">      => makeObject("team", id);
@@ -85,8 +78,6 @@ export const tuple = (
     relation: Relation,
     subject: Subject,
 ): TupleKey => ({ object: objectId, relation, user: subject });
-
-// ── Parse / inspect ───────────────────────────────────────────────────────────
 
 export const parseObject = (value: string): { type: ObjectType; id: string } => {
     const [type, ...idParts] = value.split(":");
@@ -131,5 +122,5 @@ const makeObject = <TType extends ObjectType>(type: TType, id: string): RebacObj
 const isObjectType = (value: string | undefined): value is ObjectType =>
     value === "user" || value === "team" || value === "workspace" || value === "document";
 
-const isTeamRelation = (value: string | undefined): value is TeamRelation =>
+export const isTeamRelation = (value: string | undefined): value is TeamRelation =>
     value === "admin" || value === "member";
