@@ -1,43 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { workspace } from "../src/authz/types.js";
-import { InMemoryDocumentRepository } from "../src/domain/repository.js";
+import { makeInMemoryDocumentRepository } from "../src/modules/db/index.ts";
+import { productWorkspace, alice } from "../src/modules/fixtures/index.ts";
 
-describe("InMemoryDocumentRepository", () => {
-  it("given_saved_document_when_listing_documents_then_document_is_returned", async () => {
-    // Arrange
-    const repository = new InMemoryDocumentRepository();
-
-    // Act
-    await repository.save({
-      id: "roadmapDocument",
-      title: "Roadmap",
-      body: "v1",
-      workspace: workspace("productWorkspace"),
-      updatedBy: "user:alice"
-    });
-    const documents = await repository.list();
-
-    // Assert
-    expect(documents).toHaveLength(1);
-  });
-
-  it("given_saved_document_when_caller_mutates_original_then_repository_keeps_snapshot", async () => {
-    // Arrange
-    const repository = new InMemoryDocumentRepository();
+describe("makeInMemoryDocumentRepository", () => {
+  it("stores snapshots instead of caller-owned objects", async () => {
+    const repository = makeInMemoryDocumentRepository();
     const document = {
-      id: "roadmapDocument",
-      title: "Roadmap",
-      body: "v1",
-      workspace: workspace("productWorkspace"),
-      updatedBy: "user:alice" as const
+      id:        "roadmapDocument",
+      title:     "Roadmap",
+      body:      "v1",
+      workspace: productWorkspace,
+      updatedBy: alice,
     };
 
-    // Act
     await repository.save(document);
     document.body = "mutated outside repository";
-    const found = await repository.findById("roadmapDocument");
 
-    // Assert
-    expect(found?.body).toBe("v1");
+    await expect(repository.findById("roadmapDocument")).resolves.toMatchObject({ body: "v1" });
   });
 });

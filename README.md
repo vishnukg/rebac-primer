@@ -13,11 +13,10 @@ to demonstrate the core ideas in both languages.
 
 ```
 typescript/       TypeScript implementation
-  src/authz/      Authorization types, tuple store, graph evaluator, OpenFGA adapter
-  src/domain/     Document model and service layer
-  src/http/       HTTP handler and server
-  src/app/        Composition root
-  src/client/     Interactive terminal client
+  src/modules/    Module-pattern code: authn, authz, documents, db, http, client
+  src/server/     Server composition root and entry point
+  src/cli/        Terminal client composition root and entry point
+  src/demo/       Small graph-tracing demo
   test/           Vitest tests
 
 go/               Go implementation
@@ -64,6 +63,7 @@ make ts-build
 make ts-test
 make ts-coverage
 make ts-check
+cd typescript && npm run demo
 make ts-server
 make ts-client
 ```
@@ -112,3 +112,25 @@ Casey has no path through the graph — access is denied.
 
 Both implementations answer the same question with the same graph traversal
 algorithm. Reading them side by side is the lesson.
+
+## TypeScript module pattern
+
+The TypeScript project is organized around small modules that expose factory
+functions through `index.ts` barrel files.
+
+```text
+make*(dependencies) -> operation(runtimeArgs) -> result
+```
+
+Domain code does not import concrete infrastructure. For example, document
+operations receive a repository and authorizer. The server entry point chooses
+the in-memory repository, demo OAuth2 token verifier, and graph authorizer, then
+`src/server/compose.ts` wires them together.
+
+Good files to read first:
+
+1. `typescript/src/server/compose.ts`
+2. `typescript/src/modules/documents/index.ts`
+3. `typescript/src/modules/authn/makeDemoTokenVerifier.ts`
+4. `typescript/src/modules/authz/makeGraphAuthorizer.ts`
+5. `typescript/src/modules/http/makeHttpHandler.ts`

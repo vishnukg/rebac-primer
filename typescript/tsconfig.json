@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
     "strict": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
@@ -11,11 +12,21 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "rootDir": ".",
+    "noEmit": true,
+    "erasableSyntaxOnly": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": [
+    "src/modules/**/*.ts",
+    "src/server/**/*.ts",
+    "src/cli/**/*.ts",
+    "src/demo/**/*.ts",
+    "src/main.ts",
+    "src/server.ts",
+    "test/**/*.ts"
+  ]
 }

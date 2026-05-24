@@ -9,8 +9,10 @@ export default defineConfig({
       exclude: [
         "src/main.ts",
         "src/server.ts",
-        "src/client/tui.ts",
-        "src/http/server.ts"
+        "src/cli/index.ts",
+        "src/demo/index.ts",
+        "src/server/index.ts",
+        "src/modules/http/makeHttpServer.ts"
       ]
     }
   }
