@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import makeGraphAuthorizer from "../src/adapters/authz/makeGraphAuthorizer.ts";
+import {
+    makeGraphPermissionEvaluator,
+    makeTupleStoreRelationshipReader,
+} from "../src/adapters/authz/graphEvaluation.ts";
 import makeInMemoryTupleStore from "../src/adapters/authz/makeInMemoryTupleStore.ts";
+import { staticAuthorizationPolicy } from "../src/adapters/authz/graphPolicy.ts";
 import {
     document,
     parseObject,
@@ -10,6 +14,7 @@ import {
     tuple,
     user,
 } from "../src/core/index.ts";
+import type { Authorizer, TupleKey } from "../src/core/index.ts";
 import {
     alice,
     bob,
@@ -32,10 +37,9 @@ describe("ReBAC object helpers", () => {
     });
 });
 
-describe("makeGraphAuthorizer", () => {
+describe("graph authorizer", () => {
     it("allows alice to edit through team membership and workspace inheritance", async () => {
-        const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
-        const authorizer = makeGraphAuthorizer({ tupleStore });
+        const authorizer = makeTestGraphAuthorizer(seedRelationshipTuples());
 
         const result = await authorizer.check({
             user:     alice,
@@ -53,9 +57,7 @@ describe("makeGraphAuthorizer", () => {
     });
 
     it("lets bob read as a workspace viewer but denies editing", async () => {
-        const authorizer = makeGraphAuthorizer({
-            tupleStore: makeInMemoryTupleStore({ seed: seedRelationshipTuples() }),
-        });
+        const authorizer = makeTestGraphAuthorizer(seedRelationshipTuples());
 
         await expect(
             authorizer.check({ user: bob, relation: "can_read", object: roadmapDocument }),
@@ -67,11 +69,10 @@ describe("makeGraphAuthorizer", () => {
     });
 
     it("treats team admins as team members", async () => {
-        const authorizer = makeGraphAuthorizer({
-            tupleStore: makeInMemoryTupleStore({
-                seed: [...seedRelationshipTuples(), tuple(platformTeam, "admin", casey)],
-            }),
-        });
+        const authorizer = makeTestGraphAuthorizer([
+            ...seedRelationshipTuples(),
+            tuple(platformTeam, "admin", casey),
+        ]);
 
         const result = await authorizer.check({
             user:     casey,
@@ -85,14 +86,10 @@ describe("makeGraphAuthorizer", () => {
 
     it("stops cycles without denying unrelated direct grants", async () => {
         const cyclicDocument = document("cyclic");
-        const authorizer = makeGraphAuthorizer({
-            tupleStore: makeInMemoryTupleStore({
-                seed: [
-                    tuple(cyclicDocument, "workspace", cyclicDocument),
-                    tuple(cyclicDocument, "viewer", bob),
-                ],
-            }),
-        });
+        const authorizer = makeTestGraphAuthorizer([
+            tuple(cyclicDocument, "workspace", cyclicDocument),
+            tuple(cyclicDocument, "viewer", bob),
+        ]);
 
         const result = await authorizer.check({
             user:     bob,
@@ -103,3 +100,15 @@ describe("makeGraphAuthorizer", () => {
         expect(result.allowed).toBe(true);
     });
 });
+
+const makeTestGraphAuthorizer = (seed: TupleKey[]): Authorizer => {
+    const tupleStore = makeInMemoryTupleStore({ seed });
+    const relationships = makeTupleStoreRelationshipReader(tupleStore);
+    const evaluator = makeGraphPermissionEvaluator({
+        relationships,
+        policy: staticAuthorizationPolicy,
+    });
+    return {
+        check: async request => evaluator.check(request),
+    };
+};

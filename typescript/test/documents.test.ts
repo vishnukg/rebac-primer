@@ -1,18 +1,29 @@
 import { describe, expect, it } from "vitest";
-import makeGraphAuthorizer from "../src/adapters/authz/makeGraphAuthorizer.ts";
+import {
+    makeGraphPermissionEvaluator,
+    makeTupleStoreRelationshipReader,
+} from "../src/adapters/authz/graphEvaluation.ts";
 import makeInMemoryTupleStore from "../src/adapters/authz/makeInMemoryTupleStore.ts";
+import { staticAuthorizationPolicy } from "../src/adapters/authz/graphPolicy.ts";
 import makeInMemoryDocumentRepository from "../src/adapters/db/makeInMemoryDocumentRepository.ts";
 import {
     ForbiddenError,
     makeDocuments,
 } from "../src/core/index.ts";
+import type { Authorizer } from "../src/core/index.ts";
 import { alice, bob, productWorkspace, seedRelationshipTuples } from "../src/demo/fixtures.ts";
 
 const makeDocumentService = () => {
     const repository = makeInMemoryDocumentRepository();
-    const authorizer = makeGraphAuthorizer({
-        tupleStore: makeInMemoryTupleStore({ seed: seedRelationshipTuples() }),
+    const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+    const relationships = makeTupleStoreRelationshipReader(tupleStore);
+    const evaluator = makeGraphPermissionEvaluator({
+        relationships,
+        policy: staticAuthorizationPolicy,
     });
+    const authorizer: Authorizer = {
+        check: async request => evaluator.check(request),
+    };
     return makeDocuments({ repository, authorizer });
 };
 

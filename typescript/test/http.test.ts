@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
-import makeGraphAuthorizer from "../src/adapters/authz/makeGraphAuthorizer.ts";
+import {
+    makeGraphPermissionEvaluator,
+    makeTupleStoreRelationshipReader,
+} from "../src/adapters/authz/graphEvaluation.ts";
 import makeInMemoryTupleStore from "../src/adapters/authz/makeInMemoryTupleStore.ts";
+import { staticAuthorizationPolicy } from "../src/adapters/authz/graphPolicy.ts";
 import makeDemoTokenVerifier from "../src/adapters/authn/makeDemoTokenVerifier.ts";
 import makeInMemoryDocumentRepository from "../src/adapters/db/makeInMemoryDocumentRepository.ts";
 import makeHttpHandler from "../src/adapters/http/makeHttpHandler.ts";
 import { makeDocuments } from "../src/core/index.ts";
+import type { Authorizer } from "../src/core/index.ts";
 import {
     demoTokens,
     seedRelationshipTuples,
@@ -13,9 +18,15 @@ import {
 
 const makeHandler = async () => {
     const repository = makeInMemoryDocumentRepository();
-    const authorizer = makeGraphAuthorizer({
-        tupleStore: makeInMemoryTupleStore({ seed: seedRelationshipTuples() }),
+    const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+    const relationships = makeTupleStoreRelationshipReader(tupleStore);
+    const evaluator = makeGraphPermissionEvaluator({
+        relationships,
+        policy: staticAuthorizationPolicy,
     });
+    const authorizer: Authorizer = {
+        check: async request => evaluator.check(request),
+    };
     const documents = makeDocuments({ repository, authorizer });
     await documents.create(seedRoadmapDocument);
     return makeHttpHandler({

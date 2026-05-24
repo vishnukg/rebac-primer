@@ -1,7 +1,8 @@
 // ── Composition root ──────────────────────────────────────────────────────────
 //
 // This is where the application is wired together for the HTTP server.
-// Each make*() call runs once at startup; the result is used for every request.
+// Concrete adapters are constructed once at startup; the result is used for
+// every request.
 //
 // The flow for a protected request:
 //
@@ -17,22 +18,52 @@
 
 import makeHttpHandler from "../adapters/http/makeHttpHandler.ts";
 import makeHttpServer from "../adapters/http/makeHttpServer.ts";
+import {
+    makeGraphPermissionEvaluator,
+    makeTupleStoreRelationshipReader,
+} from "../adapters/authz/graphEvaluation.ts";
+import makeInMemoryTupleStore from "../adapters/authz/makeInMemoryTupleStore.ts";
+import { staticAuthorizationPolicy } from "../adapters/authz/graphPolicy.ts";
+import makeDemoTokenVerifier from "../adapters/authn/makeDemoTokenVerifier.ts";
+import makeInMemoryDocumentRepository from "../adapters/db/makeInMemoryDocumentRepository.ts";
 import { makeDocuments } from "../core/index.ts";
-import type { Authenticator, Authorizer, DocumentRepository } from "../core/index.ts";
+import type { Authorizer } from "../core/index.ts";
+import {
+    demoTokens,
+    seedRelationshipTuples,
+    seedRoadmapDocument,
+} from "../demo/fixtures.ts";
 
 type ServerAppCfg = {
-    port:          number;
-    authenticator: Authenticator; // driven port — verifies bearer tokens
-    authorizer:    Authorizer;    // driven port — checks ReBAC permissions
-    repository:    DocumentRepository; // driven port — stores documents
+    port?: number;
 };
 
-const makeServerApp = ({ port, authenticator, authorizer, repository }: ServerAppCfg) => {
+const makeServerApp = ({ port = readPort(process.env.PORT, 4000) }: ServerAppCfg = {}) => {
+    const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
+    const relationships = makeTupleStoreRelationshipReader(tupleStore);
+    const evaluator = makeGraphPermissionEvaluator({
+        relationships,
+        policy: staticAuthorizationPolicy,
+    });
+    const authorizer: Authorizer = {
+        check: async request => evaluator.check(request),
+    };
+    const authenticator = makeDemoTokenVerifier({ tokens: demoTokens });
+    const repository = makeInMemoryDocumentRepository();
     const documents = makeDocuments({ repository, authorizer });
     const handler = makeHttpHandler({ authenticator, documents });
     const server = makeHttpServer({ handler });
 
-    return { port, server, documents };
+    return { port, server, documents, seedDocument: seedRoadmapDocument };
+};
+
+const readPort = (value: string | undefined, fallback: number): number => {
+    if (value === undefined || value.trim() === "") return fallback;
+    const portValue = Number(value);
+    if (!Number.isInteger(portValue) || portValue < 1 || portValue > 65_535) {
+        throw new Error(`Invalid PORT: ${value}`);
+    }
+    return portValue;
 };
 
 export default makeServerApp;
