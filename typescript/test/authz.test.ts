@@ -1,114 +1,32 @@
+// Kept for backwards compatibility — see test/graphEvaluator.test.ts for the
+// full graph traversal suite.  Tests here verify the shared rebac.ts helpers.
 import { describe, expect, it } from "vitest";
-import {
-    makeGraphPermissionEvaluator,
-    makeTupleStoreRelationshipReader,
-} from "../src/adapters/authz/graphEvaluation.ts";
-import makeInMemoryTupleStore from "../src/adapters/authz/makeInMemoryTupleStore.ts";
-import { staticAuthorizationPolicy } from "../src/adapters/authz/graphPolicy.ts";
-import {
-    document,
-    parseObject,
-    parseSubjectSet,
-    subjectSet,
-    team,
-    tuple,
-    user,
-} from "../src/core/index.ts";
-import type { Authorizer, TupleKey } from "../src/core/index.ts";
-import {
-    alice,
-    bob,
-    casey,
-    platformTeam,
-    roadmapDocument,
-    seedRelationshipTuples,
-} from "../src/demo/fixtures.ts";
+import { parseObject, parseSubjectSet, user, team, workspace, document, tuple, subjectSet } from
+    "../src/shared/rebac.ts";
 
 describe("ReBAC object helpers", () => {
     it("builds and parses OpenFGA-style ids", () => {
         expect(user("alice")).toBe("user:alice");
+        expect(team("platform")).toBe("team:platform");
+        expect(workspace("prod")).toBe("workspace:prod");
         expect(document("roadmap")).toBe("document:roadmap");
-        expect(subjectSet(team("platform"), "member")).toBe("team:platform#member");
-        expect(parseObject(user("github:123"))).toEqual({ type: "user", id: "github:123" });
-        expect(parseSubjectSet(subjectSet(team("platform"), "member"))).toEqual({
-            object:   "team:platform",
-            relation: "member",
+
+        expect(parseObject("user:alice")).toEqual({ type: "user", id: "alice" });
+        expect(parseObject("workspace:prod:v2")).toEqual({ type: "workspace", id: "prod:v2" });
+
+        expect(() => parseObject("bad")).toThrow();
+        expect(() => parseObject("unknown:x")).toThrow();
+    });
+
+    it("builds and parses subject sets", () => {
+        const ss = subjectSet(team("platform"), "member");
+        expect(ss).toBe("team:platform#member");
+        expect(parseSubjectSet(ss)).toEqual({ object: "team:platform", relation: "member" });
+    });
+
+    it("builds tuples", () => {
+        expect(tuple(document("d"), "viewer", user("alice"))).toEqual({
+            object: "document:d", relation: "viewer", user: "user:alice",
         });
     });
 });
-
-describe("graph authorizer", () => {
-    it("allows alice to edit through team membership and workspace inheritance", async () => {
-        const authorizer = makeTestGraphAuthorizer(seedRelationshipTuples());
-
-        const result = await authorizer.check({
-            user:     alice,
-            relation: "can_edit",
-            object:   roadmapDocument,
-        });
-
-        expect(result.allowed).toBe(true);
-        expect(result.trace).toContain(
-            "Resolve subject set team:platformTeam#member: does it contain user:alice?",
-        );
-        expect(result.trace).toContain(
-            "document:roadmapDocument editor can inherit editor from workspace:productWorkspace",
-        );
-    });
-
-    it("lets bob read as a workspace viewer but denies editing", async () => {
-        const authorizer = makeTestGraphAuthorizer(seedRelationshipTuples());
-
-        await expect(
-            authorizer.check({ user: bob, relation: "can_read", object: roadmapDocument }),
-        ).resolves.toMatchObject({ allowed: true });
-
-        await expect(
-            authorizer.check({ user: bob, relation: "can_edit", object: roadmapDocument }),
-        ).resolves.toMatchObject({ allowed: false });
-    });
-
-    it("treats team admins as team members", async () => {
-        const authorizer = makeTestGraphAuthorizer([
-            ...seedRelationshipTuples(),
-            tuple(platformTeam, "admin", casey),
-        ]);
-
-        const result = await authorizer.check({
-            user:     casey,
-            relation: "member",
-            object:   platformTeam,
-        });
-
-        expect(result.allowed).toBe(true);
-        expect(result.trace).toContain("team:platformTeam member includes admin");
-    });
-
-    it("stops cycles without denying unrelated direct grants", async () => {
-        const cyclicDocument = document("cyclic");
-        const authorizer = makeTestGraphAuthorizer([
-            tuple(cyclicDocument, "workspace", cyclicDocument),
-            tuple(cyclicDocument, "viewer", bob),
-        ]);
-
-        const result = await authorizer.check({
-            user:     bob,
-            relation: "can_read",
-            object:   cyclicDocument,
-        });
-
-        expect(result.allowed).toBe(true);
-    });
-});
-
-const makeTestGraphAuthorizer = (seed: TupleKey[]): Authorizer => {
-    const tupleStore = makeInMemoryTupleStore({ seed });
-    const relationships = makeTupleStoreRelationshipReader(tupleStore);
-    const evaluator = makeGraphPermissionEvaluator({
-        relationships,
-        policy: staticAuthorizationPolicy,
-    });
-    return {
-        check: async request => evaluator.check(request),
-    };
-};

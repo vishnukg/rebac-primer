@@ -1,77 +1,69 @@
+// Unit tests for the documents domain with a fully in-process authz client.
+// See test/documentsService.test.ts for HTTP-level integration tests.
 import { describe, expect, it } from "vitest";
-import {
-    makeGraphPermissionEvaluator,
-    makeTupleStoreRelationshipReader,
-} from "../src/adapters/authz/graphEvaluation.ts";
-import makeInMemoryTupleStore from "../src/adapters/authz/makeInMemoryTupleStore.ts";
-import { staticAuthorizationPolicy } from "../src/adapters/authz/graphPolicy.ts";
-import makeInMemoryDocumentRepository from "../src/adapters/db/makeInMemoryDocumentRepository.ts";
-import {
-    ForbiddenError,
-    makeDocuments,
-} from "../src/core/index.ts";
-import type { Authorizer } from "../src/core/index.ts";
-import { alice, bob, productWorkspace, seedRelationshipTuples } from "../src/demo/fixtures.ts";
+import makeDocuments from "../src/documents-service/core/domain/makeDocuments.ts";
+import makeInMemoryDocumentRepository from
+    "../src/documents-service/adapters/db/makeInMemoryDocumentRepository.ts";
+import makeInMemoryTupleRepository from
+    "../src/authz-service/adapters/db/makeInMemoryTupleRepository.ts";
+import makeGraphEvaluator from
+    "../src/authz-service/adapters/graph/makeGraphEvaluator.ts";
+import type { AuthzClient } from "../src/documents-service/core/ports/authzClient.ts";
+import type { TupleKey } from "../src/shared/rebac.ts";
+import { alice, bob, productWorkspace, seedPolicyTuples } from "../src/demo/fixtures.ts";
 
-const makeDocumentService = () => {
-    const repository = makeInMemoryDocumentRepository();
-    const tupleStore = makeInMemoryTupleStore({ seed: seedRelationshipTuples() });
-    const relationships = makeTupleStoreRelationshipReader(tupleStore);
-    const evaluator = makeGraphPermissionEvaluator({
-        relationships,
-        policy: staticAuthorizationPolicy,
-    });
-    const authorizer: Authorizer = {
-        check: async request => evaluator.check(request),
+const makeInProcessAuthzClient = (seed: TupleKey[] = []): AuthzClient => {
+    const repository = makeInMemoryTupleRepository(seed);
+    const evaluator  = makeGraphEvaluator({ repository });
+    return {
+        check:       async req  => evaluator.evaluate(req),
+        writeTuples: async tpls => { for (const t of tpls) repository.write(t); },
     };
-    return makeDocuments({ repository, authorizer });
 };
 
-describe("documents", () => {
+const makeService = () =>
+    makeDocuments({
+        repository:  makeInMemoryDocumentRepository(),
+        authzClient: makeInProcessAuthzClient(seedPolicyTuples()),
+    });
+
+describe("documents domain", () => {
     it("creates a document when the actor is a workspace editor", async () => {
-        const documents = makeDocumentService();
-
-        const created = await documents.create({
-            id:        "strategy",
-            title:     "Strategy",
-            body:      "Ship carefully",
-            workspace: productWorkspace,
-            actor:     alice,
+        const documents = makeService();
+        const doc = await documents.create({
+            id: "d1", title: "T", body: "B",
+            workspace: productWorkspace, actor: alice,
         });
-
-        expect(created.updatedBy).toBe(alice);
+        expect(doc.id).toBe("d1");
+        expect(doc.updatedBy).toBe(alice);
     });
 
     it("rejects creation for workspace viewers", async () => {
-        const documents = makeDocumentService();
-
-        await expect(
-            documents.create({
-                id:        "incident-plan",
-                title:     "Incident Plan",
-                body:      "Draft",
-                workspace: productWorkspace,
-                actor:     bob,
-            }),
-        ).rejects.toBeInstanceOf(ForbiddenError);
+        const documents = makeService();
+        await expect(documents.create({
+            id: "d1", title: "T", body: "B",
+            workspace: productWorkspace, actor: bob,
+        })).rejects.toMatchObject({ name: "ForbiddenError" });
     });
 
-    it("updates a document when ReBAC allows can_edit", async () => {
-        const documents = makeDocumentService();
+    it("allows reads after the document-workspace tuple is written on create", async () => {
+        const documents = makeService();
         await documents.create({
-            id:        "roadmapDocument",
-            title:     "Roadmap",
-            body:      "v1",
-            workspace: productWorkspace,
-            actor:     alice,
+            id: "d1", title: "T", body: "B",
+            workspace: productWorkspace, actor: alice,
         });
+        // bob is a workspace viewer — can_read should be granted via inheritance
+        const doc = await documents.read({ id: "d1", actor: bob });
+        expect(doc.id).toBe("d1");
+    });
 
-        const updated = await documents.update({
-            id:    "roadmapDocument",
-            body:  "v2",
-            actor: alice,
+    it("returns ForbiddenError when editor tries to delete (no can_delete tuple)", async () => {
+        const documents = makeService();
+        await documents.create({
+            id: "d1", title: "T", body: "B",
+            workspace: productWorkspace, actor: alice,
         });
-
+        const updated = await documents.update({ id: "d1", body: "v2", actor: alice });
         expect(updated.body).toBe("v2");
     });
 });

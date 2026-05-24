@@ -6,8 +6,16 @@ export type Fetcher = (input: URL, init?: RequestInit) => Promise<Response>;
 export type DocumentsClient = {
     health:         () => Promise<boolean>;
     whoami:         (token: string) => Promise<string>;
-    readDocument:   (id: string, actorId: string) => Promise<CollaborativeDocument>;
-    updateDocument: (id: string, actorId: string, body: string) => Promise<CollaborativeDocument>;
+    createDocument: (input: CreateDocumentClientInput, token: string) => Promise<CollaborativeDocument>;
+    readDocument:   (id: string, token: string) => Promise<CollaborativeDocument>;
+    updateDocument: (id: string, body: string, token: string) => Promise<CollaborativeDocument>;
+};
+
+export type CreateDocumentClientInput = {
+    id:          string;
+    title:       string;
+    body:        string;
+    workspaceId: string;
 };
 
 type HttpDocumentsClientCfg = {
@@ -31,6 +39,10 @@ const makeHttpDocumentsClient = ({
         return body;
     };
 
+    const bearerHeader = (token: string): { authorization: string } => ({
+        authorization: `Bearer ${token}`,
+    });
+
     const health = async (): Promise<boolean> => {
         const response = await fetcher(new URL("/health", baseUrl));
         return response.ok;
@@ -39,7 +51,7 @@ const makeHttpDocumentsClient = ({
     const whoami = async (token: string): Promise<string> => {
         const body = await request(new URL("/whoami", baseUrl), {
             method:  "GET",
-            headers: { authorization: `Bearer ${token}` },
+            headers: bearerHeader(token),
         });
         if (!isJsonObject(body) || typeof body.user !== "string") {
             throw new Error("Response body did not contain a user");
@@ -47,25 +59,40 @@ const makeHttpDocumentsClient = ({
         return body.user;
     };
 
-    const readDocument = async (id: string, actorId: string): Promise<CollaborativeDocument> => {
-        const url = new URL(`/documents/${id}`, baseUrl);
-        url.searchParams.set("actorId", actorId);
-        return documentFromResponse(await request(url, { method: "GET" }));
-    };
-
-    const updateDocument = async (
-        id: string,
-        actorId: string,
-        body: string,
+    const createDocument = async (
+        input: CreateDocumentClientInput,
+        token: string,
     ): Promise<CollaborativeDocument> =>
         documentFromResponse(
-            await request(new URL(`/documents/${id}`, baseUrl), {
-                method: "PATCH",
-                body:   JSON.stringify({ actorId, body }),
+            await request(new URL("/documents", baseUrl), {
+                method:  "POST",
+                headers: bearerHeader(token),
+                body:    JSON.stringify(input),
             }),
         );
 
-    return { health, whoami, readDocument, updateDocument };
+    const readDocument = async (id: string, token: string): Promise<CollaborativeDocument> =>
+        documentFromResponse(
+            await request(new URL(`/documents/${id}`, baseUrl), {
+                method:  "GET",
+                headers: bearerHeader(token),
+            }),
+        );
+
+    const updateDocument = async (
+        id: string,
+        body: string,
+        token: string,
+    ): Promise<CollaborativeDocument> =>
+        documentFromResponse(
+            await request(new URL(`/documents/${id}`, baseUrl), {
+                method:  "PATCH",
+                headers: bearerHeader(token),
+                body:    JSON.stringify({ body }),
+            }),
+        );
+
+    return { health, whoami, createDocument, readDocument, updateDocument };
 };
 
 const documentFromResponse = (value: unknown): CollaborativeDocument => {

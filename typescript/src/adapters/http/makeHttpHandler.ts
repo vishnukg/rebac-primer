@@ -1,8 +1,7 @@
 import {
-    AuthenticationError,
-    DocumentNotFoundError,
-    ForbiddenError,
-    user,
+    isAuthenticationError,
+    isDocumentNotFoundError,
+    isForbiddenError,
     workspace,
 } from "../../core/index.ts";
 import type { Authenticator, Documents } from "../../core/index.ts";
@@ -56,23 +55,19 @@ const makeHttpHandler = ({ authenticator, documents }: HttpHandlerCfg): HttpHand
             const documentId = matchDocumentPath(request.path);
 
             if (documentId && request.method === "GET") {
-                const actor = await resolveActor(
-                    request.authorization,
-                    request.query.get("actorId") ?? undefined,
-                );
-                return json(200, { document: await documents.read(documentId, actor) });
+                const authed = await authenticator.verifyAccessToken(request.authorization);
+                return json(200, {
+                    document: await documents.read({ id: documentId, actor: authed.subject }),
+                });
             }
 
             if (documentId && request.method === "PATCH") {
-                const body  = requireBody(request.body);
-                const actor = await resolveActor(
-                    request.authorization,
-                    optionalString(body, "actorId"),
-                );
+                const body   = requireBody(request.body);
+                const authed = await authenticator.verifyAccessToken(request.authorization);
                 const updated = await documents.update({
                     id:    documentId,
                     body:  stringField(body, "body"),
-                    actor,
+                    actor: authed.subject,
                 });
                 return json(200, { document: updated });
             }
@@ -83,16 +78,6 @@ const makeHttpHandler = ({ authenticator, documents }: HttpHandlerCfg): HttpHand
         }
     };
 
-    // If actorIdOverride is provided (demo/testing convenience), use it directly.
-    // Otherwise verify the bearer token and use the authenticated subject.
-    const resolveActor = async (
-        authorization: string | undefined,
-        actorIdOverride: string | undefined,
-    ) => {
-        if (actorIdOverride) return user(actorIdOverride);
-        return (await authenticator.verifyAccessToken(authorization)).subject;
-    };
-
     return handle;
 };
 
@@ -101,22 +86,13 @@ const requireBody = (body: unknown): Record<string, unknown> => {
     return body;
 };
 
-const optionalString = (body: Record<string, unknown>, field: string): string | undefined => {
-    const value = body[field];
-    if (value === undefined) return undefined;
-    if (typeof value !== "string" || value.trim().length === 0) {
-        throw new Error(`Invalid string field: ${field}`);
-    }
-    return value;
-};
-
 const matchDocumentPath = (pathname: string): string | undefined =>
     /^\/documents\/([^/]+)$/.exec(pathname)?.[1];
 
 const toErrorResponse = (error: unknown): HttpResponse => {
-    if (error instanceof AuthenticationError)  return json(401, { error: error.message });
-    if (error instanceof ForbiddenError)       return json(403, { error: error.message });
-    if (error instanceof DocumentNotFoundError) return json(404, { error: error.message });
+    if (isAuthenticationError(error))   return json(401, { error: error.message });
+    if (isForbiddenError(error))        return json(403, { error: error.message });
+    if (isDocumentNotFoundError(error)) return json(404, { error: error.message });
     const message = error instanceof Error ? error.message : "Unknown error";
     return json(400, { error: message });
 };

@@ -122,5 +122,5 @@ const makeObject = <TType extends ObjectType>(type: TType, id: string): RebacObj
 const isObjectType = (value: string | undefined): value is ObjectType =>
     value === "user" || value === "team" || value === "workspace" || value === "document";
 
-export const isTeamRelation = (value: string | undefined): value is TeamRelation =>
+const isTeamRelation = (value: string | undefined): value is TeamRelation =>
     value === "admin" || value === "member";

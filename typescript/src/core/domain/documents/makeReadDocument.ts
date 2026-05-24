@@ -14,16 +14,16 @@ type ReadDocumentCfg = {
 };
 
 const makeReadDocument = ({ repository, authorizer }: ReadDocumentCfg): ReadDocumentFn => {
-    return async (id, actor) => {
+    return async ({ id, actor }) => {
         const existing = await repository.findById(id);
-        if (!existing) throw new DocumentNotFoundError(id);
+        if (!existing) throw DocumentNotFoundError(id);
 
         const decision = await authorizer.check({
             user:     actor,
             relation: "can_read",
             object:   document(id),
         });
-        if (!decision.allowed) throw new ForbiddenError(`${actor} cannot read document:${id}`);
+        if (!decision.allowed) throw ForbiddenError(`${actor} cannot read document:${id}`);
 
         return existing;
     };

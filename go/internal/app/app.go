@@ -1,9 +1,10 @@
-// Package app is the composition root. It wires together the authz, domain,
-// and httpserver layers and seeds the store with demo data.
+// Package app is the composition root.  It wires together the authz service,
+// documents service, and HTTP layer and seeds the store with demo data.
 //
-// This is the Go equivalent of typescript/src/app/create-services.ts and
-// create-server.ts: one place that knows every concrete type so the rest of
-// the codebase can depend only on interfaces.
+// This is the single place in the codebase that knows every concrete type.
+// Everything else depends only on interfaces (ports).
+//
+// Mirrors the TypeScript compose.ts files in each service directory.
 package app
 
 import (
@@ -13,10 +14,14 @@ import (
 	"os"
 	"strconv"
 
-	"rebac-primer/internal/authz"
-	"rebac-primer/internal/domain"
+	authzdb "rebac-primer/internal/authzservice/adapters/db"
+	"rebac-primer/internal/authzservice/adapters/graph"
+	authzdomain "rebac-primer/internal/authzservice/core/domain"
+	docsauthn "rebac-primer/internal/documentsservice/adapters/authn"
+	docsdb "rebac-primer/internal/documentsservice/adapters/db"
+	docshttp "rebac-primer/internal/documentsservice/adapters/http"
+	docsdomain "rebac-primer/internal/documentsservice/core/domain"
 	"rebac-primer/internal/fixtures"
-	"rebac-primer/internal/httpserver"
 )
 
 // App holds the fully-wired HTTP handler and the port to listen on.
@@ -31,9 +36,7 @@ type Config struct {
 }
 
 // DefaultConfig returns local-development defaults.
-func DefaultConfig() Config {
-	return Config{Port: 4001}
-}
+func DefaultConfig() Config { return Config{Port: 4001} }
 
 // ConfigFromEnv reads 12-factor style process configuration.
 func ConfigFromEnv(lookup func(string) string) (Config, error) {
@@ -48,11 +51,7 @@ func ConfigFromEnv(lookup func(string) string) (Config, error) {
 	return cfg, nil
 }
 
-// New creates and seeds the application. It:
-//  1. Builds the in-memory tuple store and seeds it with fixture tuples.
-//  2. Creates the graph authorizer and domain service.
-//  3. Creates a demo "Roadmap" document.
-//  4. Returns an http.Handler ready to serve requests.
+// New creates and seeds the application from environment variables.
 func New(ctx context.Context) (*App, error) {
 	cfg, err := ConfigFromEnv(os.Getenv)
 	if err != nil {
@@ -62,17 +61,35 @@ func New(ctx context.Context) (*App, error) {
 }
 
 // NewWithConfig creates and seeds the application with explicit configuration.
+//
+// Wiring order mirrors the TypeScript compose.ts files:
+//  1. Authz service: tuple store → graph evaluator → authz domain
+//  2. Documents service: repo + authn + authz domain as AuthzClient → documents domain
+//  3. HTTP server wraps the documents domain
 func NewWithConfig(ctx context.Context, cfg Config) (*App, error) {
-	// --- authz layer ---
-	tupleStore := authz.NewInMemoryTupleStore(fixtures.SeedRelationshipTuples()...)
-	authorizer := authz.NewGraphAuthorizer(tupleStore)
+	// ── Authz service ──────────────────────────────────────────────────────────
+	// adapter: in-memory tuple store, pre-seeded with fixture relationships
+	tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
 
-	// --- domain layer ---
-	repo := domain.NewInMemoryDocumentRepository()
-	docs := domain.NewDocumentService(repo, authorizer)
+	// adapter: in-process graph evaluator
+	evaluator := graph.NewGraphEvaluator(tupleStore)
 
-	// --- seed demo document ---
-	_, err := docs.Create(ctx, domain.CreateDocumentInput{
+	// domain: wire repository + evaluator into the AuthzService
+	authzSvc := authzdomain.New(tupleStore, evaluator)
+
+	// ── Documents service ──────────────────────────────────────────────────────
+	// adapter: in-memory document repository
+	docRepo := docsdb.New()
+
+	// adapter: demo token verifier (AuthzService satisfies AuthzClient structurally)
+	tokenVerifier := docsauthn.New(fixtures.DemoTokens())
+
+	// domain: authzSvc satisfies ports.AuthzClient via Go structural typing
+	// (it has Check and WriteTuples with matching signatures)
+	docs := docsdomain.New(docRepo, authzSvc)
+
+	// seed demo document
+	_, err := docs.Create(ctx, docsdomain.CreateDocumentInput{
 		ID:        "roadmapDocument",
 		Title:     "Roadmap",
 		Body:      "Initial roadmap document",
@@ -83,8 +100,8 @@ func NewWithConfig(ctx context.Context, cfg Config) (*App, error) {
 		return nil, fmt.Errorf("app: seed demo document: %w", err)
 	}
 
-	// --- HTTP layer ---
-	handler := httpserver.NewServer(docs)
+	// ── HTTP layer ─────────────────────────────────────────────────────────────
+	httpHandler := docshttp.NewServer(tokenVerifier, docs)
 
-	return &App{Handler: handler, Port: cfg.Port}, nil
+	return &App{Handler: httpHandler, Port: cfg.Port}, nil
 }

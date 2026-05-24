@@ -1,4 +1,4 @@
-export { AuthenticationError }                                            from "./authn.ts";
+export { AuthenticationError, isAuthenticationError }                     from "./authn.ts";
 export type { Authenticator, AuthenticatedUser, TokenClaims, VerifyAccessTokenFn } from "./authn.ts";
 export {
     document,

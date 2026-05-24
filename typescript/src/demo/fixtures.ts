@@ -1,48 +1,42 @@
-// Demo scenario fixtures — used by the server entry point and by tests.
-// Defines the alice/bob/casey scenario described in the README.
+// Demo fixtures — shared by the server entrypoint and by tests.
+//
+// seedPolicyTuples: the workspace/team relationships a platform team would
+// configure by calling POST /tuples on the authz service.  These represent
+// "policy" — they rarely change.
+//
+// Document-level tuples (workspace relation, owner) are written by the
+// documents service at document-creation time.
 
-import { document, subjectSet, team, tuple, user, workspace } from "../core/index.ts";
-import type { CreateDocumentInput, TokenClaims, TupleKey } from "../core/index.ts";
+import { subjectSet, team, tuple, user, workspace } from "../shared/rebac.ts";
+import type { TupleKey } from "../shared/rebac.ts";
 
-// ── Actors ────────────────────────────────────────────────────────────────────
+// ── Demo actors ───────────────────────────────────────────────────────────────
 
 export const alice = user("alice");
 export const bob   = user("bob");
 export const casey = user("casey");
 
-// ── Objects ───────────────────────────────────────────────────────────────────
+// ── Demo objects ──────────────────────────────────────────────────────────────
 
 export const platformTeam     = team("platformTeam");
 export const productWorkspace = workspace("productWorkspace");
-export const roadmapDocument  = document("roadmapDocument");
 
-// ── Demo tokens ───────────────────────────────────────────────────────────────
+// ── Demo bearer tokens ────────────────────────────────────────────────────────
 
-export const demoTokens: Record<string, TokenClaims> = {
+export const demoTokens: Record<string, { sub: string; scopes: string[] }> = {
     "demo-token-alice": { sub: "alice", scopes: ["documents:read", "documents:write"] },
     "demo-token-bob":   { sub: "bob",   scopes: ["documents:read"] },
     "demo-token-casey": { sub: "casey", scopes: ["documents:read"] },
 };
 
-// ── Relationship tuples ───────────────────────────────────────────────────────
+// ── Policy tuples (workspace/team memberships) ────────────────────────────────
+//
+// These are what the platform team writes to the authz service.
+// They express: Alice is a platform team member, platform team members are
+// editors of productWorkspace, and Bob is a viewer of productWorkspace.
 
-// alice is a member of platformTeam
-// platformTeam#member are editors of productWorkspace
-// bob is a viewer of productWorkspace
-// roadmapDocument lives in productWorkspace
-export const seedRelationshipTuples = (): TupleKey[] => [
+export const seedPolicyTuples = (): TupleKey[] => [
     tuple(platformTeam, "member", alice),
     tuple(productWorkspace, "editor", subjectSet(platformTeam, "member")),
     tuple(productWorkspace, "viewer", bob),
-    tuple(roadmapDocument, "workspace", productWorkspace),
 ];
-
-// ── Seed document ─────────────────────────────────────────────────────────────
-
-export const seedRoadmapDocument: CreateDocumentInput = {
-    id:        "roadmapDocument",
-    title:     "Roadmap",
-    body:      "Initial roadmap document",
-    workspace: productWorkspace,
-    actor:     alice,
-};

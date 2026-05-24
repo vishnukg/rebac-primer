@@ -81,11 +81,12 @@ Read these after the shared ReBAC track if TypeScript is your implementation lan
 | 15 | Coding style for maintainable TypeScript | `docs/15-typescript-code-style.md` |
 | 16 | Node ESM, module loading, module patterns, singletons | `typescript/package.json`, `typescript/tsconfig.json`, `typescript/src/server/index.ts` |
 
-Read this after the shared OpenFGA model chapter.
+Read these after the shared OpenFGA model chapter.
 
 | Doc | Topic | Code to inspect |
 |-----|-------|-----------------|
 | 17 | TypeScript OpenFGA implementation | `typescript/src/adapters/authz/makeOpenFgaAuthorizer.ts` |
+| 18 | TypeScript ReBAC implementation — theory to code walkthrough | `typescript/src/adapters/authz/makeGraphAuthorizer.ts`, `typescript/src/adapters/http/makeHttpHandler.ts` |
 
 ## Go track
 
@@ -126,7 +127,7 @@ Read if TypeScript or Node.js is your primary goal.
 ```
 01 → 02 → 03 → 04 → 05             Authn/authz + ReBAC + OpenFGA model
 10 → 11 → 12 → 13 → 14 → 15 → 16   TypeScript language and app structure
-17                                  TypeScript OpenFGA adapter
+17 → 18                             OpenFGA adapter + theory-to-code walkthrough
 30 → 31 → 32 → 33                  Docker + client/server
 40                                  Production gaps
 ```
@@ -212,8 +213,9 @@ Checkpoint: explain the same tuple in both languages.
 TypeScript:
 
 1. Read `12-functions-modules-classes.md` and `13-async-errors-and-boundaries.md`.
-2. Inspect `typescript/src/core/domain/documents`.
-3. Trace how an update request becomes an authorization check.
+2. Read `18-typescript-rebac-implementation.md` — traces a full request through the graph.
+3. Inspect `typescript/src/core/domain/documents`.
+4. Trace how an update request becomes an authorization check.
 
 Go:
 

@@ -20,7 +20,7 @@ const makeCreateDocument = ({ repository, authorizer }: CreateDocumentCfg): Crea
             object:   input.workspace,
         });
         if (!decision.allowed) {
-            throw new ForbiddenError(
+            throw ForbiddenError(
                 `${input.actor} cannot create documents in ${input.workspace}`,
             );
         }

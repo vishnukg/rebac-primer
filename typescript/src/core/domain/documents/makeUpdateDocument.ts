@@ -16,7 +16,7 @@ type UpdateDocumentCfg = {
 const makeUpdateDocument = ({ repository, authorizer }: UpdateDocumentCfg): UpdateDocumentFn => {
     return async input => {
         const existing = await repository.findById(input.id);
-        if (!existing) throw new DocumentNotFoundError(input.id);
+        if (!existing) throw DocumentNotFoundError(input.id);
 
         const decision = await authorizer.check({
             user:     input.actor,
@@ -24,7 +24,7 @@ const makeUpdateDocument = ({ repository, authorizer }: UpdateDocumentCfg): Upda
             object:   document(input.id),
         });
         if (!decision.allowed) {
-            throw new ForbiddenError(`${input.actor} cannot edit document:${input.id}`);
+            throw ForbiddenError(`${input.actor} cannot edit document:${input.id}`);
         }
 
         const updated = { ...existing, body: input.body, updatedBy: input.actor };

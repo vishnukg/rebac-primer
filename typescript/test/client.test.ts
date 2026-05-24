@@ -5,10 +5,11 @@ import type { DocumentsClient, Fetcher } from "../src/adapters/client/makeHttpDo
 import type { QuestionTerminal } from "../src/adapters/client/makeTerminalClient.ts";
 
 describe("makeHttpDocumentsClient", () => {
-    it("reads documents through the HTTP API", async () => {
-        const fetcher: Fetcher = async url => {
-            expect(url.toString()).toBe(
-                "http://server.test/documents/roadmapDocument?actorId=alice",
+    it("reads a document using a bearer token", async () => {
+        const fetcher: Fetcher = async (url, init) => {
+            expect(url.toString()).toBe("http://server.test/documents/roadmapDocument");
+            expect((init?.headers as Record<string, string>)?.authorization).toBe(
+                "Bearer demo-token-alice",
             );
             return new Response(
                 JSON.stringify({
@@ -25,16 +26,17 @@ describe("makeHttpDocumentsClient", () => {
         };
         const client = makeHttpDocumentsClient({ baseUrl: "http://server.test", fetcher });
 
-        const doc = await client.readDocument("roadmapDocument", "alice");
+        const doc = await client.readDocument("roadmapDocument", "demo-token-alice");
 
         expect(doc.id).toBe("roadmapDocument");
     });
 });
 
 describe("makeTerminalClient", () => {
-    it("runs the read workflow", async () => {
+    it("authenticates then reads a document", async () => {
         const writes: string[] = [];
-        const answers          = ["1", "bob", "3"];
+        // Answers: token, then choose "2" (read), document id, then "4" (exit)
+        const answers = ["demo-token-bob", "2", "roadmapDocument", "4"];
         const terminal: QuestionTerminal = {
             question: async () => {
                 const answer = answers.shift();
@@ -43,18 +45,17 @@ describe("makeTerminalClient", () => {
             },
         };
         const client: DocumentsClient = {
-            health:       async () => true,
-            whoami:       async () => "user:bob",
-            readDocument: async () => ({
+            health:         async () => true,
+            whoami:         async () => "user:bob",
+            createDocument: async () => { throw new Error("Not expected"); },
+            readDocument:   async () => ({
                 id:        "roadmapDocument",
                 title:     "Roadmap",
                 body:      "Read the tutorial",
                 workspace: "workspace:productWorkspace",
                 updatedBy: "user:alice",
             }),
-            updateDocument: async () => {
-                throw new Error("Update was not expected");
-            },
+            updateDocument: async () => { throw new Error("Not expected"); },
         };
 
         await makeTerminalClient({
@@ -63,6 +64,7 @@ describe("makeTerminalClient", () => {
             write: message => writes.push(message),
         }).run();
 
+        expect(writes).toContain("Authenticated as: user:bob");
         expect(writes).toContain("\nRoadmap");
         expect(writes).toContain("Read the tutorial");
     });

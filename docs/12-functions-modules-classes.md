@@ -12,8 +12,10 @@ style:
 - functions for small transformations and typed id constructors
 - modules for ownership
 - interfaces for ports
-- factories for services and adapters
-- classes only for domain errors
+- factories for stateful adapters and services
+
+The `class` keyword does not appear anywhere in this repo — not even for errors.
+Domain errors use a tagged factory pattern instead (covered below).
 
 The guiding rule is:
 
@@ -141,6 +143,38 @@ The closure hides the map. The returned object exposes a small port:
 That gives the same encapsulation benefit people often reach for classes to get,
 with less syntax for this tutorial.
 
+## Tagged error factories — no class needed
+
+A common reason to reach for a class is to create a custom error type that can
+be caught precisely. The factory pattern handles this without `class`:
+
+```ts
+// A branded type: any Error whose `name` is "ForbiddenError".
+export type ForbiddenError = Error & { readonly name: "ForbiddenError" };
+
+// A factory function that builds one.
+export const ForbiddenError = (message: string): ForbiddenError =>
+    Object.assign(new Error(message), { name: "ForbiddenError" as const });
+
+// A type guard for narrowing in catch blocks.
+export const isForbiddenError = (e: unknown): e is ForbiddenError =>
+    e instanceof Error && e.name === "ForbiddenError";
+```
+
+Usage at the call site is clean and identical to what a class would look like:
+
+```ts
+// throwing
+throw ForbiddenError(`${actor} cannot edit ${id}`);
+
+// catching precisely
+if (isForbiddenError(error)) return json(403, { error: error.message });
+```
+
+The type guard works because TypeScript narrows `error.name` — no `instanceof`
+dependency on the class constructor. Tests use `toMatchObject({ name: "ForbiddenError" })`
+instead of `toBeInstanceOf(...)`.
+
 ## The ports-and-adapters direction
 
 The dependency direction in this repo is:
@@ -196,12 +230,15 @@ implementations. The domain code still depends on ports.
 This repo separates runtime imports from type-only imports:
 
 ```ts
-import { document } from "../../ports/authz.ts";
-import type { Authorizer } from "../../ports/authz.ts";
+// From src/adapters/authz/makeGraphAuthorizer.ts
+import { isObjectOfType, isSubjectSet, parseObject, parseSubjectSet } from "../../core/index.ts";
+import type { Authorizer, CheckRequest, CheckResult, RebacObject, Relation } from "../../core/index.ts";
 ```
 
-`import type` is a good habit. It tells readers and tooling that the import is
-used only by TypeScript.
+`import type` is a good habit. It tells TypeScript (and bundlers) that the
+import is erased at runtime — no runtime cost, no circular-dependency risk.
+Both lines import from the same barrel (`core/index.ts`), but the split makes
+intent explicit: the first line brings in functions; the second brings in types.
 
 ## Exercise
 
