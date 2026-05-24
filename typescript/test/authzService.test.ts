@@ -19,8 +19,7 @@ const makeHandler = (extra: ReturnType<typeof seedPolicyTuples> = []): AuthzHttp
     const repository      = makeInMemoryTupleRepository({ seed: [...seedPolicyTuples(), ...extra] });
     const evaluator       = makeGraphEvaluator({ repository });
     const domain          = makeAuthzDomain({ repository, evaluator });
-    const { handler }     = makeAuthzHttpHandler({ authz: domain });
-    return handler;
+    return makeAuthzHttpHandler({ authz: domain });
 };
 
 describe("AuthZ service — GET /health", () => {

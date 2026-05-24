@@ -141,38 +141,53 @@ idea of hidden state and requires every dependency to be passed explicitly.
 
 This repo is that idea applied to TypeScript and ReBAC.
 
-## The object destructuring convention
+## The naming convention
 
 **Inputs** always use a named config object:
 
 ```ts
 // Good — names visible at the call site
-const { create } = makeCreateDocument({ repository, authzClient });
+const create = makeCreateDocument({ repository, authzClient });
 
 // Bad — positional, caller must read the signature to know order
-const { create } = makeCreateDocument(repository, authzClient);
+const create = makeCreateDocument(repository, authzClient);
 ```
 
-**Outputs** always use an object literal, even for a single capability:
+**`make` functions return the thing itself.** Whatever the factory builds
+— a port implementation, a handler function, a server — that value is
+returned directly. No wrapper object around it:
 
 ```ts
-// Good — key names what the factory produced; extensible later
-return { create };
-
-// Inconsistent — caller cannot destructure; harder to extend
-return create;
+// make* returns the thing itself
+const repository = makeInMemoryTupleRepository({ seed: seedTuples });
+const evaluator  = makeGraphEvaluator({ repository });
+const domain     = makeAuthzDomain({ repository, evaluator });
+const handler    = makeAuthzHttpHandler({ authz: domain });
+const server     = makeAuthzHttpServer({ handler });
 ```
 
-Every call site in the repo looks the same:
+The variable name at the call site names the thing. The function name already
+tells you what it makes. There is no value in re-wrapping as `{ handler }` or
+`{ server }` — that just forces the caller to destructure a single key for no
+gain.
+
+**`compose` functions return a bag.** A composition root wires several peers
+together and its callers often need more than one of them. A named object is
+the right return shape:
 
 ```ts
-const { create }   = makeCreateDocument({ repository, authzClient });
-const { evaluate } = makeGraphEvaluator({ repository });
-const { handler }  = makeAuthzHttpHandler({ authz: domain });
-const { server }   = makeAuthzHttpServer({ handler });
+// compose* returns a bag of peers
+const makeAuthzService = ({ port, seedTuples }) => {
+    // ...wiring...
+    return { port, server, domain };   // callers pick what they need
+};
+
+const { server, domain, port } = makeAuthzService({ seedTuples });
 ```
 
-Completely predictable. You always know what to expect.
+The rule of thumb: if the factory builds exactly one thing, return that
+thing. If it assembles multiple peers that callers may need independently,
+return a named object.
 
 ## Where this lives in the repo
 

@@ -28,8 +28,7 @@ const makeHandler = (): DocumentsHttpHandler => {
     const authenticator = makeDemoTokenVerifier({ tokens: demoTokens });
     const repository    = makeInMemoryDocumentRepository();
     const documents     = makeDocuments({ repository, authzClient });
-    const { handler }   = makeDocumentsHttpHandler({ authenticator, documents });
-    return handler;
+    return makeDocumentsHttpHandler({ authenticator, documents });
 };
 
 // Builds a handler that already has a seeded document (alice as owner).

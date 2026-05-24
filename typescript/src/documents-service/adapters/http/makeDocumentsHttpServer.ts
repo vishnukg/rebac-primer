@@ -23,7 +23,7 @@ const makeDocumentsHttpServer = ({ handler }: DocumentsHttpServerCfg) => {
         res.end(JSON.stringify(response.body));
     });
 
-    return { server };
+    return server;
 };
 
 const readBody = (req: IncomingMessage): Promise<string> =>

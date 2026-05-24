@@ -87,7 +87,7 @@ const makeAuthzHttpHandler = ({ authz }: AuthzHttpHandlerCfg) => {
         }
     };
 
-    return { handler: handle };
+    return handle;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

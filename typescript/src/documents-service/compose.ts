@@ -32,8 +32,8 @@ const makeDocumentsService = ({
     const authenticator = makeDemoTokenVerifier({ tokens });
     const repository    = makeInMemoryDocumentRepository();
     const documents     = makeDocuments({ repository, authzClient });
-    const { handler } = makeDocumentsHttpHandler({ authenticator, documents });
-    const { server }  = makeDocumentsHttpServer({ handler });
+    const handler = makeDocumentsHttpHandler({ authenticator, documents });
+    const server  = makeDocumentsHttpServer({ handler });
 
     return { port, server, documents };
 };

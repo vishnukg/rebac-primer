@@ -22,7 +22,7 @@ const makeAuthzHttpServer = ({ handler }: AuthzHttpServerCfg) => {
         res.end(JSON.stringify(response.body));
     });
 
-    return { server };
+    return server;
 };
 
 const readBody = (req: IncomingMessage): Promise<string> =>

@@ -30,8 +30,8 @@ const makeAuthzService = ({
     const repository = makeInMemoryTupleRepository({ seed: seedTuples });
     const evaluator  = makeGraphEvaluator({ repository });
     const domain     = makeAuthzDomain({ repository, evaluator });
-    const { handler } = makeAuthzHttpHandler({ authz: domain });
-    const { server }  = makeAuthzHttpServer({ handler });
+    const handler = makeAuthzHttpHandler({ authz: domain });
+    const server  = makeAuthzHttpServer({ handler });
 
     return { port, server, domain };
 };

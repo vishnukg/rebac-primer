@@ -94,7 +94,7 @@ const makeDocumentsHttpHandler = ({
         }
     };
 
-    return { handler: handle };
+    return handle;
 };
 
 const requireBody = (body: unknown): Record<string, unknown> => {
