@@ -62,7 +62,7 @@ Go uses named types. A named type has the same underlying representation as its
 base type but is a distinct type at compile time:
 
 ```go
-// go/internal/authz/types.go
+// go/internal/shared/rebac.go
 type Object   string  // "type:id" — e.g. "document:roadmapDocument"
 type Relation string  // "can_edit", "viewer", etc.
 type Subject  string  // Object or a subject-set like "team:platformTeam#member"
@@ -93,7 +93,7 @@ type TupleKey = Readonly<{
 Go:
 
 ```go
-// go/internal/authz/types.go
+// go/internal/shared/rebac.go
 type TupleKey struct {
     Object   Object
     Relation Relation
@@ -112,7 +112,7 @@ by default. Field names in Go are capitalized (exported), which would produce
 control the output:
 
 ```go
-// go/internal/domain/document.go
+// go/internal/documentsservice/core/domain/document.go
 type CollaborativeDocument struct {
     ID        string       `json:"id"`
     Title     string       `json:"title"`
@@ -135,12 +135,12 @@ In Go, a type satisfies an interface if it has all the required methods. There i
 no `implements` keyword. The connection is established at the point of assignment:
 
 ```go
-// go/internal/authz/types.go — the interface, in the authz package
+// go/internal/shared/rebac.go — the interface, in the authz package
 type Authorizer interface {
     Check(ctx context.Context, req CheckRequest) (CheckResult, error)
 }
 
-// go/internal/authz/graph.go — the implementation, same package, no "implements"
+// go/internal/authzservice/adapters/graph/evaluator.go — the implementation, same package, no "implements"
 type GraphAuthorizer struct {
     store TupleReader
 }
@@ -168,7 +168,7 @@ The Go community convention: keep interfaces to one or two methods. The smaller
 the interface, the easier it is to satisfy with a mock in tests.
 
 ```go
-// go/internal/authz/store.go
+// go/internal/authzservice/adapters/db/store.go
 // TupleReader is the only thing GraphAuthorizer depends on.
 // It does not need Write or Delete.
 type TupleReader interface {
@@ -186,7 +186,7 @@ A common Go pattern is to add an assertion at package level so the compiler
 catches missing methods immediately, before any code runs:
 
 ```go
-// go/internal/authz/openfga.go
+// go/internal/authzservice/adapters/openfga/authorizer.go
 var _ Authorizer = (*OpenFGAAuthorizer)(nil)
 ```
 
@@ -227,7 +227,7 @@ async function requireDocument(id: string): Promise<CollaborativeDocument> {
 ```
 
 ```go
-// go/internal/domain/service.go — returns error
+// go/internal/documentsservice/core/domain/service.go — returns error
 func (s *documentService) requireDocument(ctx context.Context, id string) (*CollaborativeDocument, error) {
     doc, err := s.repo.FindByID(ctx, id)
     if err != nil {
@@ -258,7 +258,7 @@ export class DocumentNotFoundError extends Error {
 Go:
 
 ```go
-// go/internal/domain/document.go
+// go/internal/documentsservice/core/domain/document.go
 type DocumentNotFoundError struct {
     ID string
 }
@@ -312,7 +312,7 @@ if (error instanceof ForbiddenError) {
 Go uses `errors.As`:
 
 ```go
-// go/internal/httpserver/handler.go
+// go/internal/documentsservice/adapters/http/handler.go
 func (h *handler) writeError(w http.ResponseWriter, err error) {
     var notFound *domain.DocumentNotFoundError
     if errors.As(err, &notFound) {
@@ -403,7 +403,7 @@ Go has no `new` keyword for custom initialization. The convention is a `New*`
 function that returns a pointer to an initialized struct:
 
 ```go
-// go/internal/authz/store.go
+// go/internal/authzservice/adapters/db/store.go
 func NewInMemoryTupleStore(seed ...TupleKey) *InMemoryTupleStore {
     s := &InMemoryTupleStore{
         tuples: make(map[string]TupleKey, len(seed)),
@@ -431,7 +431,7 @@ authz.NewInMemoryTupleStore(fixtures.SeedRelationshipTuples()...) // spread a sl
 regardless of how it returns — normal return, early return, or panic:
 
 ```go
-// go/internal/authz/store.go
+// go/internal/authzservice/adapters/db/store.go
 func (s *InMemoryTupleStore) Has(object Object, relation Relation, user Subject) bool {
     s.mu.RLock()          // acquire a read lock
     defer s.mu.RUnlock()  // release it when this function exits — guaranteed
@@ -456,7 +456,7 @@ reading and writing a map concurrently causes a data race (undefined behaviour).
 ensuring that writes are exclusive:
 
 ```go
-// go/internal/authz/store.go
+// go/internal/authzservice/adapters/db/store.go
 type InMemoryTupleStore struct {
     mu     sync.RWMutex
     tuples map[string]TupleKey
@@ -480,7 +480,7 @@ TypeScript does not need this because the JavaScript event loop is single-thread
 ### Return the interface, not the concrete type
 
 ```go
-// go/internal/domain/service.go
+// go/internal/documentsservice/core/domain/service.go
 func NewDocumentService(repo DocumentRepository, auth authz.Authorizer) DocumentOperations {
     return &documentService{repo: repo, auth: auth}
 }
@@ -528,7 +528,7 @@ Go does not have `async`/`await`. All I/O runs synchronously in Go goroutines
 first argument so callers can cancel them or attach a deadline:
 
 ```go
-// go/internal/domain/service.go
+// go/internal/documentsservice/core/domain/service.go
 func (s *documentService) Read(ctx context.Context, id string, actor authz.Object) (*CollaborativeDocument, error) {
     doc, err := s.requireDocument(ctx, id)  // passes ctx to the repo
     // ...
@@ -562,7 +562,7 @@ Since Go 1.22, the standard `net/http` `ServeMux` supports method-prefixed path
 patterns and path variables directly:
 
 ```go
-// go/internal/httpserver/server.go
+// go/internal/documentsservice/adapters/http/server.go
 mux := http.NewServeMux()
 mux.HandleFunc("GET /health", h.handleHealth)
 mux.HandleFunc("POST /documents", h.handleCreateDocument)
@@ -573,7 +573,7 @@ mux.HandleFunc("PATCH /documents/{id}", h.handleUpdateDocument)
 Extract path variables with:
 
 ```go
-// go/internal/httpserver/handler.go
+// go/internal/documentsservice/adapters/http/handler.go
 id := r.PathValue("id")
 ```
 
@@ -591,7 +591,7 @@ Test functions follow the Arrange → Act → Assert pattern with explicit comme
 marking each section:
 
 ```go
-// go/internal/authz/graph_test.go
+// go/internal/authzservice/adapters/graph/evaluator_test.go
 func TestGraphAuthorizer_TeamMemberCanEditDocument(t *testing.T) {
     // Arrange: alice is a member of platformTeam, which is an editor of
     // productWorkspace. roadmapDocument lives in productWorkspace.
@@ -634,7 +634,7 @@ line in the helper, not the caller. Mark the helper with `t.Helper()` so the
 failure points at the test:
 
 ```go
-// go/internal/domain/service_test.go
+// go/internal/documentsservice/core/domain/service_test.go
 func newSeededService(t *testing.T) domain.DocumentOperations {
     t.Helper()
     // wires up a full service and pre-creates the roadmap document
@@ -674,7 +674,7 @@ go test -v ./...
 
 ## Try this
 
-Open `go/internal/authz/graph_test.go`.
+Open `go/internal/authzservice/adapters/graph/evaluator_test.go`.
 
 1. Read `TestGraphAuthorizer_TeamMemberCanEditDocument`. Notice the trace is
    printed when the test fails — the same `Trace []string` that the TypeScript
@@ -686,7 +686,7 @@ Open `go/internal/authz/graph_test.go`.
    structure with `// Arrange`, `// Act`, `// Assert` comments.
 
 3. Run it: `make go-test`. Read the trace output and match each line to the
-   expansion rules in `go/internal/authz/graph.go`.
+   expansion rules in `go/internal/authzservice/adapters/graph/evaluator.go`.
 
 ---
 

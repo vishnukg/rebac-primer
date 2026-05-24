@@ -4,8 +4,8 @@ Go ships a testing package in the standard library. No framework required. This
 chapter covers the four patterns that appear in this repo, in order from most
 common to most specialised.
 
-Code references: `go/internal/authz/graph_test.go`, `go/internal/authz/parallel_test.go`,
-`go/internal/authz/middleware_test.go`, `go/internal/authz/result_test.go`.
+Code references: `go/internal/authzservice/adapters/graph/evaluator_test.go`, `go/internal/authzservice/adapters/graph/parallel_test.go`,
+`go/internal/authzservice/adapters/graph/middleware_test.go`, `go/internal/authzservice/adapters/graph/result_test.go`.
 
 ## The testing package basics
 
@@ -38,7 +38,7 @@ go test -v ./internal/authz/...
 Every test in this repo follows the AAA style. The comments are literal:
 
 ```go
-// go/internal/authz/graph_test.go
+// go/internal/authzservice/adapters/graph/evaluator_test.go
 func TestGraphAuthorizer_CaseyIsDenied(t *testing.T) {
     // Arrange: Casey has no tuples in the graph.
     store := seedStore()
@@ -103,7 +103,7 @@ When the same behaviour needs verifying against many inputs, a table-driven test
 is cleaner than N duplicate functions.
 
 ```go
-// go/internal/authz/graph_test.go
+// go/internal/authzservice/adapters/graph/evaluator_test.go
 func TestGraphAuthorizer_PermissionMatrix(t *testing.T) {
     store := seedStore()
     auth := authz.NewGraphAuthorizer(store)
@@ -167,7 +167,7 @@ func BenchmarkName(b *testing.B) { ... }
 ```
 
 ```go
-// go/internal/authz/graph_test.go
+// go/internal/authzservice/adapters/graph/evaluator_test.go
 func BenchmarkGraphAuthorizer_Check(b *testing.B) {
     store := seedStore()
     auth := authz.NewGraphAuthorizer(store)
@@ -213,7 +213,7 @@ func FuzzName(f *testing.F) { ... }
 ```
 
 ```go
-// go/internal/authz/graph_test.go
+// go/internal/authzservice/adapters/graph/evaluator_test.go
 func FuzzParseObject(f *testing.F) {
     // Seed corpus: the fuzzer mutates these inputs.
     f.Add("user:alice")

@@ -34,9 +34,11 @@ domain rules, HTTP mapping, client behavior, and infrastructure adapters:
 
 | Test file | What it teaches |
 |-----------|-----------------|
-| `test/authz.test.ts` | ReBAC helpers and traversal behavior |
+| `test/graphEvaluator.test.ts` | graph traversal through the ReBAC engine |
+| `test/authz.test.ts` | shared `rebac.ts` helper constructors and parsers |
 | `test/documents.test.ts` | business actions enforce authorization |
-| `test/http.test.ts` | HTTP mapping without opening sockets |
+| `test/authzService.test.ts` | AuthZ service HTTP mapping without opening sockets |
+| `test/documentsService.test.ts` | Documents service HTTP mapping without opening sockets |
 | `test/client.test.ts` | client behavior with injected dependencies |
 | `test/authn.test.ts` | bearer-token verification behavior |
 | `test/repository.test.ts` | document repository copy semantics |
@@ -51,7 +53,7 @@ import { describe, expect, it } from "vitest";
 describe("makeGraphEvaluator", () => {
   it("allows alice to edit via team → workspace → document chain", async () => {
     // Arrange
-    const repository = makeInMemoryTupleRepository([...seedPolicyTuples(), docWorkspaceTuple]);
+    const repository = makeInMemoryTupleRepository({ seed: [...seedPolicyTuples(), docWorkspaceTuple] });
     const evaluator  = makeGraphEvaluator({ repository });
 
     // Act
@@ -106,7 +108,7 @@ Example:
 
 ```ts
 // Arrange
-const repository = makeInMemoryTupleRepository([...seedPolicyTuples(), docWorkspaceTuple]);
+const repository = makeInMemoryTupleRepository({ seed: [...seedPolicyTuples(), docWorkspaceTuple] });
 const evaluator  = makeGraphEvaluator({ repository });
 
 // Act

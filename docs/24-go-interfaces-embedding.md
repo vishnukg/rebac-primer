@@ -2,7 +2,7 @@
 
 This chapter covers three ideas that reinforce each other: implicit interface
 satisfaction, struct embedding, and the decorator pattern. All three appear in
-`go/internal/authz/middleware.go`. Read that file alongside this doc.
+`go/internal/authzservice/adapters/graph/middleware.go`. Read that file alongside this doc.
 
 ## Interfaces are satisfied implicitly
 
@@ -38,7 +38,7 @@ Because satisfaction is implicit, it is easy to drift. You rename a method and
 silently stop satisfying an interface. The repo uses this idiom to catch it:
 
 ```go
-// go/internal/authz/middleware.go
+// go/internal/authzservice/adapters/graph/middleware.go
 var _ Authorizer = (*AuditAuthorizer)(nil)
 ```
 
@@ -65,7 +65,7 @@ In Go, a decorator is a struct that holds the inner value and implements the sam
 interface:
 
 ```go
-// go/internal/authz/middleware.go
+// go/internal/authzservice/adapters/graph/middleware.go
 type AuditAuthorizer struct {
     inner  Authorizer
     logger *log.Logger
@@ -114,7 +114,7 @@ a method and an interface instead of a class and `implements`.
 Interfaces can embed other interfaces. `store.go` uses this:
 
 ```go
-// go/internal/authz/store.go
+// go/internal/authzservice/adapters/db/store.go
 type TupleStore interface {
     TupleReader   // embeds
     TupleWriter   // embeds
@@ -132,7 +132,7 @@ Struct embedding is Go's form of composition-as-inheritance. Embed a type and
 its method set is promoted onto the outer struct:
 
 ```go
-// go/internal/authz/middleware.go
+// go/internal/authzservice/adapters/graph/middleware.go
 type ReadOnlyStore struct {
     TupleReader  // embedded interface
 }

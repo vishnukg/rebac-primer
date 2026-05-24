@@ -48,9 +48,9 @@ adapter changes.
 
 ```ts
 // Port — what the domain needs (documents-service/core/ports/authenticator.ts)
-export type Authenticator = {
+export interface Authenticator {
     verifyAccessToken: (header: string | undefined) => Promise<AuthenticatedUser>;
-};
+}
 
 export type AuthenticatedUser = {
     subject: RebacObject<"user">;  // "user:alice"
