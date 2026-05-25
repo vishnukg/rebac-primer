@@ -15,7 +15,7 @@
 package fixtures
 
 import (
-	"rebac-primer/internal/documentsservice/adapters/authn"
+	"rebac-primer/internal/documents/adapters/authn"
 	"rebac-primer/internal/shared"
 )
 

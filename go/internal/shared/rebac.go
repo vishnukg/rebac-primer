@@ -70,26 +70,28 @@ type Subject string
 // TupleKey is one edge in the relationship graph:
 //
 //	(object, relation, user)  →  "team:platform has member user:alice"
+//
+// JSON tags use lowercase to match the TypeScript wire format.
 type TupleKey struct {
-	Object   Object
-	Relation Relation
-	User     Subject
+	Object   Object   `json:"object"`
+	Relation Relation `json:"relation"`
+	User     Subject  `json:"user"`
 }
 
 // ── Check types ───────────────────────────────────────────────────────────────
 
 // CheckRequest asks "does User have Relation on Object?"
 type CheckRequest struct {
-	User     Object
-	Relation Relation
-	Object   Object
+	User     Object   `json:"user"`
+	Relation Relation `json:"relation"`
+	Object   Object   `json:"object"`
 }
 
 // CheckResult is the answer to a CheckRequest.
 // Trace is an ordered log of the traversal steps — useful for debugging.
 type CheckResult struct {
-	Allowed bool
-	Trace   []string
+	Allowed bool     `json:"allowed"`
+	Trace   []string `json:"trace"`
 }
 
 // ── Constructor helpers ───────────────────────────────────────────────────────

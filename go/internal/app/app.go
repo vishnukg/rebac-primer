@@ -1,10 +1,17 @@
-// Package app is the composition root.  It wires together the authz service,
-// documents service, and HTTP layer and seeds the store with demo data.
+// Package app is the composition root.  It wires together every concrete type
+// and returns an [App] holding the fully-configured HTTP handler.
 //
-// This is the single place in the codebase that knows every concrete type.
+// This is the single place in the codebase that knows about concrete adapters.
 // Everything else depends only on interfaces (ports).
 //
-// Mirrors the TypeScript compose.ts files in each service directory.
+// Wiring order (mirrors the TypeScript compose.ts files in each service):
+//
+//  1. Authz service:   tuple store → graph evaluator → authz.New()
+//  2. Documents service: repo + token verifier + authz service → documents.New()
+//  3. HTTP layer:      documents server wraps the domain
+//
+// Mirrors typescript/src/authz-service/compose.ts
+// and   typescript/src/documents-service/compose.ts.
 package app
 
 import (
@@ -14,13 +21,13 @@ import (
 	"os"
 	"strconv"
 
-	authzdb "rebac-primer/internal/authzservice/adapters/db"
-	"rebac-primer/internal/authzservice/adapters/graph"
-	authzdomain "rebac-primer/internal/authzservice/core/domain"
-	docsauthn "rebac-primer/internal/documentsservice/adapters/authn"
-	docsdb "rebac-primer/internal/documentsservice/adapters/db"
-	docshttp "rebac-primer/internal/documentsservice/adapters/http"
-	docsdomain "rebac-primer/internal/documentsservice/core/domain"
+	"rebac-primer/internal/authz"
+	authzdb "rebac-primer/internal/authz/adapters/db"
+	"rebac-primer/internal/authz/adapters/graph"
+	"rebac-primer/internal/documents"
+	docsauthn "rebac-primer/internal/documents/adapters/authn"
+	docsdb "rebac-primer/internal/documents/adapters/db"
+	docshttp "rebac-primer/internal/documents/adapters/http"
 	"rebac-primer/internal/fixtures"
 )
 
@@ -61,35 +68,34 @@ func New(ctx context.Context) (*App, error) {
 }
 
 // NewWithConfig creates and seeds the application with explicit configuration.
-//
-// Wiring order mirrors the TypeScript compose.ts files:
-//  1. Authz service: tuple store → graph evaluator → authz domain
-//  2. Documents service: repo + authn + authz domain as AuthzClient → documents domain
-//  3. HTTP server wraps the documents domain
 func NewWithConfig(ctx context.Context, cfg Config) (*App, error) {
 	// ── Authz service ──────────────────────────────────────────────────────────
 	// adapter: in-memory tuple store, pre-seeded with fixture relationships
 	tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
 
-	// adapter: in-process graph evaluator
+	// adapter: in-process graph evaluator (driven port: authz.Evaluator)
 	evaluator := graph.NewGraphEvaluator(tupleStore)
 
-	// domain: wire repository + evaluator into the AuthzService
-	authzSvc := authzdomain.New(tupleStore, evaluator)
+	// domain: wire store + evaluator into the authz.Service driving port
+	authzSvc := authz.New(tupleStore, evaluator)
 
 	// ── Documents service ──────────────────────────────────────────────────────
-	// adapter: in-memory document repository
+	// adapter: in-memory document repository (driven port: documents.DocumentRepository)
 	docRepo := docsdb.New()
 
-	// adapter: demo token verifier (AuthzService satisfies AuthzClient structurally)
+	// adapter: demo token verifier (driven port: documents.Authenticator)
 	tokenVerifier := docsauthn.New(fixtures.DemoTokens())
 
-	// domain: authzSvc satisfies ports.AuthzClient via Go structural typing
-	// (it has Check and WriteTuples with matching signatures)
-	docs := docsdomain.New(docRepo, authzSvc)
+	// domain: authzSvc satisfies documents.AuthzClient via Go structural typing
+	// (it has Check and WriteTuples with the same signatures).
+	//
+	// In a distributed deployment, swap authzSvc for an HTTP client:
+	//   authzclient.NewClient("http://127.0.0.1:4100")
+	// Domain code is unchanged — only this wiring line differs.
+	docsSvc := documents.New(docRepo, authzSvc)
 
 	// seed demo document
-	_, err := docs.Create(ctx, docsdomain.CreateDocumentInput{
+	_, err := docsSvc.Create(ctx, documents.CreateDocumentInput{
 		ID:        "roadmapDocument",
 		Title:     "Roadmap",
 		Body:      "Initial roadmap document",
@@ -101,7 +107,8 @@ func NewWithConfig(ctx context.Context, cfg Config) (*App, error) {
 	}
 
 	// ── HTTP layer ─────────────────────────────────────────────────────────────
-	httpHandler := docshttp.NewServer(tokenVerifier, docs)
+	// driving adapter: HTTP server wraps the documents domain
+	httpHandler := docshttp.NewServer(tokenVerifier, docsSvc)
 
 	return &App{Handler: httpHandler, Port: cfg.Port}, nil
 }
