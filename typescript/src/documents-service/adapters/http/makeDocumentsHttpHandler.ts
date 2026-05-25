@@ -42,7 +42,7 @@ type DocumentsHttpHandlerCfg = {
 const makeDocumentsHttpHandler = ({
     authenticator,
     documents,
-}: DocumentsHttpHandlerCfg) => {
+}: DocumentsHttpHandlerCfg): DocumentsHttpHandler => {
     const handle: DocumentsHttpHandler = async request => {
         try {
             if (request.method === "GET" && request.path === "/health") {

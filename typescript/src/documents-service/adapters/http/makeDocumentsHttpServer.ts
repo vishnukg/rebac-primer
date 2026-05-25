@@ -1,11 +1,11 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { DocumentsHttpHandler } from "./makeDocumentsHttpHandler.ts";
 
 type DocumentsHttpServerCfg = {
     handler: DocumentsHttpHandler;
 };
 
-const makeDocumentsHttpServer = ({ handler }: DocumentsHttpServerCfg) => {
+const makeDocumentsHttpServer = ({ handler }: DocumentsHttpServerCfg): Server => {
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
         const url    = new URL(req.url ?? "/", `http://localhost`);
         const body   = await readBody(req);

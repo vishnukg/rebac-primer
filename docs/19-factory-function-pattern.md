@@ -153,12 +153,33 @@ const create = makeCreateDocument({ repository, authzClient });
 const create = makeCreateDocument(repository, authzClient);
 ```
 
-**`make` functions return the thing itself.** Whatever the factory builds
-— a port implementation, a handler function, a server — that value is
-returned directly. No wrapper object around it:
+**`make` functions always carry an explicit return type annotation.**
+The annotation names the port or type the factory builds. This is the
+clearest signal that the function returns one thing:
 
 ```ts
-// make* returns the thing itself
+const makeGraphEvaluator   = ({ repository }: ...): Evaluator          => { ... }
+const makeAuthzDomain      = ({ repository, evaluator }: ...): AuthzService    => { ... }
+const makeAuthzHttpHandler = ({ authz }: ...): AuthzHttpHandler        => { ... }
+const makeAuthzHttpServer  = ({ handler }: ...): Server                => { ... }
+const makeCreateDocument   = ({ repository, authzClient }: ...): CreateDocumentFn => { ... }
+```
+
+The return statement may look like an object literal with multiple keys —
+but those keys are the *methods of a single interface*, not independent
+peers. The return type annotation is what makes that explicit:
+
+```ts
+// The object literal IS the AuthzService — the type annotation proves it.
+const makeAuthzDomain = (...): AuthzService => {
+    return { check, writeTuples, deleteTuples, listTuples };
+};
+```
+
+Returning the value directly (no wrapper) means the variable at the call
+site names the thing, and the function name already tells you what it makes:
+
+```ts
 const repository = makeInMemoryTupleRepository({ seed: seedTuples });
 const evaluator  = makeGraphEvaluator({ repository });
 const domain     = makeAuthzDomain({ repository, evaluator });
@@ -166,28 +187,25 @@ const handler    = makeAuthzHttpHandler({ authz: domain });
 const server     = makeAuthzHttpServer({ handler });
 ```
 
-The variable name at the call site names the thing. The function name already
-tells you what it makes. There is no value in re-wrapping as `{ handler }` or
-`{ server }` — that just forces the caller to destructure a single key for no
-gain.
-
-**`compose` functions return a bag.** A composition root wires several peers
-together and its callers often need more than one of them. A named object is
-the right return shape:
+**`compose` functions have no return type annotation** — because no named
+type exists for the bag they return. That absence is itself a signal:
+these functions wire together independent peers, not a single interface.
+The returned bag exists purely for the caller's convenience:
 
 ```ts
-// compose* returns a bag of peers
-const composeAuthzService = ({ port, seedTuples }) => {
+// No return type annotation — the bag has no name.
+const composeAuthzService = ({ port?, seedTuples? } = {}) => {
     // ...wiring...
-    return { port, server, domain };   // callers pick what they need
+    return { listen, domain };   // independent peers; callers pick what they need
 };
-
-const { server, domain, port } = composeAuthzService({ seedTuples });
 ```
 
-The rule of thumb: if the factory builds exactly one thing, return that
-thing. If it assembles multiple peers that callers may need independently,
-return a named object.
+The rule of thumb:
+
+| Prefix | Has return type annotation? | Returns |
+|---|---|---|
+| `make*` | ✓ always | the thing itself — one named type |
+| `compose*` | ✗ never | a bag of independent peers |
 
 ## Where this lives in the repo
 
@@ -241,11 +259,13 @@ separates wiring from execution.
 Also explain why the file is named `compose.ts` and the function is named
 `composeAuthzService` rather than `makeAuthzService`:
 
-Good answer: `make*` functions build one thing and return it directly.
-`compose*` functions wire multiple independent peers together and return a
-named bag so callers can pick what they need. The `compose.ts` file is the
-composition root — the one place in the codebase that knows which concrete
-adapter goes behind each port.
+Good answer: `make*` functions build one thing and return it directly —
+they always have an explicit return type annotation naming the port or type
+they produce. `compose*` functions wire multiple independent peers together,
+return a named bag, and carry no return type annotation (because no single
+named type covers the bag). The `compose.ts` file is the composition root —
+the one place in the codebase that knows which concrete adapter goes behind
+each port.
 
 ## Further reading
 

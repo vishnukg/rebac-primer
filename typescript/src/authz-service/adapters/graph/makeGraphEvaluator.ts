@@ -19,6 +19,7 @@ import type {
 } from "../../../shared/rebac.ts";
 import type { TupleRepository } from "../../core/ports/tupleRepository.ts";
 import { DOCUMENT_RULES, TEAM_RULES, WORKSPACE_RULES, type ImpliedBy } from "./permissionModel.ts";
+import type { Evaluator } from "../../core/ports/evaluator.ts";
 
 type GraphEvaluatorCfg = {
     repository: TupleRepository;
@@ -27,7 +28,7 @@ type GraphEvaluatorCfg = {
 // Tracks (object#relation) pairs currently on the call stack — prevents cycles.
 type VisitKey = `${RebacObject}#${Relation}`;
 
-const makeGraphEvaluator = ({ repository }: GraphEvaluatorCfg) => {
+const makeGraphEvaluator = ({ repository }: GraphEvaluatorCfg): Evaluator => {
     const evaluate = async (request: CheckRequest): Promise<CheckResult> => {
         const trace = [
             `Check whether ${request.user} has ${request.relation} on ${request.object}`,

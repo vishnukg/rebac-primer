@@ -9,7 +9,7 @@ type UpdateDocumentCfg = {
     authzClient: AuthzClient;
 };
 
-const makeUpdateDocument = ({ repository, authzClient }: UpdateDocumentCfg) => {
+const makeUpdateDocument = ({ repository, authzClient }: UpdateDocumentCfg): UpdateDocumentFn => {
     const update: UpdateDocumentFn = async ({ id, body, actor }) => {
         const existing = await repository.findById(id);
         if (!existing) throw DocumentNotFoundError(id);

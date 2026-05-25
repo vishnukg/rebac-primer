@@ -35,7 +35,7 @@ type AuthzHttpHandlerCfg = {
     authz: AuthzService;
 };
 
-const makeAuthzHttpHandler = ({ authz }: AuthzHttpHandlerCfg) => {
+const makeAuthzHttpHandler = ({ authz }: AuthzHttpHandlerCfg): AuthzHttpHandler => {
     const handle: AuthzHttpHandler = async request => {
         try {
             // ── Health ────────────────────────────────────────────────────────

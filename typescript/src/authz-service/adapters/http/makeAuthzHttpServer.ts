@@ -1,11 +1,11 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AuthzHttpHandler } from "./makeAuthzHttpHandler.ts";
 
 type AuthzHttpServerCfg = {
     handler: AuthzHttpHandler;
 };
 
-const makeAuthzHttpServer = ({ handler }: AuthzHttpServerCfg) => {
+const makeAuthzHttpServer = ({ handler }: AuthzHttpServerCfg): Server => {
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
         const url    = new URL(req.url ?? "/", `http://localhost`);
         const body   = await readBody(req);
