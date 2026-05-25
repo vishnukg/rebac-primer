@@ -193,7 +193,7 @@ Concrete examples:
 - `makeAuthzServiceClient` is the HTTP AuthZ implementation.
 - `makeInMemoryDocumentRepository` implements `DocumentRepository`.
 - `makeDocumentsServer` wires document domain to the HTTP server.
-- `makeCliApp` wires the terminal client to the HTTP client.
+- `composeCliApp` wires the terminal client to the HTTP client.
 - HTTP handlers depend on `Documents`, not document implementation details.
 
 The rule is simple:

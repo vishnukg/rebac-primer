@@ -54,7 +54,7 @@ const makeCreateDocument = ({ repository, authzClient }: CreateDocumentCfg) => {
         return doc;
     };
 
-    return { create };
+    return create;
 };
 
 export default makeCreateDocument;

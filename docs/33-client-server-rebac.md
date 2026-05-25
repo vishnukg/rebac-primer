@@ -157,29 +157,29 @@ client -> documents :4000 -> Documents -> AuthzClient -> authz :4100 -> graph
 The executable files stay intentionally thin:
 
 ```text
-src/authz-service/index.ts     -> makeAuthzService(), then listen()
-src/documents-service/index.ts -> makeDocumentsService(), then listen()
-src/cli/index.ts               -> makeCliApp(), then run()
+src/authz-service/index.ts     -> composeAuthzService(), then listen()
+src/documents-service/index.ts -> composeDocumentsService(), then listen()
+src/cli/index.ts               -> composeCliApp(), then run()
 go/cmd/server/main.go          -> app.New(), then ListenAndServe()
 ```
 
 The object graphs are assembled in the composition roots:
 
 ```text
-makeAuthzService (authz-service/compose.ts)
+composeAuthzService (authz-service/compose.ts)
   -> makeInMemoryTupleRepository (seeded with policy tuples)
   -> makeGraphEvaluator
   -> makeAuthzDomain
   -> makeAuthzHttpHandler + makeAuthzHttpServer
 
-makeDocumentsService (documents-service/compose.ts)
+composeDocumentsService (documents-service/compose.ts)
   -> makeAuthzServiceClient (HTTP to authz :4100)
   -> makeDemoTokenVerifier
   -> makeInMemoryDocumentRepository
   -> makeDocuments
   -> makeDocumentsHttpHandler + makeDocumentsHttpServer
 
-makeCliApp (cli/compose.ts)
+composeCliApp (cli/compose.ts)
   -> makeHttpDocumentsClient
   -> Node readline terminal
   -> makeTerminalClient

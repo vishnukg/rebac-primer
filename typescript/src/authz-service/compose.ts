@@ -23,7 +23,7 @@ type AuthzServiceCfg = {
     seedTuples?:  import("../shared/rebac.ts").TupleKey[];
 };
 
-const makeAuthzService = ({
+const composeAuthzService = ({
     port        = readPort(process.env.AUTHZ_PORT, 4100),
     seedTuples  = [],
 }: AuthzServiceCfg = {}) => {
@@ -33,7 +33,11 @@ const makeAuthzService = ({
     const handler = makeAuthzHttpHandler({ authz: domain });
     const server  = makeAuthzHttpServer({ handler });
 
-    return { port, server, domain };
+    const listen = (onReady: (port: number) => void) => {
+        server.listen(port, "127.0.0.1", () => onReady(port));
+    };
+
+    return { listen, domain };
 };
 
 const readPort = (value: string | undefined, fallback: number): number => {
@@ -43,4 +47,4 @@ const readPort = (value: string | undefined, fallback: number): number => {
     return p;
 };
 
-export default makeAuthzService;
+export default composeAuthzService;

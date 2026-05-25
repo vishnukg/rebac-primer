@@ -26,7 +26,7 @@ const makeUpdateDocument = ({ repository, authzClient }: UpdateDocumentCfg) => {
         return updated;
     };
 
-    return { update };
+    return update;
 };
 
 export default makeUpdateDocument;

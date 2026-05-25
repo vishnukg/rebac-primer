@@ -11,13 +11,13 @@
 //
 // Port: DOCUMENTS_PORT (default 4000)
 
-import makeDocumentsService from "./compose.ts";
+import composeDocumentsService from "./compose.ts";
 import { demoTokens } from "../../test/fixtures.ts";
 
-const documents = makeDocumentsService({ tokens: demoTokens });
+const { listen, documents } = composeDocumentsService({ tokens: demoTokens });
 
-documents.server.listen(documents.port, "127.0.0.1", async () => {
-    console.log(`Documents service → http://127.0.0.1:${documents.port}`);
+listen(async port => {
+    console.log(`Documents service → http://127.0.0.1:${port}`);
     console.log(`  GET   /whoami`);
     console.log(`  POST  /documents`);
     console.log(`  GET   /documents/:id`);
@@ -26,7 +26,7 @@ documents.server.listen(documents.port, "127.0.0.1", async () => {
     // Seed a demo document so the server is ready to explore immediately.
     // This write goes: domain.create → authz.check → repo.save → authz.writeTuples
     try {
-        await documents.documents.create({
+        await documents.create({
             id:        "roadmapDocument",
             title:     "Roadmap",
             body:      "Initial roadmap document",

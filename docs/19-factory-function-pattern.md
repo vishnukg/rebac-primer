@@ -43,7 +43,7 @@ closure. The returned operation is called **once per request** at runtime.
 
 ```ts
 // Startup — called once in compose.ts
-const { create } = makeCreateDocument({ repository, authzClient });
+const create = makeCreateDocument({ repository, authzClient });
 
 // Runtime — called once per HTTP POST /documents
 await create({ id, title, body, workspace, actor });
@@ -80,7 +80,7 @@ const makeCreateDocument = ({ repository, authzClient }: CreateDocumentCfg) => {
     const create: CreateDocumentFn = async input => {
         // repository and authzClient captured in closure — no this
     };
-    return { create };
+    return create;
 };
 ```
 
@@ -99,7 +99,7 @@ framework, no class instantiation. The factory is just a function call.
 
 ```ts
 // In a test — wire it directly
-const { create } = makeCreateDocument({
+const create = makeCreateDocument({
     repository:  makeInMemoryDocumentRepository(),
     authzClient: makeInProcessAuthzClient(seedPolicyTuples()),
 });
@@ -177,12 +177,12 @@ the right return shape:
 
 ```ts
 // compose* returns a bag of peers
-const makeAuthzService = ({ port, seedTuples }) => {
+const composeAuthzService = ({ port, seedTuples }) => {
     // ...wiring...
     return { port, server, domain };   // callers pick what they need
 };
 
-const { server, domain, port } = makeAuthzService({ seedTuples });
+const { server, domain, port } = composeAuthzService({ seedTuples });
 ```
 
 The rule of thumb: if the factory builds exactly one thing, return that
@@ -227,15 +227,25 @@ Explain this in one sentence:
 
 ```ts
 // compose.ts
-const { create } = makeCreateDocument({ repository, authzClient });
+const create = makeCreateDocument({ repository, authzClient });
 
 // HTTP handler
 await create({ id, title, body, workspace, actor });
 ```
 
 Good answer: `makeCreateDocument` captures the infrastructure dependencies
-once at startup; `create` is called once per request with only the runtime
-data it needs. The closure separates wiring from execution.
+once at startup and returns the `create` function directly; `create` is then
+called once per request with only the runtime data it needs. The closure
+separates wiring from execution.
+
+Also explain why the file is named `compose.ts` and the function is named
+`composeAuthzService` rather than `makeAuthzService`:
+
+Good answer: `make*` functions build one thing and return it directly.
+`compose*` functions wire multiple independent peers together and return a
+named bag so callers can pick what they need. The `compose.ts` file is the
+composition root — the one place in the codebase that knows which concrete
+adapter goes behind each port.
 
 ## Further reading
 

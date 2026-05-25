@@ -24,7 +24,7 @@ const makeReadDocument = ({ repository, authzClient }: ReadDocumentCfg) => {
         return doc;
     };
 
-    return { read };
+    return read;
 };
 
 export default makeReadDocument;

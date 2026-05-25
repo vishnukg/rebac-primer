@@ -289,7 +289,7 @@ This is fine for an application entrypoint:
 
 ```ts
 // src/authz-service/index.ts
-const authz = makeAuthzService({ seedTuples: seedPolicyTuples() });
+const authz = composeAuthzService({ seedTuples: seedPolicyTuples() });
 authz.server.listen(authz.port, "127.0.0.1", () => { /* log */ });
 ```
 

@@ -1,9 +1,4 @@
-import makeCliApp from "./compose.ts";
+import composeCliApp from "./compose.ts";
 
-const app = makeCliApp();
-
-try {
-  await app.run();
-} finally {
-  app.terminal.close();
-}
+const { run } = composeCliApp();
+await run();

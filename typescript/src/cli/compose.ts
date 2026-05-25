@@ -7,7 +7,7 @@ type CliAppCfg = {
     env?: NodeJS.ProcessEnv;
 };
 
-const makeCliApp = ({ env = process.env }: CliAppCfg = {}) => {
+const composeCliApp = ({ env = process.env }: CliAppCfg = {}) => {
     const terminal = createInterface({ input, output });
     const client   = makeHttpDocumentsClient({
         baseUrl: env.REBAC_API_URL ?? "http://127.0.0.1:4000",
@@ -18,10 +18,15 @@ const makeCliApp = ({ env = process.env }: CliAppCfg = {}) => {
         write: message => console.log(message),
     });
 
-    return {
-        terminal,
-        run: terminalClient.run,
+    const run = async () => {
+        try {
+            await terminalClient.run();
+        } finally {
+            terminal.close();
+        }
     };
+
+    return { run };
 };
 
-export default makeCliApp;
+export default composeCliApp;

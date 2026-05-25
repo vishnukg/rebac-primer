@@ -23,7 +23,7 @@ type DocumentsServiceCfg = {
     tokens?:   Record<string, { sub: string; scopes: string[] }>;
 };
 
-const makeDocumentsService = ({
+const composeDocumentsService = ({
     port     = readPort(process.env.DOCUMENTS_PORT, 4000),
     authzUrl = process.env.AUTHZ_URL ?? "http://127.0.0.1:4100",
     tokens   = {},
@@ -35,7 +35,11 @@ const makeDocumentsService = ({
     const handler = makeDocumentsHttpHandler({ authenticator, documents });
     const server  = makeDocumentsHttpServer({ handler });
 
-    return { port, server, documents };
+    const listen = (onReady: (port: number) => void | Promise<void>) => {
+        server.listen(port, "127.0.0.1", () => void onReady(port));
+    };
+
+    return { listen, documents };
 };
 
 const readPort = (value: string | undefined, fallback: number): number => {
@@ -45,4 +49,4 @@ const readPort = (value: string | undefined, fallback: number): number => {
     return p;
 };
 
-export default makeDocumentsService;
+export default composeDocumentsService;
