@@ -99,10 +99,12 @@ framework, no class instantiation. The factory is just a function call.
 
 ```ts
 // In a test — wire it directly
-const create = makeCreateDocument({
+const documents = makeDocuments({
     repository:  makeInMemoryDocumentRepository(),
     authzClient: makeInProcessAuthzClient(seedPolicyTuples()),
 });
+
+await documents.create({ id, title, body, workspace, actor });
 ```
 
 ## Connection to functional programming

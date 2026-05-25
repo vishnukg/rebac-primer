@@ -35,8 +35,13 @@ const composeDocumentsService = ({
     const handler = makeDocumentsHttpHandler({ authenticator, documents });
     const server  = makeDocumentsHttpServer({ handler });
 
-    const listen = (onReady: (port: number) => void | Promise<void>) => {
-        server.listen(port, "127.0.0.1", () => void onReady(port));
+    const listen = (onReady: (port: number) => Promise<void>) => {
+        server.listen(port, "127.0.0.1", () => {
+            onReady(port).catch(err => {
+                console.error("Startup error:", err);
+                process.exit(1);
+            });
+        });
     };
 
     return { listen, documents };
