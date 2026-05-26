@@ -1,7 +1,7 @@
 # Go generics: type parameters, constraints, and why they are worth it
 
 Generics landed in Go 1.18. The syntax is deliberate and minimal. This chapter
-grounds every concept in `go/internal/authzservice/adapters/graph/result.go`, which you can read and
+grounds every concept in `go/internal/authz/adapters/graph/result.go`, which you can read and
 run right now.
 
 ## The problem generics solve here
@@ -27,7 +27,7 @@ error handling — it demonstrates generics in a real context.
 ## Declaring a generic type
 
 ```go
-// go/internal/authzservice/adapters/graph/result.go
+// go/internal/authz/adapters/graph/result.go
 type Result[T any] struct {
     value T
     err   error
@@ -70,7 +70,7 @@ need `comparable` instead of `any`.
 ## Generic constructors
 
 ```go
-// go/internal/authzservice/adapters/graph/result.go
+// go/internal/authz/adapters/graph/result.go
 func OK[T any](v T) Result[T] {
     return Result[T]{value: v, ok: true}
 }
@@ -97,7 +97,7 @@ TypeScript.
 ## Generic functions (not methods)
 
 ```go
-// go/internal/authzservice/adapters/graph/result.go
+// go/internal/authz/adapters/graph/result.go
 func Map[T, U any](r Result[T], f func(T) U) Result[U] {
     if !r.ok {
         return Fail[U](r.err)
@@ -118,7 +118,7 @@ can write `result.map(f)` fluently; in Go you write `authz.Map(r, f)`.
 ## `Collect` — the Promise.all of Go generics
 
 ```go
-// go/internal/authzservice/adapters/graph/result.go
+// go/internal/authz/adapters/graph/result.go
 func Collect[T any](results []Result[T]) Result[[]T] {
     out := make([]T, 0, len(results))
     for _, r := range results {

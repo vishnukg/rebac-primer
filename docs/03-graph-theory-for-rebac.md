@@ -451,7 +451,11 @@ A -> B -> C -> A
 Cycles can happen in relationship graphs. A traversal algorithm must avoid
 walking forever.
 
-This repo's `makeGraphEvaluator` keeps a `visited` set:
+Both implementations keep a `visited` set that records every `(object, relation)`
+pair already evaluated in this request. If the same pair is seen again, the branch
+stops immediately.
+
+TypeScript (`makeGraphEvaluator.ts`):
 
 ```ts
 const visitKey: VisitKey = `${object}#${relation}`;
@@ -461,7 +465,19 @@ if (visited.has(visitKey)) {
 visited.add(visitKey);
 ```
 
-That is basic cycle protection.
+Go (`evaluator.go`):
+
+```go
+visitKey := fmt.Sprintf("%s#%s", object, relation)
+if visited[visitKey] {
+    return false
+}
+visited[visitKey] = true
+```
+
+That is basic cycle protection. The key format — `"document:roadmapDocument#viewer"` —
+intentionally omits the user. If a path from `(object, relation)` cannot reach the
+user, it will not reach them through the same node a second time.
 
 ## Depth and complexity
 
@@ -538,6 +554,18 @@ Can Casey read the roadmap document?
 ```
 
 Do not run the tests first. Predict from the graph.
+
+## Going deeper: the Go implementation
+
+If you want to see how these graph concepts map line-by-line to running code,
+read `docs/27-graph-evaluator-walkthrough.md`.
+
+It walks through the complete `alice / can_edit / roadmapDocument` check step
+by step — every recursive call, every visited-set lookup, every subject-set
+resolution — against the actual Go evaluator source.
+
+No graph theory experience required; the walkthrough is designed for readers
+coming from this chapter.
 
 ## Checkpoint
 

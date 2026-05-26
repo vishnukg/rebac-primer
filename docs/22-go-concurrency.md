@@ -1,7 +1,7 @@
 # Go concurrency: goroutines, channels, and WaitGroups
 
 Go's concurrency model is famously simple to write and famously easy to get wrong.
-This chapter grounds every concept in `go/internal/authzservice/adapters/graph/parallel.go`, which you
+This chapter grounds every concept in `go/internal/authz/adapters/graph/parallel.go`, which you
 can run right now.
 
 ## The problem concurrency solves here
@@ -47,7 +47,7 @@ ch := make(chan int, 5)  // buffered: first 5 sends do not block
 relations (`parallel.go:32`):
 
 ```go
-// go/internal/authzservice/adapters/graph/parallel.go
+// go/internal/authz/adapters/graph/parallel.go
 ch := make(chan outcome, len(relations))
 ```
 
@@ -100,7 +100,7 @@ but the explicit argument form is still the clearer idiom — it documents inten
 `BulkCheck` uses `sync.WaitGroup` instead of a channel (`parallel.go:60`):
 
 ```go
-// go/internal/authzservice/adapters/graph/parallel.go
+// go/internal/authz/adapters/graph/parallel.go
 func BulkCheck(ctx context.Context, auth Authorizer, reqs []CheckRequest) []BulkResult {
     results := make([]BulkResult, len(reqs))
     var wg sync.WaitGroup
@@ -149,7 +149,7 @@ Both functions accept a `context.Context` as their first parameter. Context
 carries a cancellation signal — when the caller cancels, goroutines that check
 `ctx.Done()` can stop early.
 
-`GraphAuthorizer.Check` currently ignores the context (it is an in-memory
+`GraphEvaluator.Evaluate` currently ignores the context (it is an in-memory
 traversal, so cancellation is not worth the complexity). A real network call
 would pass `ctx` to the HTTP client and abort automatically. The interface
 requires the parameter so swapping in the real OpenFGA client later needs no
@@ -157,7 +157,7 @@ changes at the call site.
 
 ```go
 // context.Background() in tests means "never cancel"
-result, err := auth.Check(context.Background(), req)
+result, err := ev.Evaluate(context.Background(), req)
 ```
 
 ## `select`: waiting on multiple channels

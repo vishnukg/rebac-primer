@@ -2,15 +2,15 @@
 
 This chapter covers three ideas that reinforce each other: implicit interface
 satisfaction, struct embedding, and the decorator pattern. All three appear in
-`go/internal/authzservice/adapters/graph/middleware.go`. Read that file alongside this doc.
+`go/internal/authz/adapters/graph/middleware.go`. Read that file alongside this doc.
 
 ## Interfaces are satisfied implicitly
 
 In TypeScript, you declare that a class implements an interface:
 
 ```ts
-class AuditAuthorizer implements Authorizer {
-    check(req: CheckRequest): Promise<CheckResult> { ... }
+class AuditEvaluator implements Evaluator {
+    evaluate(req: CheckRequest): Promise<CheckResult> { ... }
 }
 ```
 
@@ -18,15 +18,15 @@ In Go, you never write `implements`. If a type has all the methods the interface
 requires, it satisfies the interface — automatically, silently, and for free:
 
 ```go
-// AuditAuthorizer has a Check method with the right signature.
-// It satisfies Authorizer without any declaration.
-func (a *AuditAuthorizer) Check(ctx context.Context, req CheckRequest) (CheckResult, error) { ... }
+// AuditEvaluator has an Evaluate method with the right signature.
+// It satisfies the Checker interface without any declaration.
+func (a *AuditEvaluator) Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error) { ... }
 ```
 
 This is implicit interface satisfaction, and it matters:
 
-1. **Decoupling**: `AuditAuthorizer` can live in a different package from
-   `Authorizer`. It does not import the interface definition; the interface is
+1. **Decoupling**: `AuditEvaluator` can live in a different package from
+   `Checker`. It does not import the interface definition; the interface is
    satisfied by shape.
 2. **Retroactive satisfaction**: you can make an existing type satisfy a new
    interface without touching the type.
@@ -38,12 +38,12 @@ Because satisfaction is implicit, it is easy to drift. You rename a method and
 silently stop satisfying an interface. The repo uses this idiom to catch it:
 
 ```go
-// go/internal/authzservice/adapters/graph/middleware.go
-var _ Authorizer = (*AuditAuthorizer)(nil)
+// go/internal/authz/adapters/graph/middleware.go
+var _ Checker = (*AuditEvaluator)(nil)
 ```
 
-This line assigns a nil `*AuditAuthorizer` to the blank identifier `_` typed as
-`Authorizer`. If the method set does not match, the compiler rejects it here
+This line assigns a nil `*AuditEvaluator` to the blank identifier `_` typed as
+`Checker`. If the method set does not match, the compiler rejects it here
 rather than at the distant call site. Think of it as a standing unit test for
 your interface contract.
 
@@ -56,50 +56,53 @@ evaluates the types without generating code.
 A decorator wraps a value, intercepts calls, and adds behaviour around them:
 
 ```
-caller → AuditAuthorizer.Check → GraphAuthorizer.Check → result
-                              ↑
-                     writes audit log here
+caller → AuditEvaluator.Evaluate → GraphEvaluator.Evaluate → result
+                                ↑
+                       writes audit log here
 ```
 
 In Go, a decorator is a struct that holds the inner value and implements the same
 interface:
 
 ```go
-// go/internal/authzservice/adapters/graph/middleware.go
-type AuditAuthorizer struct {
-    inner  Authorizer
+// go/internal/authz/adapters/graph/middleware.go
+//
+// Checker is a local alias for authz.Evaluator — the interface that both
+// GraphEvaluator and AuditEvaluator satisfy.
+type AuditEvaluator struct {
+    inner  Checker
     logger *log.Logger
 }
 
-func (a *AuditAuthorizer) Check(ctx context.Context, req CheckRequest) (CheckResult, error) {
+func (a *AuditEvaluator) Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
     start := time.Now()
-    result, err := a.inner.Check(ctx, req)
+    result, err := a.inner.Evaluate(ctx, req)
     // ... log outcome ...
     return result, err
 }
 ```
 
-The key: `AuditAuthorizer.inner` is an `Authorizer` interface, not a concrete
-type. You can wrap `GraphAuthorizer`, `OpenFGAAuthorizer`, or another
-`AuditAuthorizer`. The decorators compose without knowing each other's types.
+The key: `AuditEvaluator.inner` is a `Checker` interface, not a concrete
+type. You can wrap `GraphEvaluator`, an OpenFGA evaluator, or another
+`AuditEvaluator`. The decorators compose without knowing each other's types.
 
-In `app.go` (the composition root), wiring one in is one line:
+In `cmd/server/main.go` (the composition root), wiring one in is one line:
 
 ```go
-authorizer := authz.NewAuditAuthorizer(authz.NewGraphAuthorizer(tupleStore), os.Stderr)
+evaluator := graph.NewAuditEvaluator(graph.NewGraphEvaluator(tupleStore), os.Stderr)
 ```
 
-Nothing else changes. `DocumentService` depends on `Authorizer` and will never
-know an audit layer was added. That separation — "what the service needs" from
-"how it is implemented" — is the payoff of interface-based dependency injection.
+Nothing else changes. `documents.Service` depends on `authz.AuthzClient` and will
+never know an audit layer was added. That separation — "what the service needs"
+from "how it is implemented" — is the payoff of interface-based dependency injection.
 
 Compare with TypeScript middleware:
 
 ```ts
-class AuditAuthorizer implements Authorizer {
-    constructor(private inner: Authorizer, private log: Logger) {}
-    async check(req: CheckRequest): Promise<CheckResult> {
-        const result = await this.inner.check(req);
+class AuditEvaluator implements Evaluator {
+    constructor(private inner: Evaluator, private log: Logger) {}
+    async evaluate(req: CheckRequest): Promise<CheckResult> {
+        const result = await this.inner.evaluate(req);
         this.log.info(...);
         return result;
     }
@@ -111,20 +114,34 @@ a method and an interface instead of a class and `implements`.
 
 ## Interface composition
 
-Interfaces can embed other interfaces. `store.go` uses this:
+Interfaces can embed other interfaces. This is how you would model a tuple store
+that separates read and write capabilities:
 
 ```go
-// go/internal/authzservice/adapters/db/store.go
-type TupleStore interface {
-    TupleReader   // embeds
-    TupleWriter   // embeds
-    All() []TupleKey
+// Conceptual split — illustrates interface composition
+type TupleReader interface {
+    Has(object shared.Object, relation shared.Relation, user shared.Subject) bool
+    FindByObjectRelation(object shared.Object, relation shared.Relation) []shared.TupleKey
+}
+
+type TupleWriter interface {
+    Write(tuple shared.TupleKey)
+    Delete(tuple shared.TupleKey)
+}
+
+// TupleRepository composes both — satisfying either interface is enough for code
+// that only needs that half.
+type TupleRepository interface {
+    TupleReader  // embeds
+    TupleWriter  // embeds
+    FindAll(filter ...TupleFilter) []TupleKey
 }
 ```
 
-A `TupleStore` is anything that satisfies `TupleReader`, `TupleWriter`, and
-`All()`. `*InMemoryTupleStore` satisfies all three. This composes interfaces
-without repeating method signatures.
+In this repo `authz.TupleRepository` (`go/internal/authz/ports.go`) is the
+single combined interface. Any code that only needs reads can accept a narrower
+interface — splitting is a refactor you can make without changing any caller that
+already passes a full `TupleRepository`.
 
 ## Struct embedding
 
@@ -132,29 +149,27 @@ Struct embedding is Go's form of composition-as-inheritance. Embed a type and
 its method set is promoted onto the outer struct:
 
 ```go
-// go/internal/authzservice/adapters/graph/middleware.go
+// go/internal/authz/adapters/graph/middleware.go
 type ReadOnlyStore struct {
-    TupleReader  // embedded interface
+    authz.TupleRepository  // embedded interface — all methods are promoted
 }
 ```
 
-Because `TupleReader` is embedded, `ReadOnlyStore` automatically has `Has` and
-`FindByObjectRelation` methods — promoted from the embedded field. No delegation
-boilerplate required:
+Because `authz.TupleRepository` is embedded, `ReadOnlyStore` automatically has
+`Has`, `FindByObjectRelation`, `FindAll`, `Write`, and `Delete` — promoted from
+the embedded field. No delegation boilerplate required:
 
 ```go
-ro := authz.NewReadOnlyStore(store)
-ro.Has(...)                  // promoted from TupleReader
-ro.FindByObjectRelation(...) // promoted from TupleReader
+ro := graph.NewReadOnlyStore(store)
+ro.Has(...)                  // promoted from TupleRepository
+ro.FindByObjectRelation(...) // promoted from TupleRepository
 ```
 
-`ReadOnlyStore` does not embed `TupleWriter`, so `Write` and `Delete` are
-simply absent from its method set. The compiler enforces the restriction — you
-cannot call `ro.Write(...)` because the method does not exist.
-
-This is a structural alternative to visibility modifiers. TypeScript uses
-`readonly` and `private`. Go restricts by controlling which interface is
-embedded.
+The "read-only" name expresses intent — this value is meant to be passed only to
+code that reads tuples. At the type level, all `TupleRepository` methods are
+available; restricting by interface would require a separate read-only interface.
+This is a common Go pattern: use naming and code review to communicate intent
+when compiler enforcement is not worth the extra interface definition.
 
 ## Method promotion rules
 
@@ -164,15 +179,15 @@ When you embed type `T`:
 2. If the outer struct defines a method with the same name, the outer method
    wins — it shadows the promoted one.
 3. Promoted methods can satisfy interfaces. `ReadOnlyStore` satisfies
-   `TupleReader` because the embedded `TupleReader` field promotes the required
-   methods.
+   `authz.TupleRepository` because the embedded `authz.TupleRepository` field
+   promotes all the required methods.
 
 ```go
-auth := authz.NewGraphAuthorizer(ro)  // ro satisfies TupleReader — compiles
+ev := graph.NewGraphEvaluator(ro)  // ro satisfies TupleRepository — compiles
 ```
 
-`NewGraphAuthorizer` accepts a `TupleReader`. `ReadOnlyStore` satisfies
-`TupleReader` through embedding. No conversion, no casting.
+`NewGraphEvaluator` accepts an `authz.TupleRepository`. `ReadOnlyStore` satisfies
+that interface through embedding. No conversion, no casting.
 
 ## Interface values: the two-word secret
 
@@ -180,25 +195,26 @@ An interface value in Go is secretly two words: a pointer to the type descriptor
 and a pointer to the data. When you assign a concrete value to an interface:
 
 ```go
-var a authz.Authorizer = authz.NewGraphAuthorizer(store)
+var e authz.Evaluator = graph.NewGraphEvaluator(store)
 ```
 
-Go stores `(*GraphAuthorizer)(pointer)` inside the interface. The compiler erases
-the concrete type from the caller's perspective — callers only see `Authorizer`.
+Go stores `(*GraphEvaluator)(pointer)` inside the interface. The compiler erases
+the concrete type from the caller's perspective — callers only see `Evaluator`.
 
 This is the same as TypeScript's structural typing: callers program to the
 interface shape, not the concrete class.
 
 ## Layers of wrapping in practice
 
-The composition root (`app.go`) is where you decide the order:
+The composition root (`cmd/server/main.go`) is where you decide the order:
 
 ```go
-tupleStore := authz.NewInMemoryTupleStore(...)
-ro         := authz.NewReadOnlyStore(tupleStore)   // restrict writes
-base       := authz.NewGraphAuthorizer(ro)
-audited    := authz.NewAuditAuthorizer(base, os.Stderr)
-docs       := domain.NewDocumentService(audited)
+tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
+ro         := graph.NewReadOnlyStore(tupleStore)   // signal: this path reads only
+base       := graph.NewGraphEvaluator(ro)
+audited    := graph.NewAuditEvaluator(base, os.Stderr)
+authzSvc   := authz.New(tupleStore, audited)
+docsSvc    := documents.New(docRepo, authzSvc)
 ```
 
 Each layer adds one concern. Reading the composition root tells you the full
@@ -209,34 +225,40 @@ pattern: one place where all the wiring happens.
 
 **Add a caching decorator:**
 
-Write `CachingAuthorizer` that wraps `Authorizer` and caches the last result for
+Write `CachingEvaluator` that wraps `Checker` and caches the last result for
 each `(user, relation, object)` triple using a `sync.Map`:
 
 ```go
-type CachingAuthorizer struct {
-    inner authz.Authorizer
+type CachingEvaluator struct {
+    inner Checker
     cache sync.Map
 }
 ```
 
-Add the compile-time assertion (`var _ Authorizer = (*CachingAuthorizer)(nil)`).
-Wire it between `AuditAuthorizer` and `GraphAuthorizer` in the composition root.
+Add the compile-time assertion (`var _ Checker = (*CachingEvaluator)(nil)`).
+Wire it between `AuditEvaluator` and `GraphEvaluator` in `buildHandler()`:
 
-Run `go test -race ./internal/...` to confirm it is thread-safe.
+```go
+base    := graph.NewGraphEvaluator(tupleStore)
+cached  := graph.NewCachingEvaluator(base)
+audited := graph.NewAuditEvaluator(cached, os.Stderr)
+```
+
+Run `go test -race ./...` to confirm it is thread-safe.
 
 ## Checkpoint
 
 Three short questions:
 
-1. Go has no `implements` keyword. How does the compiler know `AuditAuthorizer`
-   satisfies `Authorizer`?
+1. Go has no `implements` keyword. How does the compiler know `AuditEvaluator`
+   satisfies `Checker`?
 2. `ReadOnlyStore` has `Has` and `FindByObjectRelation` methods but you did not
    write them. Where do they come from?
-3. What does `var _ Authorizer = (*AuditAuthorizer)(nil)` actually do at runtime?
+3. What does `var _ Checker = (*AuditEvaluator)(nil)` actually do at runtime?
 
 Good answers:
-1. By checking that `AuditAuthorizer` has all the methods `Authorizer` requires
+1. By checking that `AuditEvaluator` has all the methods `Checker` requires
    with the right signatures. The check is structural, not declarative.
-2. They are promoted from the embedded `TupleReader` field.
+2. They are promoted from the embedded `authz.TupleRepository` field.
 3. Nothing. The blank identifier discards the value; the assignment generates no
    code. Only the compiler evaluates it, at compile time.

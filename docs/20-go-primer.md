@@ -75,7 +75,7 @@ the hood. You cannot pass a `Relation` where an `Object` is expected:
 func Tuple(obj Object, rel Relation, subject Subject) TupleKey { ... }
 
 // Compile error — cannot use Relation as Object:
-// authz.Tuple(authz.RelationDocumentCanEdit, authz.Document("x"), ...)
+// shared.Tuple(shared.RelationDocumentCanEdit, shared.Document("x"), ...)
 ```
 
 ### Structs instead of object types
@@ -112,13 +112,13 @@ by default. Field names in Go are capitalized (exported), which would produce
 control the output:
 
 ```go
-// go/internal/documentsservice/core/domain/document.go
+// go/internal/documents/ports.go
 type CollaborativeDocument struct {
-    ID        string       `json:"id"`
-    Title     string       `json:"title"`
-    Body      string       `json:"body"`
-    Workspace authz.Object `json:"workspace"`
-    UpdatedBy authz.Object `json:"updatedBy"`
+    ID        string        `json:"id"`
+    Title     string        `json:"title"`
+    Body      string        `json:"body"`
+    Workspace shared.Object `json:"workspace"`
+    UpdatedBy shared.Object `json:"updatedBy"`
 }
 ```
 
@@ -135,17 +135,17 @@ In Go, a type satisfies an interface if it has all the required methods. There i
 no `implements` keyword. The connection is established at the point of assignment:
 
 ```go
-// go/internal/shared/rebac.go — the interface, in the authz package
-type Authorizer interface {
-    Check(ctx context.Context, req CheckRequest) (CheckResult, error)
+// go/internal/authz/ports.go — the interface, owned by the domain
+type Evaluator interface {
+    Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error)
 }
 
-// go/internal/authzservice/adapters/graph/evaluator.go — the implementation, same package, no "implements"
-type GraphAuthorizer struct {
-    store TupleReader
+// go/internal/authz/adapters/graph/evaluator.go — the implementation, no "implements" keyword
+type GraphEvaluator struct {
+    store authz.TupleRepository
 }
 
-func (g *GraphAuthorizer) Check(_ context.Context, req CheckRequest) (CheckResult, error) {
+func (g *GraphEvaluator) Evaluate(_ context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
     // ...
 }
 ```
@@ -153,9 +153,10 @@ func (g *GraphAuthorizer) Check(_ context.Context, req CheckRequest) (CheckResul
 The compiler proves the connection here:
 
 ```go
-// go/internal/app/app.go — the only place that names both the interface and the concrete type
-var auth authz.Authorizer = authz.NewGraphAuthorizer(store)
-// If GraphAuthorizer were missing the Check method, this line would not compile.
+// go/cmd/server/main.go — the only place that names both the interface and the concrete type
+evaluator := graph.NewGraphEvaluator(tupleStore)   // concrete type
+authzSvc  := authz.New(tupleStore, evaluator)      // evaluator satisfies authz.Evaluator
+// If GraphEvaluator were missing the Evaluate method, authz.New would not compile.
 ```
 
 TypeScript requires `implements Authorizer` on the class. Go requires nothing on
@@ -168,17 +169,21 @@ The Go community convention: keep interfaces to one or two methods. The smaller
 the interface, the easier it is to satisfy with a mock in tests.
 
 ```go
-// go/internal/authzservice/adapters/db/store.go
-// TupleReader is the only thing GraphAuthorizer depends on.
-// It does not need Write or Delete.
-type TupleReader interface {
-    Has(object Object, relation Relation, user Subject) bool
-    FindByObjectRelation(object Object, relation Relation) []TupleKey
+// go/internal/authz/ports.go
+// TupleRepository is what GraphEvaluator depends on.
+// The interface lists only the methods the evaluator needs.
+type TupleRepository interface {
+    Has(object shared.Object, relation shared.Relation, user shared.Subject) bool
+    FindByObjectRelation(object shared.Object, relation shared.Relation) []shared.TupleKey
+    FindAll(filter ...TupleFilter) []shared.TupleKey
+    Write(tuple shared.TupleKey)
+    Delete(tuple shared.TupleKey)
 }
 ```
 
-`InMemoryTupleStore` also implements `TupleWriter` and exposes `All()`, but
-`GraphAuthorizer` never sees those — it only holds a `TupleReader`.
+`InMemoryTupleStore` (in `authz/adapters/db/store.go`) satisfies the full
+`TupleRepository` interface. `GraphEvaluator` only calls the read methods, but
+accepting the full interface keeps the dependency graph simple.
 
 ### Compile-time interface check
 
@@ -186,17 +191,17 @@ A common Go pattern is to add an assertion at package level so the compiler
 catches missing methods immediately, before any code runs:
 
 ```go
-// go/internal/authzservice/adapters/openfga/authorizer.go
-var _ Authorizer = (*OpenFGAAuthorizer)(nil)
+// go/internal/authz/adapters/graph/evaluator.go
+var _ authz.Evaluator = (*GraphEvaluator)(nil)
 ```
 
 Breaking this down:
 - `var _` — declare a variable and throw it away (blank identifier)
-- `Authorizer` — the type of that variable is the interface
-- `= (*OpenFGAAuthorizer)(nil)` — assign a nil pointer of the concrete type
+- `authz.Evaluator` — the type of that variable is the interface
+- `= (*GraphEvaluator)(nil)` — assign a nil pointer of the concrete type
 
-If `OpenFGAAuthorizer` is missing the `Check` method, the assignment fails to
-compile because a nil `*OpenFGAAuthorizer` cannot satisfy `Authorizer`. This
+If `GraphEvaluator` is ever missing the `Evaluate` method, the assignment fails
+to compile because a nil `*GraphEvaluator` cannot satisfy `authz.Evaluator`. This
 catches the mistake at compile time rather than at the first runtime call.
 
 You will also see `_` used to explicitly discard return values:
@@ -227,7 +232,7 @@ async function requireDocument(id: string): Promise<CollaborativeDocument> {
 ```
 
 ```go
-// go/internal/documentsservice/core/domain/service.go — returns error
+// go/internal/documents/domain.go — returns error
 func (s *documentService) requireDocument(ctx context.Context, id string) (*CollaborativeDocument, error) {
     doc, err := s.repo.FindByID(ctx, id)
     if err != nil {
@@ -258,7 +263,7 @@ export class DocumentNotFoundError extends Error {
 Go:
 
 ```go
-// go/internal/documentsservice/core/domain/document.go
+// go/internal/documents/domain.go
 type DocumentNotFoundError struct {
     ID string
 }
@@ -277,7 +282,7 @@ When a function receives an error and wants to add context before returning it
 upstream, it wraps the error:
 
 ```go
-// go/internal/app/app.go
+// go/cmd/server/main.go
 _, err := docs.Create(ctx, input)
 if err != nil {
     return nil, fmt.Errorf("app: seed demo document: %w", err)
@@ -312,7 +317,7 @@ if (error instanceof ForbiddenError) {
 Go uses `errors.As`:
 
 ```go
-// go/internal/documentsservice/adapters/http/handler.go
+// go/internal/documents/adapters/http/handler.go
 func (h *handler) writeError(w http.ResponseWriter, err error) {
     var notFound *domain.DocumentNotFoundError
     if errors.As(err, &notFound) {
@@ -403,7 +408,7 @@ Go has no `new` keyword for custom initialization. The convention is a `New*`
 function that returns a pointer to an initialized struct:
 
 ```go
-// go/internal/authzservice/adapters/db/store.go
+// go/internal/authz/adapters/db/store.go
 func NewInMemoryTupleStore(seed ...TupleKey) *InMemoryTupleStore {
     s := &InMemoryTupleStore{
         tuples: make(map[string]TupleKey, len(seed)),
@@ -420,9 +425,9 @@ just without the `constructor` keyword. Notice the variadic `seed ...TupleKey`:
 you can call it with no arguments, one tuple, or a slice spread with `...`:
 
 ```go
-authz.NewInMemoryTupleStore()                          // empty store
-authz.NewInMemoryTupleStore(t1, t2, t3)               // three tuples
-authz.NewInMemoryTupleStore(fixtures.SeedRelationshipTuples()...) // spread a slice
+authzdb.New()                                      // empty store
+authzdb.New(t1, t2, t3)                            // three tuples
+authzdb.New(fixtures.SeedRelationshipTuples()...)  // spread a slice
 ```
 
 ### `defer` — guaranteed cleanup
@@ -431,7 +436,7 @@ authz.NewInMemoryTupleStore(fixtures.SeedRelationshipTuples()...) // spread a sl
 regardless of how it returns — normal return, early return, or panic:
 
 ```go
-// go/internal/authzservice/adapters/db/store.go
+// go/internal/authz/adapters/db/store.go
 func (s *InMemoryTupleStore) Has(object Object, relation Relation, user Subject) bool {
     s.mu.RLock()          // acquire a read lock
     defer s.mu.RUnlock()  // release it when this function exits — guaranteed
@@ -456,7 +461,7 @@ reading and writing a map concurrently causes a data race (undefined behaviour).
 ensuring that writes are exclusive:
 
 ```go
-// go/internal/authzservice/adapters/db/store.go
+// go/internal/authz/adapters/db/store.go
 type InMemoryTupleStore struct {
     mu     sync.RWMutex
     tuples map[string]TupleKey
@@ -480,7 +485,7 @@ TypeScript does not need this because the JavaScript event loop is single-thread
 ### Return the interface, not the concrete type
 
 ```go
-// go/internal/documentsservice/core/domain/service.go
+// go/internal/documents/domain.go
 func NewDocumentService(repo DocumentRepository, auth authz.Authorizer) DocumentOperations {
     return &documentService{repo: repo, auth: auth}
 }
@@ -528,8 +533,8 @@ Go does not have `async`/`await`. All I/O runs synchronously in Go goroutines
 first argument so callers can cancel them or attach a deadline:
 
 ```go
-// go/internal/documentsservice/core/domain/service.go
-func (s *documentService) Read(ctx context.Context, id string, actor authz.Object) (*CollaborativeDocument, error) {
+// go/internal/documents/domain.go (read.go)
+func (s *documentService) Read(ctx context.Context, id string, actor shared.Object) (*CollaborativeDocument, error) {
     doc, err := s.requireDocument(ctx, id)  // passes ctx to the repo
     // ...
 }
@@ -562,7 +567,7 @@ Since Go 1.22, the standard `net/http` `ServeMux` supports method-prefixed path
 patterns and path variables directly:
 
 ```go
-// go/internal/documentsservice/adapters/http/server.go
+// go/internal/documents/adapters/http/server.go
 mux := http.NewServeMux()
 mux.HandleFunc("GET /health", h.handleHealth)
 mux.HandleFunc("POST /documents", h.handleCreateDocument)
@@ -573,7 +578,7 @@ mux.HandleFunc("PATCH /documents/{id}", h.handleUpdateDocument)
 Extract path variables with:
 
 ```go
-// go/internal/documentsservice/adapters/http/handler.go
+// go/internal/documents/adapters/http/handler.go
 id := r.PathValue("id")
 ```
 
@@ -591,20 +596,19 @@ Test functions follow the Arrange → Act → Assert pattern with explicit comme
 marking each section:
 
 ```go
-// go/internal/authzservice/adapters/graph/evaluator_test.go
-func TestGraphAuthorizer_TeamMemberCanEditDocument(t *testing.T) {
+// go/internal/authz/adapters/graph/evaluator_test.go
+func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
     // Arrange: alice is a member of platformTeam, which is an editor of
     // productWorkspace. roadmapDocument lives in productWorkspace.
-    store := seedStore()
-    auth := authz.NewGraphAuthorizer(store)
-    req := authz.CheckRequest{
+    ev := newEvaluator()
+    req := shared.CheckRequest{
         User:     fixtures.Alice,
-        Relation: authz.RelationDocumentCanEdit,
+        Relation: shared.RelationDocumentCanEdit,
         Object:   fixtures.RoadmapDocument,
     }
 
     // Act
-    result, err := auth.Check(context.Background(), req)
+    result, err := ev.Evaluate(context.Background(), req)
 
     // Assert
     if err != nil {
@@ -634,7 +638,7 @@ line in the helper, not the caller. Mark the helper with `t.Helper()` so the
 failure points at the test:
 
 ```go
-// go/internal/documentsservice/core/domain/service_test.go
+// go/internal/documents/service_test.go
 func newSeededService(t *testing.T) domain.DocumentOperations {
     t.Helper()
     // wires up a full service and pre-creates the roadmap document
@@ -674,19 +678,19 @@ go test -v ./...
 
 ## Try this
 
-Open `go/internal/authzservice/adapters/graph/evaluator_test.go`.
+Open `go/internal/authz/adapters/graph/evaluator_test.go`.
 
-1. Read `TestGraphAuthorizer_TeamMemberCanEditDocument`. Notice the trace is
+1. Read `TestGraphEvaluator_TeamMemberCanEditDocument`. Notice the trace is
    printed when the test fails — the same `Trace []string` that the TypeScript
-   `GraphAuthorizer` builds.
+   `makeGraphEvaluator` builds.
 
-2. Add a new test: `TestGraphAuthorizer_WorkspaceOwnerCanDelete`. Make
+2. Add a new test: `TestGraphEvaluator_WorkspaceOwnerCanDelete`. Make
    Casey (`user:casey`) an `owner` of `productWorkspace` by adding an extra
    tuple, then verify they can `can_delete` `roadmapDocument`. Use the AAA
    structure with `// Arrange`, `// Act`, `// Assert` comments.
 
 3. Run it: `make go-test`. Read the trace output and match each line to the
-   expansion rules in `go/internal/authzservice/adapters/graph/evaluator.go`.
+   expansion rules in `go/internal/authz/adapters/graph/evaluator.go`.
 
 ---
 

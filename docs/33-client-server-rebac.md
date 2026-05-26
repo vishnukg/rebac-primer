@@ -82,42 +82,70 @@ casey -> Casey, denied by default
 
 ## API routes
 
+Both servers share the same resource shape, but the two implementations use
+different authentication styles:
+
+- **TypeScript** identifies the caller via an `actorId` query param or JSON body field.
+- **Go** uses a standard `Authorization: Bearer <token>` header. Demo tokens are
+  `demo-token-alice`, `demo-token-bob`, and `demo-token-casey`.
+
 ```text
-GET /health
-POST /documents
-GET /documents/:id?actorId=alice
-PATCH /documents/:id
+TypeScript (port 4000)                Go (port 4001)
+──────────────────────────────────    ──────────────────────────────────
+GET  /health                          GET  /health
+                                      GET  /whoami
+POST /documents                       POST /documents
+GET  /documents/:id?actorId=alice     GET  /documents/{id}
+PATCH /documents/:id                  PATCH /documents/{id}
 ```
 
 Example read:
 
 ```bash
+# TypeScript — actor in query string
 curl "http://127.0.0.1:4000/documents/roadmapDocument?actorId=bob"
-curl "http://127.0.0.1:4001/documents/roadmapDocument?actorId=bob"
+
+# Go — actor in Authorization header
+curl "http://127.0.0.1:4001/documents/roadmapDocument" \
+  -H "Authorization: Bearer demo-token-bob"
 ```
 
 Example update:
 
 ```bash
+# TypeScript — actor in JSON body
 curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
   -H "content-type: application/json" \
   -d '{"actorId":"alice","body":"Updated from curl"}'
 
+# Go — actor in Authorization header
 curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
+  -H "Authorization: Bearer demo-token-alice" \
   -H "content-type: application/json" \
-  -d '{"actorId":"alice","body":"Updated from curl"}'
+  -d '{"body":"Updated from curl"}'
 ```
 
 Bob can read but cannot update:
 
 ```bash
+# TypeScript
 curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
   -H "content-type: application/json" \
   -d '{"actorId":"bob","body":"Should fail"}'
 
+# Go
 curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
+  -H "Authorization: Bearer demo-token-bob" \
   -H "content-type: application/json" \
-  -d '{"actorId":"bob","body":"Should fail"}'
+  -d '{"body":"Should fail"}'
+```
+
+Verify your identity (Go only):
+
+```bash
+curl "http://127.0.0.1:4001/whoami" \
+  -H "Authorization: Bearer demo-token-alice"
+# → {"user":"alice","scopes":["documents:read","documents:write"]}
 ```
 
 ## Where ReBAC is enforced
@@ -139,7 +167,7 @@ const { allowed } = await authzClient.check({
 Go:
 
 ```go
-err := s.requireAllowed(ctx, input.Actor, authz.RelationDocumentCanEdit, authz.Document(input.ID), "edit")
+err := s.requireAllowed(ctx, input.Actor, shared.RelationDocumentCanEdit, shared.Document(input.ID), "edit")
 ```
 
 That is the important boundary.
@@ -160,7 +188,7 @@ The executable files stay intentionally thin:
 src/authz-service/index.ts     -> composeAuthzService(), then listen()
 src/documents-service/index.ts -> composeDocumentsService(), then listen()
 src/cli/index.ts               -> composeCliApp(), then run()
-go/cmd/server/main.go          -> app.New(), then ListenAndServe()
+go/cmd/server/main.go          -> buildHandler(), then ListenAndServe()
 ```
 
 The object graphs are assembled in the composition roots:
@@ -184,12 +212,14 @@ composeCliApp (cli/compose.ts)
   -> Node readline terminal
   -> makeTerminalClient
 
-go app.New
-  -> NewInMemoryTupleStore
-  -> NewGraphAuthorizer
-  -> NewInMemoryDocumentRepository
-  -> NewDocumentService
-  -> httpserver.NewServer
+go buildHandler() (cmd/server/main.go)
+  -> authzdb.New (in-memory tuple store, seeded)
+  -> graph.NewGraphEvaluator
+  -> authz.New (authz service)
+  -> docsdb.New (in-memory document repository)
+  -> docsauthn.New (demo token verifier)
+  -> documents.New (documents service)
+  -> docshttp.NewServer (HTTP handler)
 ```
 
 That split matters because ReBAC code is easier to reason about when business

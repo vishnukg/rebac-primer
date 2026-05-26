@@ -11,40 +11,43 @@ what stays the same, and why.
 
 ## Package map
 
-The Go code mirrors the TypeScript ports/adapters structure exactly.
-Each service has a `core/` layer (pure logic + interface definitions) and an
-`adapters/` layer (concrete implementations).
+The Go code follows **hexagonal architecture (ports and adapters)**: each service
+defines the interfaces it needs (ports), and concrete implementations live in
+`adapters/`. The package structure is deliberately flat — no nested `core/`
+directories.
 
 ```
 go/
-├── cmd/server/main.go               Entry point — starts the HTTP server
+├── cmd/server/main.go               Entry point + composition root
+│                                    (the only file that imports all concrete types)
 └── internal/
     ├── shared/
     │   └── rebac.go                 Object / Relation / TupleKey / CheckRequest types
-    │                                — mirrors typescript/src/shared/rebac.ts
-    ├── authzservice/
-    │   ├── core/
-    │   │   ├── ports/ports.go       TupleRepository + Evaluator interfaces (driven ports)
-    │   │   └── domain/domain.go     AuthzService interface + authzDomain impl
+    │                                mirrors typescript/src/shared/rebac.ts
+    ├── authz/
+    │   ├── authz.go                 Service interface (driving port) + domain errors
+    │   ├── ports.go                 TupleRepository + Evaluator interfaces (driven ports)
+    │   ├── domain.go                authzDomain implementation + New()
     │   └── adapters/
     │       ├── db/store.go          InMemoryTupleStore
     │       ├── graph/
     │       │   ├── evaluator.go     GraphEvaluator (graph traversal)
-    │       │   ├── permissionmodel.go  Implied-by rules
+    │       │   ├── permissionmodel.go  Implied-by rules (the permission hierarchy)
     │       │   ├── parallel.go      AllPermissions / BulkCheck (concurrency demo)
     │       │   ├── middleware.go    AuditEvaluator, ReadOnlyStore (decorator demo)
     │       │   └── result.go        Result[T] generic (generics demo)
-    │       └── openfga/authorizer.go   OpenFGA SDK adapter
-    ├── documentsservice/
-    │   ├── core/
-    │   │   ├── ports/ports.go       CollaborativeDocument + DocumentRepository +
-    │   │   │                        AuthzClient + Authenticator interfaces
-    │   │   └── domain/
-    │   │       ├── document.go      Type alias + input/error types
-    │   │       ├── service.go       Documents interface + documentService struct
-    │   │       ├── create.go        Create use case
-    │   │       ├── read.go          Read use case
-    │   │       └── update.go        Update use case
+    │       └── http/
+    │           ├── server.go        routes: /health, /check, /tuples
+    │           ├── handler.go       request handlers
+    │           └── json.go          writeJSON / readJSON helpers
+    ├── documents/
+    │   ├── documents.go             Service interface (driving port)
+    │   ├── ports.go                 CollaborativeDocument + DocumentRepository +
+    │   │                            AuthzClient + Authenticator interfaces (driven ports)
+    │   ├── domain.go                documentService struct + New()
+    │   ├── create.go                Create use case
+    │   ├── read.go                  Read use case
+    │   ├── update.go                Update use case
     │   └── adapters/
     │       ├── db/repository.go     InMemoryDocumentRepository
     │       ├── authn/verifier.go    DemoTokenVerifier
@@ -52,19 +55,26 @@ go/
     │           ├── server.go        NewServer() — registers routes
     │           ├── handler.go       Route handlers + error dispatch
     │           └── json.go          writeJSON / readJSON helpers
-    ├── fixtures/fixtures.go         Shared test data (users, tuples)
-    └── app/app.go                   Composition root
+    └── fixtures/fixtures.go         Shared test data (users, tuples, tokens)
 ```
 
-The dependency arrows flow inward:
+The dependency arrows always flow inward — nothing in `internal/` ever imports
+`cmd/`:
 
 ```
-cmd/server → app → adapters → core/domain → core/ports
-                                           ↑
-                                        shared/
+cmd/server/main.go   ← knows all concrete types; wires everything
+    ├── authz.*                      ← domain interfaces
+    ├── authz/adapters/db.*          ← concrete store
+    ├── authz/adapters/graph.*       ← concrete evaluator
+    ├── documents.*                  ← domain interfaces
+    ├── documents/adapters/authn.*   ← concrete token verifier
+    ├── documents/adapters/db.*      ← concrete document repo
+    ├── documents/adapters/http.*    ← HTTP handler
+    └── fixtures.*                   ← seed data
 ```
 
-No arrows point outward. `shared/` has no project imports at all.
+`shared/` has no project imports at all — it is the foundation everything else
+builds on.
 
 ---
 
@@ -100,10 +110,6 @@ shared.Tuple(shared.RelationDocumentCanEdit, shared.Document("x"), ...)
 // compile error: cannot use Relation as Object
 ```
 
-This is less precise than TypeScript's generic approach (you can still cast a
-raw string with `Object("oops")`) but catches the most common mistakes at
-compile time.
-
 ### Relation constants
 
 TypeScript uses a union type:
@@ -134,16 +140,16 @@ const (
 
 ---
 
-## `authzservice/core/ports/` — driven ports
+## `authz/ports.go` — driven ports
 
-Open `go/internal/authzservice/core/ports/ports.go`.
+Open `go/internal/authz/ports.go`.
 
 A **driven port** is an interface the domain calls out to. The domain says "I
 need something that can do X". Adapters supply the concrete X. The domain never
 imports a concrete type.
 
 ```go
-// go/internal/authzservice/core/ports/ports.go
+// go/internal/authz/ports.go
 
 // TupleRepository is the persistence port.
 type TupleRepository interface {
@@ -171,41 +177,45 @@ Two differences from the TypeScript port:
 
 ---
 
-## `authzservice/core/domain/` — the authz use cases
+## `authz/authz.go` and `authz/domain.go` — the authz service
 
-Open `go/internal/authzservice/core/domain/domain.go`.
+Open `go/internal/authz/authz.go` (driving port + errors) and
+`go/internal/authz/domain.go` (implementation).
+
+The **driving port** is what external callers depend on. The implementation is
+private — callers only ever hold the interface:
 
 ```go
-// AuthzService is the driving port — what callers depend on.
-type AuthzService interface {
+// go/internal/authz/authz.go — the driving port
+type Service interface {
     Check(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error)
     WriteTuples(ctx context.Context, tuples []shared.TupleKey) error
     DeleteTuples(ctx context.Context, tuples []shared.TupleKey) error
-    ListTuples(ctx context.Context, filter ...ports.TupleFilter) ([]shared.TupleKey, error)
+    ListTuples(ctx context.Context, filter ...TupleFilter) ([]shared.TupleKey, error)
 }
 
-// authzDomain is the private implementation.
+// go/internal/authz/domain.go — private implementation
 type authzDomain struct {
-    repository ports.TupleRepository
-    evaluator  ports.Evaluator
+    repository TupleRepository
+    evaluator  Evaluator
 }
 
-// New wires the two driven ports together.
-func New(repository ports.TupleRepository, evaluator ports.Evaluator) AuthzService {
+// New wires the two driven ports together and returns the driving port.
+func New(repository TupleRepository, evaluator Evaluator) Service {
     return &authzDomain{repository: repository, evaluator: evaluator}
 }
 ```
 
-`New` returns `AuthzService` (the interface), not `*authzDomain` (the struct).
+`New` returns `Service` (the interface), not `*authzDomain` (the struct).
 Callers can only use methods on the interface — they cannot reach into the struct
 or construct one without going through `New`. This is Go's equivalent of
 TypeScript's factory boundary.
 
 ---
 
-## `authzservice/adapters/db/` — in-memory tuple store
+## `authz/adapters/db/` — in-memory tuple store
 
-Open `go/internal/authzservice/adapters/db/store.go`.
+Open `go/internal/authz/adapters/db/store.go`.
 
 ### Thread-safe map with `sync.RWMutex`
 
@@ -237,7 +247,7 @@ func (s *InMemoryTupleStore) Write(key shared.TupleKey) {
 ### Map key format — identical to TypeScript
 
 ```go
-// go/internal/authzservice/adapters/db/store.go
+// go/internal/authz/adapters/db/store.go
 func keyFor(k shared.TupleKey) string {
     return fmt.Sprintf("%s|%s|%s", k.Object, k.Relation, k.User)
 }
@@ -252,12 +262,17 @@ Identical logic, different syntax.
 
 ---
 
-## `authzservice/adapters/graph/` — the graph evaluator
+## `authz/adapters/graph/` — the graph evaluator
 
-Open `go/internal/authzservice/adapters/graph/evaluator.go`. This is the most
+Open `go/internal/authz/adapters/graph/evaluator.go`. This is the most
 important file to read side by side with `makeGraphEvaluator.ts`.
 
-The algorithm is identical. Go idioms make it look different.
+For a deep walkthrough of how the graph traversal works, read
+`docs/27-graph-evaluator-walkthrough.md` — it traces every recursive step for
+the `alice / can_edit / roadmapDocument` case with diagrams.
+
+The algorithm is identical to the TypeScript version. Go idioms make it look
+different.
 
 ### Pointer to slice for the trace
 
@@ -305,8 +320,8 @@ Reading a missing key returns the zero value for the value type — `false` for
 ### Compile-time interface assertion
 
 ```go
-// go/internal/authzservice/adapters/graph/evaluator.go
-var _ ports.Evaluator = (*GraphEvaluator)(nil)
+// go/internal/authz/adapters/graph/evaluator.go
+var _ authz.Evaluator = (*GraphEvaluator)(nil)
 ```
 
 This declares a blank variable of interface type and assigns a nil pointer to it.
@@ -315,7 +330,7 @@ compile. It is a zero-cost guard that makes the compiler your test.
 
 ---
 
-## `authzservice/adapters/graph/` — Go-specific extras
+## `authz/adapters/graph/` — Go-specific extras
 
 These files have no TypeScript equivalent. They demonstrate Go-specific patterns
 using the authz types.
@@ -323,7 +338,7 @@ using the authz types.
 ### `result.go` — generic value-or-error container
 
 ```go
-// go/internal/authzservice/adapters/graph/result.go
+// go/internal/authz/adapters/graph/result.go
 type Result[T any] struct {
     value T
     err   error
@@ -392,7 +407,7 @@ goroutines finishing in an arbitrary sequence.
 
 ### `middleware.go` — decorator pattern
 
-`AuditEvaluator` wraps any `Checker` (= `ports.Evaluator`) and logs every call:
+`AuditEvaluator` wraps any `Checker` (= `authz.Evaluator`) and logs every call:
 
 ```go
 type AuditEvaluator struct {
@@ -416,25 +431,29 @@ interface, do something before/after. `AuditEvaluator` itself satisfies
 
 ```go
 type ReadOnlyStore struct {
-    ports.TupleRepository               // all read methods promoted automatically
+    authz.TupleRepository               // all interface methods promoted automatically
 }
 ```
 
-Embedding `TupleRepository` promotes `Has` and `FindByObjectRelation` onto
-`ReadOnlyStore`. The write methods (`Write`, `Delete`) are not promoted because
-`TupleRepository` is the whole interface — you have to expose all of it. But
-`ReadOnlyStore` can be passed anywhere a `TupleRepository` is expected, and the
-compiler prevents calling write methods directly on it.
+Embedding `authz.TupleRepository` promotes `Has`, `FindByObjectRelation`, and
+`FindAll` onto `ReadOnlyStore`. The store can be passed anywhere a
+`TupleRepository` is expected. Because `ReadOnlyStore` does not expose `Write`
+or `Delete` as its own methods, callers cannot mutate the store through it.
 
 ---
 
-## `documentsservice/core/ports/` — driven ports
+## `documents/ports.go` — driven ports
 
-Open `go/internal/documentsservice/core/ports/ports.go`.
+Open `go/internal/documents/ports.go`.
+
+All port interfaces, the aggregate type, and the authentication types live here
+in a single file:
 
 ```go
-// CollaborativeDocument is defined here, not in domain/, to avoid an import cycle:
-// domain imports ports; repository adapters import ports; neither imports the other.
+// go/internal/documents/ports.go
+
+// CollaborativeDocument is the aggregate root — the central type the service
+// reads, creates, and updates.
 type CollaborativeDocument struct {
     ID        string        `json:"id"`
     Title     string        `json:"title"`
@@ -450,8 +469,8 @@ type DocumentRepository interface {
 }
 
 // AuthzClient is what the documents domain needs from the authz service.
-// AuthzService from authzservice/core/domain satisfies this automatically via
-// Go's structural typing — it has Check and WriteTuples with matching signatures.
+// authz.Service satisfies this automatically via Go's structural typing —
+// it has Check and WriteTuples with matching signatures.
 type AuthzClient interface {
     Check(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error)
     WriteTuples(ctx context.Context, tuples []shared.TupleKey) error
@@ -464,51 +483,37 @@ type Authenticator interface {
 
 ### Structural typing satisfies `AuthzClient`
 
-`authzdomain.AuthzService` has `Check` and `WriteTuples` with the same
-signatures as `AuthzClient`. Go's structural typing means `*authzDomain`
-automatically satisfies `AuthzClient` — no `implements` keyword, no explicit
-declaration. `app.go` passes the authz domain directly as an `AuthzClient`:
+`authz.Service` has `Check` and `WriteTuples` with the same signatures as
+`AuthzClient`. Go's structural typing means the authz domain automatically
+satisfies `AuthzClient` — no `implements` keyword, no explicit declaration.
+`main.go` passes the authz service directly as an `AuthzClient`:
 
 ```go
-// go/internal/app/app.go
-authzSvc := authzdomain.New(tupleStore, evaluator)   // type: authzdomain.AuthzService
-docs := docsdomain.New(docRepo, authzSvc)            // authzSvc satisfies AuthzClient
+// go/cmd/server/main.go
+authzSvc := authz.New(tupleStore, evaluator)   // type: authz.Service
+docsSvc  := documents.New(docRepo, authzSvc)   // authzSvc satisfies documents.AuthzClient
 ```
 
-To replace the in-process evaluator with an HTTP call to a separate authz
-service, you would write an HTTP client that implements `AuthzClient` and pass
-it here. Nothing else changes.
+To replace the in-process evaluator with a call to a remote authz service, you
+would write an HTTP client that implements `AuthzClient` and pass it here.
+Nothing else changes.
 
 ---
 
-## `documentsservice/core/domain/` — use cases split by file
+## `documents/` — domain use cases
 
 Each use case lives in its own file, mirroring the TypeScript structure.
 
-| Go file     | TypeScript file                    | What it does             |
-|-------------|------------------------------------|--------------------------| 
-| `service.go`| `makeDocuments.ts`                 | Interface + struct + `New` |
-| `create.go` | `makeCreateDocument.ts`            | Create use case          |
-| `read.go`   | `makeReadDocument.ts`              | Read use case            |
-| `update.go` | `makeUpdateDocument.ts`            | Update use case          |
-| `document.go`| `types.ts`                        | Type alias + inputs + errors |
+| Go file       | TypeScript file               | What it does              |
+|---------------|-------------------------------|---------------------------|
+| `domain.go`   | `makeDocuments.ts`            | Interface + struct + `New` |
+| `create.go`   | `makeCreateDocument.ts`       | Create use case           |
+| `read.go`     | `makeReadDocument.ts`         | Read use case             |
+| `update.go`   | `makeUpdateDocument.ts`       | Update use case           |
+| `documents.go`| `types.ts`                    | Service interface + errors |
+| `ports.go`    | `ports/*.ts`                  | Driven port interfaces    |
 
-### Type alias avoids conversion boilerplate
-
-`CollaborativeDocument` is defined in `ports/` (so both the domain and the
-repository adapter can reference it without a cycle). The domain re-exports it
-as a type alias:
-
-```go
-// go/internal/documentsservice/core/domain/document.go
-type CollaborativeDocument = ports.CollaborativeDocument
-```
-
-The `=` means this is a **true alias**, not a new type. Domain code writes
-`CollaborativeDocument` everywhere; the compiler sees it as identical to
-`ports.CollaborativeDocument`. No `toPort()`/`fromPort()` conversion needed.
-
-### Copying a struct for immutable update
+### Copying a struct for an immutable update
 
 TypeScript spreads to create an updated copy:
 
@@ -519,7 +524,7 @@ const updated = { ...existing, body: input.body, updatedBy: input.actor };
 Go dereferences the pointer to copy the struct, then modifies fields:
 
 ```go
-// go/internal/documentsservice/core/domain/update.go
+// go/internal/documents/update.go
 updated := *existing       // dereference: copies the full struct value
 updated.Body = input.Body
 updated.UpdatedBy = input.Actor
@@ -529,9 +534,9 @@ updated.UpdatedBy = input.Actor
 
 ---
 
-## `documentsservice/adapters/http/` — HTTP adapter
+## `documents/adapters/http/` — HTTP adapter
 
-Open `go/internal/documentsservice/adapters/http/server.go`.
+Open `go/internal/documents/adapters/http/server.go`.
 
 ### Go 1.22+ routing
 
@@ -545,10 +550,11 @@ if (documentId && request.method === "GET") { ... }
 Go 1.22+ `ServeMux` handles method + path patterns natively:
 
 ```go
-mux.HandleFunc("GET /health", h.handleHealth)
-mux.HandleFunc("POST /documents", h.handleCreateDocument)
-mux.HandleFunc("GET /documents/{id}", h.handleGetDocument)
-mux.HandleFunc("PATCH /documents/{id}", h.handleUpdateDocument)
+mux.HandleFunc("GET /health",          h.handleHealth)
+mux.HandleFunc("GET /whoami",          h.handleWhoami)
+mux.HandleFunc("POST /documents",      h.handleCreateDocument)
+mux.HandleFunc("GET /documents/{id}",  h.handleGetDocument)
+mux.HandleFunc("PATCH /documents/{id}",h.handleUpdateDocument)
 ```
 
 Path variables are extracted with `r.PathValue("id")`. No external router needed.
@@ -557,16 +563,16 @@ Path variables are extracted with `r.PathValue("id")`. No external router needed
 
 ```go
 func (h *handler) writeError(w http.ResponseWriter, err error) {
-    if ports.IsAuthenticationError(err) {
+    if documents.IsAuthenticationError(err) {
         writeJSON(w, http.StatusUnauthorized, errorBody(err.Error()))
         return
     }
-    var notFound *domain.DocumentNotFoundError
+    var notFound *documents.DocumentNotFoundError
     if errors.As(err, &notFound) {
         writeJSON(w, http.StatusNotFound, errorBody(err.Error()))
         return
     }
-    var forbidden *domain.ForbiddenError
+    var forbidden *documents.ForbiddenError
     if errors.As(err, &forbidden) {
         writeJSON(w, http.StatusForbidden, errorBody(err.Error()))
         return
@@ -575,54 +581,52 @@ func (h *handler) writeError(w http.ResponseWriter, err error) {
 }
 ```
 
-This is the Go equivalent of the TypeScript `toErrorResponse` function. The
-domain returns typed errors; the HTTP adapter maps them to status codes. Neither
-layer knows about the other's details.
+The domain returns typed errors; the HTTP adapter maps them to status codes.
+Neither layer knows about the other's details.
 
 `errors.As` unwraps error chains — it works correctly even when the domain error
 is wrapped inside a `fmt.Errorf("...: %w", err)` call.
 
 ---
 
-## `app/app.go` — composition root
+## `cmd/server/main.go` — composition root
 
-Open `go/internal/app/app.go`. This is the **only** file that imports every
+Open `go/cmd/server/main.go`. This is the **only** file that imports every
 concrete type. Everything else depends only on interfaces.
 
 ```go
-func NewWithConfig(ctx context.Context, cfg Config) (*App, error) {
+func buildHandler(ctx context.Context) (http.Handler, error) {
     // ── Authz service ─────────────────────────────────────────────────────────
     tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
     evaluator  := graph.NewGraphEvaluator(tupleStore)
-    authzSvc   := authzdomain.New(tupleStore, evaluator)
+    authzSvc   := authz.New(tupleStore, evaluator)
 
     // ── Documents service ─────────────────────────────────────────────────────
     docRepo       := docsdb.New()
     tokenVerifier := docsauthn.New(fixtures.DemoTokens())
-    docs          := docsdomain.New(docRepo, authzSvc)   // authzSvc satisfies AuthzClient
+    docsSvc       := documents.New(docRepo, authzSvc)   // authzSvc satisfies AuthzClient
 
     // seed
-    _, err := docs.Create(ctx, docsdomain.CreateDocumentInput{ ... })
+    _, err := docsSvc.Create(ctx, documents.CreateDocumentInput{ ... })
 
     // ── HTTP layer ────────────────────────────────────────────────────────────
-    httpHandler := docshttp.NewServer(tokenVerifier, docs)
-
-    return &App{Handler: httpHandler, Port: cfg.Port}, nil
+    return docshttp.NewServer(tokenVerifier, docsSvc), nil
 }
 ```
 
-To swap `GraphEvaluator` for `OpenFGAAuthorizer`:
+To swap `GraphEvaluator` for a real OpenFGA server, change only these lines:
 
 ```go
-// Replace these two lines:
+// Replace this:
 evaluator := graph.NewGraphEvaluator(tupleStore)
-authzSvc  := authzdomain.New(tupleStore, evaluator)
+authzSvc  := authz.New(tupleStore, evaluator)
 
-// With:
-authzSvc, err := openfga.New(openfga.Config{
+// With this (after restoring the openfga adapter — see docs/26-openfga-migration.md):
+evaluator, err := openfga.New(openfga.Config{
     APIURL:  "http://localhost:8080",
     StoreID: "your-store-id",
 })
+authzSvc := authz.New(openfgaStore, evaluator)
 ```
 
 Nothing else changes. The documents domain and HTTP layer never find out.
@@ -631,7 +635,7 @@ Nothing else changes. The documents domain and HTTP layer never find out.
 
 ## Tests
 
-### Evaluator tests — `authzservice/adapters/graph/evaluator_test.go`
+### Evaluator tests — `authz/adapters/graph/evaluator_test.go`
 
 ```go
 func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
@@ -656,7 +660,7 @@ func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
 }
 ```
 
-### Domain service tests — `documentsservice/core/domain/service_test.go`
+### Domain service tests — `documents/service_test.go`
 
 ```go
 func TestDocumentService_Update_ForbiddenForViewer(t *testing.T) {
@@ -664,12 +668,12 @@ func TestDocumentService_Update_ForbiddenForViewer(t *testing.T) {
     svc := newSeededService(t)
 
     // Act
-    _, err := svc.Update(context.Background(), domain.UpdateDocumentInput{
+    _, err := svc.Update(context.Background(), documents.UpdateDocumentInput{
         ID: "roadmapDocument", Body: "should not save", Actor: fixtures.Bob,
     })
 
     // Assert
-    var forbidden *domain.ForbiddenError
+    var forbidden *documents.ForbiddenError
     if !errors.As(err, &forbidden) {
         t.Errorf("expected *ForbiddenError, got %T: %v", err, err)
     }
@@ -679,7 +683,7 @@ func TestDocumentService_Update_ForbiddenForViewer(t *testing.T) {
 `newSeededService` wires the full in-process stack (no HTTP). Marking it with
 `t.Helper()` means failure lines point at the test function, not inside the helper.
 
-### HTTP integration tests — `documentsservice/adapters/http/handler_test.go`
+### HTTP integration tests — `documents/adapters/http/handler_test.go`
 
 Uses `net/http/httptest` — no network, no port:
 
@@ -705,11 +709,11 @@ calls the full stack in-process. No server, no port, no teardown.
 
 | Concern                | TypeScript                              | Go                                        |
 |------------------------|-----------------------------------------|-------------------------------------------|
-| Branded types          | Template literal `\`${T}:${string}\``   | Named type `type Object string`           |
+| Branded types          | Template literal `` `${T}:${string}` `` | Named type `type Object string`           |
 | Relation constants     | Union type `"can_edit" \| ...`          | `const` block with named `Relation` type  |
-| Port definitions       | `interface` in `core/ports/*.ts`        | `interface` in `core/ports/ports.go`      |
+| Port definitions       | `interface` in `core/ports/*.ts`        | `interface` in `authz/ports.go` or `documents/ports.go` |
 | Interface satisfaction | Object shape must match                 | Implicit — method set must match          |
-| Factory functions      | `makeDocuments({ repo, authzClient })`  | `domain.New(repo, authzClient)`           |
+| Factory functions      | `makeDocuments({ repo, authzClient })`  | `documents.New(repo, authzClient)`        |
 | Error signalling       | `throw new ForbiddenError(...)`         | `return &ForbiddenError{...}`             |
 | Error dispatch         | `instanceof`                            | `errors.As`                               |
 | Immutable copy         | `{ ...existing, body: newBody }`        | `updated := *existing; updated.Body = …`  |
@@ -733,7 +737,11 @@ Then test the API:
 # Health check
 curl http://localhost:4001/health
 
-# Read as Bob (viewer — allowed)
+# Who am I? (identity check)
+curl http://localhost:4001/whoami \
+  -H "Authorization: Bearer demo-token-alice"
+
+# Read as Bob (viewer — 200)
 curl http://localhost:4001/documents/roadmapDocument \
   -H "Authorization: Bearer demo-token-bob"
 
@@ -754,17 +762,22 @@ curl -X PATCH http://localhost:4001/documents/roadmapDocument \
   -d '{"body":"should not save"}'
 ```
 
-The same HTTP API as the TypeScript server (`make ts-server`), just on a different
-port.
+Demo bearer tokens:
+
+| Token | User | Access |
+|---|---|---|
+| `demo-token-alice` | user:alice | workspace editor via team membership |
+| `demo-token-bob` | user:bob | workspace viewer (read only) |
+| `demo-token-casey` | user:casey | no access |
 
 ---
 
 ## Checkpoint
 
-`domain.New` returns `Documents` (an interface) instead of `*documentService`
-(the concrete struct). Why does this matter?
+`documents.New` returns `documents.Service` (an interface) instead of
+`*documentService` (the concrete struct). Why does this matter?
 
-Good answer: callers can only use the three methods declared on `Documents`. They
+Good answer: callers can only use the three methods declared on `Service`. They
 cannot inspect the struct's fields, call unexported methods, or construct a
 `documentService` without going through `New`. Combined with the `internal/`
 directory restriction (nothing outside `rebac-primer` can import the internal

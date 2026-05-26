@@ -24,7 +24,7 @@ over directly:
 - The three-layer separation: HTTP parses -> domain service decides authz is
   required -> authorizer answers allow/deny
 - Factory/constructor injection with an `AuthzClient` interface: swapping
-  `makeAuthzServiceClient` or `NewGraphAuthorizer` for a real OpenFGA client
+  `makeAuthzServiceClient` or `graph.NewGraphEvaluator` for a real OpenFGA client
   requires one change, in one place
 - The tuple model: objects, relations, subject sets, inheritance via `from`
 - The OpenFGA DSL: types, type restrictions, computed permissions

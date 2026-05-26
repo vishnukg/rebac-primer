@@ -8,19 +8,42 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"rebac-primer/internal/app"
+	"rebac-primer/internal/authz"
+	authzdb "rebac-primer/internal/authz/adapters/db"
+	"rebac-primer/internal/authz/adapters/graph"
+	"rebac-primer/internal/documents"
+	docsauthn "rebac-primer/internal/documents/adapters/authn"
+	docsdb "rebac-primer/internal/documents/adapters/db"
+	docshttp "rebac-primer/internal/documents/adapters/http"
+	"rebac-primer/internal/fixtures"
 )
 
-// newTestHandler builds a fully-wired http.Handler via app.NewWithConfig.
+// newTestHandler builds a fully-wired http.Handler.
 // These are integration-level tests: they exercise the full stack
 // (authn → authz → domain → HTTP) without starting a real server.
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
-	a, err := app.NewWithConfig(context.Background(), app.Config{Port: 4001})
+
+	tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
+	evaluator := graph.NewGraphEvaluator(tupleStore)
+	authzSvc := authz.New(tupleStore, evaluator)
+
+	docRepo := docsdb.New()
+	tokenVerifier := docsauthn.New(fixtures.DemoTokens())
+	docsSvc := documents.New(docRepo, authzSvc)
+
+	_, err := docsSvc.Create(context.Background(), documents.CreateDocumentInput{
+		ID:        "roadmapDocument",
+		Title:     "Roadmap",
+		Body:      "Initial roadmap document",
+		Workspace: fixtures.ProductWorkspace,
+		Actor:     fixtures.Alice,
+	})
 	if err != nil {
-		t.Fatalf("app.NewWithConfig: %v", err)
+		t.Fatalf("seed demo document: %v", err)
 	}
-	return a.Handler
+
+	return docshttp.NewServer(tokenVerifier, docsSvc)
 }
 
 func TestHandler_Health(t *testing.T) {
