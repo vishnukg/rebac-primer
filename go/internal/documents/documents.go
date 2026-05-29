@@ -7,14 +7,14 @@
 //
 // Hexagonal architecture in one diagram:
 //
-//	                    ┌──────────────────────────────────┐
-//	   driving adapters │            documents             │  driven adapters
-//	   (HTTP handler)   │                                  │  (db, authn, authz)
-//	        ───────────►│  Service                         │
-//	                    │    Create() ─────────────────────│──►  DocumentRepository
-//	                    │    Read()   ─────────────────────│──►  AuthzClient
-//	                    │    Update() ─────────────────────│──►  Authenticator (HTTP layer)
-//	                    └──────────────────────────────────┘
+//	                 ┌──────────────────────────────────┐
+//	driving adapters │            documents             │  driven adapters
+//	(HTTP handler)   │                                  │  (db, authn, authz)
+//	     ───────────►│  Service                         │
+//	                 │    Create() ─────────────────────│──►  DocumentRepository
+//	                 │    Read()   ─────────────────────│──►  AuthzClient
+//	                 │    Update() ─────────────────────│──►  Authenticator (HTTP layer)
+//	                 └──────────────────────────────────┘
 //
 // Mirrors typescript/src/documents-service/core/domain/types.ts
 // and typescript/src/documents-service/core/ports/.

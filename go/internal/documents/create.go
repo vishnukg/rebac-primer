@@ -8,8 +8,16 @@ import (
 
 // Create saves a new document if the actor has editor access to the workspace.
 //
-// After persisting the document it writes a "document belongs to workspace"
-// tuple so subsequent can_read checks can traverse the graph.
+// After persisting the document it writes two relationship tuples to the authz
+// service so future checks can traverse the graph:
+//
+//	(document:id, workspace, workspace:X) — records where the document lives, so
+//	                                        workspace members inherit access.
+//	(document:id, owner,     user:actor)  — the creator directly owns the document
+//	                                        (e.g. can_delete, an owner-only action).
+//
+// This is the write-back pattern: the documents service owns document-level
+// tuples; the authz service owns workspace/team tuples.
 //
 // Mirrors typescript/src/documents-service/core/domain/makeCreateDocument.ts.
 func (s *documentService) Create(ctx context.Context, input CreateDocumentInput) (*CollaborativeDocument, error) {
@@ -33,13 +41,19 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 		return nil, err
 	}
 
-	// Register the document → workspace relationship so the graph evaluator can
-	// resolve can_read / can_edit for workspace members.
+	// Register the document relationships so the graph evaluator can resolve
+	// can_read / can_edit for workspace members and owner-only actions for the
+	// creator.
 	if err := s.authzClient.WriteTuples(ctx, []shared.TupleKey{
 		shared.Tuple(
 			shared.Document(input.ID),
 			shared.RelationDocumentWorkspace,
 			shared.Subject(input.Workspace),
+		),
+		shared.Tuple(
+			shared.Document(input.ID),
+			shared.RelationDocumentOwner,
+			shared.Subject(input.Actor),
 		),
 	}); err != nil {
 		return nil, err

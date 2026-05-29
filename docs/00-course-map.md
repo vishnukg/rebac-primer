@@ -66,6 +66,7 @@ Go tracks the same foundation.
 | 03 | Graph theory needed for ReBAC | conceptual |
 | 04 | ReBAC concepts, relationship graphs, agentic tool calls | `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`, `go/internal/authz/adapters/graph/evaluator.go` |
 | 05 | OpenFGA model DSL | `typescript/src/authz-service/adapters/graph/permissionModel.ts`, `go/internal/authz/adapters/graph/permissionmodel.go` |
+| 06 | Architecture: ports & adapters, dependency direction, intentional caveats (both languages) | `go/internal/authz/ports.go`, `go/internal/documents/ports.go`, `typescript/src/documents-service/core/ports` |
 
 ## TypeScript track
 
@@ -88,6 +89,7 @@ Read these after the shared OpenFGA model chapter.
 | 17 | TypeScript AuthZ adapter pattern | `typescript/src/documents-service/adapters/authz/makeAuthzServiceClient.ts`, `typescript/test/fixtures.ts` |
 | 18 | TypeScript ReBAC implementation — theory to code walkthrough | `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`, `typescript/src/documents-service/adapters/http` |
 | 19 | Factory function pattern — closure-based DI, pattern names, trade-offs | `typescript/src/documents-service/core/domain`, `typescript/src/authz-service/compose.ts` |
+| 29 | Authz call flow: tracing a request through every layer (two HTTP services) | `typescript/src/documents-service/adapters/http`, `typescript/src/documents-service/adapters/authz/makeAuthzServiceClient.ts`, `typescript/src/authz-service/adapters/http` |
 
 ## Go track
 
@@ -95,7 +97,7 @@ Read these after the shared ReBAC track if Go is your implementation language.
 
 | Doc | Topic | Code to inspect |
 |-----|-------|-----------------|
-| 20 | Go language primer | `go/internal/shared/rebac.go`, `go/internal/documents/service.go` |
+| 20 | Go language primer | `go/internal/shared/rebac.go`, `go/internal/documents/documents.go` |
 | 21 | Go ReBAC implementation walkthrough | `go/internal/authz/adapters/graph/evaluator.go`, `go/internal/documents/adapters/http/handler.go` |
 | 22 | Go concurrency: goroutines, channels, WaitGroups | `go/internal/authz/adapters/graph/parallel.go` |
 | 23 | Go generics: type parameters, constraints, Result[T] | `go/internal/authz/adapters/graph/result.go` |
@@ -103,6 +105,7 @@ Read these after the shared ReBAC track if Go is your implementation language.
 | 25 | Go testing: AAA, table-driven, benchmarks, fuzz | `go/internal/authz/adapters/graph/evaluator_test.go` |
 | 26 | From-scratch ReBAC vs OpenFGA: concept mapping and migration guide | `go/internal/authz/adapters/graph/evaluator.go`, `go/internal/authz/adapters/graph/permissionmodel.go` |
 | 27 | Graph evaluator deep dive: step-by-step walkthrough for non-graph-theory readers | `go/internal/authz/adapters/graph/evaluator.go` |
+| 28 | Authz call flow: tracing a request through every layer (in-process) | `go/cmd/server/main.go`, `go/internal/documents/read.go`, `go/internal/authz/domain.go` |
 
 ## Shared track: Docker and local services
 
@@ -130,7 +133,9 @@ Read if TypeScript or Node.js is your primary goal.
 ```
 01 → 02 → 03 → 04 → 05             Authn/authz + ReBAC + OpenFGA model
 10 → 11 → 12 → 13 → 14 → 15 → 16   TypeScript language and app structure
-17 → 18                             OpenFGA adapter + theory-to-code walkthrough
+17 → 18 → 19                        OpenFGA adapter + theory-to-code walkthrough + factories
+29                                  Authz call flow across the two HTTP services
+06                                  Architecture synthesis: ports & adapters, dependency direction
 30 → 31 → 32 → 33                  Docker + client/server
 40                                  Production gaps
 ```
@@ -147,6 +152,8 @@ concepts directly through the implementation code.
 21                                  Go ReBAC implementation
 26                                  From-scratch ReBAC vs OpenFGA (optional but recommended)
 27                                  Graph evaluator deep dive (read alongside evaluator.go)
+28                                  Authz call flow across every layer (request → decision → status)
+06                                  Architecture synthesis: ports & adapters, dependency direction
 22                                  Concurrency: goroutines and channels
 23                                  Generics: Result[T] and Map
 24                                  Interfaces and embedding: decorator pattern
@@ -229,7 +236,7 @@ TypeScript:
 Go:
 
 1. Read `21-go-rebac-implementation.md`.
-2. Open `go/internal/documents/service.go`.
+2. Open `go/internal/documents/update.go` (and `domain.go` for the shared helpers).
 3. Trace how `Update` becomes an authorization check.
 4. If the graph traversal is hard to follow, read `docs/27-graph-evaluator-walkthrough.md`
    and step through the `alice / can_edit / roadmapDocument` trace.

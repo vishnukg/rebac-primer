@@ -47,14 +47,3 @@ func (r *InMemoryDocumentRepository) FindByID(_ context.Context, id string) (*do
 	}
 	return &doc, nil
 }
-
-// List returns all documents in arbitrary order.
-func (r *InMemoryDocumentRepository) List(_ context.Context) ([]documents.CollaborativeDocument, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make([]documents.CollaborativeDocument, 0, len(r.docs))
-	for _, doc := range r.docs {
-		out = append(out, doc)
-	}
-	return out, nil
-}

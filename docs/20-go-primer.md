@@ -263,7 +263,7 @@ export class DocumentNotFoundError extends Error {
 Go:
 
 ```go
-// go/internal/documents/domain.go
+// go/internal/documents/documents.go
 type DocumentNotFoundError struct {
     ID string
 }
@@ -283,9 +283,9 @@ upstream, it wraps the error:
 
 ```go
 // go/cmd/server/main.go
-_, err := docs.Create(ctx, input)
+_, err := docsSvc.Create(ctx, input)
 if err != nil {
-    return nil, fmt.Errorf("app: seed demo document: %w", err)
+    return nil, fmt.Errorf("seed demo document: %w", err)
 }
 ```
 
@@ -295,7 +295,7 @@ original type:
 
 ```go
 // This works even when the error was wrapped with fmt.Errorf:
-var forbidden *domain.ForbiddenError
+var forbidden *documents.ForbiddenError
 if errors.As(err, &forbidden) { ... }
 ```
 
@@ -319,13 +319,13 @@ Go uses `errors.As`:
 ```go
 // go/internal/documents/adapters/http/handler.go
 func (h *handler) writeError(w http.ResponseWriter, err error) {
-    var notFound *domain.DocumentNotFoundError
+    var notFound *documents.DocumentNotFoundError
     if errors.As(err, &notFound) {
         writeJSON(w, http.StatusNotFound, errorBody(err.Error()))
         return
     }
 
-    var forbidden *domain.ForbiddenError
+    var forbidden *documents.ForbiddenError
     if errors.As(err, &forbidden) {
         writeJSON(w, http.StatusForbidden, errorBody(err.Error()))
         return
@@ -388,13 +388,13 @@ are the most common. A method's receiver can be a value or a pointer:
 func (p Point) DistanceFromOrigin() float64 { ... }
 
 // Pointer receiver — sees the address; can mutate fields and shares state.
-func (s *InMemoryTupleStore) Write(key TupleKey) { ... }
-func (s *InMemoryTupleStore) All() []TupleKey   { ... } // also a pointer — needs the mutex
+func (s *InMemoryTupleStore) Write(key shared.TupleKey) { ... }
+func (s *InMemoryTupleStore) FindAll(filter ...authz.TupleFilter) []shared.TupleKey { ... } // also a pointer — needs the mutex
 ```
 
 The rule in this repo: use pointer receivers when the method mutates state,
 holds a mutex/RWMutex, or is large enough that copying is wasteful. The
-`InMemoryTupleStore` methods all use pointer receivers because `All()`,
+`InMemoryTupleStore` methods all use pointer receivers because `FindAll()`,
 `Has()`, and friends acquire `s.mu.RLock()` — and a `sync.RWMutex` must not be
 copied. Value receivers are reserved for small, immutable value types.
 
@@ -408,10 +408,10 @@ Go has no `new` keyword for custom initialization. The convention is a `New*`
 function that returns a pointer to an initialized struct:
 
 ```go
-// go/internal/authz/adapters/db/store.go
-func NewInMemoryTupleStore(seed ...TupleKey) *InMemoryTupleStore {
+// go/internal/authz/adapters/db/store.go — package db, so callers write db.New(...)
+func New(seed ...shared.TupleKey) *InMemoryTupleStore {
     s := &InMemoryTupleStore{
-        tuples: make(map[string]TupleKey, len(seed)),
+        tuples: make(map[string]shared.TupleKey, len(seed)),
     }
     for _, k := range seed {
         s.Write(k)
@@ -486,13 +486,13 @@ TypeScript does not need this because the JavaScript event loop is single-thread
 
 ```go
 // go/internal/documents/domain.go
-func NewDocumentService(repo DocumentRepository, auth authz.Authorizer) DocumentOperations {
-    return &documentService{repo: repo, auth: auth}
+func New(repo DocumentRepository, authzClient AuthzClient) Service {
+    return &documentService{repo: repo, authzClient: authzClient}
 }
 ```
 
-`NewDocumentService` accepts interfaces and returns an interface. Callers never
-see `*documentService` — they only see `DocumentOperations`. This is the same
+`documents.New` accepts interfaces and returns an interface. Callers never
+see `*documentService` — they only see `Service`. This is the same
 intent as TypeScript's `private readonly` constructor parameters, enforced by the
 package boundary instead of the class modifier.
 
@@ -507,17 +507,19 @@ package.
 ```
 go/
 ├── go.mod                  — module root, declares "module rebac-primer"
+├── cmd/server/             — package main (the composition root + entry point)
 └── internal/
-    ├── authz/              — package authz (types.go, store.go, graph.go, …)
-    ├── domain/             — package domain (document.go, service.go, …)
-    ├── httpserver/         — package httpserver (server.go, handler.go)
-    ├── fixtures/           — package fixtures (fixtures.go)
-    └── app/                — package app (app.go)
+    ├── shared/             — package shared (rebac.go: Object, Relation, TupleKey, …)
+    ├── authz/              — package authz (authz.go, ports.go, domain.go)
+    │   └── adapters/       — db (tuple store), graph (evaluator), http
+    ├── documents/          — package documents (documents.go, ports.go, create/read/update.go)
+    │   └── adapters/       — db (repo), authn (verifier), http
+    └── fixtures/           — package fixtures (fixtures.go)
 ```
 
 The `internal/` directory is special: packages inside it can only be imported by
 code rooted at the same parent. `rebac-primer/internal/authz` can be imported
-by `rebac-primer/internal/domain`, but not by any module outside `rebac-primer`.
+by `rebac-primer/internal/documents`, but not by any module outside `rebac-primer`.
 This enforces the same encapsulation you get from TypeScript barrel files and
 access modifiers.
 
@@ -533,7 +535,7 @@ Go does not have `async`/`await`. All I/O runs synchronously in Go goroutines
 first argument so callers can cancel them or attach a deadline:
 
 ```go
-// go/internal/documents/domain.go (read.go)
+// go/internal/documents/read.go
 func (s *documentService) Read(ctx context.Context, id string, actor shared.Object) (*CollaborativeDocument, error) {
     doc, err := s.requireDocument(ctx, id)  // passes ctx to the repo
     // ...
@@ -552,7 +554,7 @@ In tests, the root context is `context.Background()` — it is never cancelled a
 has no deadline:
 
 ```go
-result, err := auth.Check(context.Background(), req)
+result, err := ev.Evaluate(context.Background(), req)
 ```
 
 Production handlers receive a context from the incoming HTTP request via
@@ -639,7 +641,7 @@ failure points at the test:
 
 ```go
 // go/internal/documents/service_test.go
-func newSeededService(t *testing.T) domain.DocumentOperations {
+func newSeededService(t *testing.T) documents.Service {
     t.Helper()
     // wires up a full service and pre-creates the roadmap document
     ...

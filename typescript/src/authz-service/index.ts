@@ -12,7 +12,7 @@
 // Port: AUTHZ_PORT (default 4100)
 
 import composeAuthzService from "./compose.ts";
-import { seedPolicyTuples } from "../../test/fixtures.ts";
+import { seedPolicyTuples } from "../demo/fixtures.ts";
 
 const { listen } = composeAuthzService({ seedTuples: seedPolicyTuples() });
 

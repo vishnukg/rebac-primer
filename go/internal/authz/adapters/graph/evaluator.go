@@ -49,11 +49,11 @@
 //
 //  1. Direct lookup      — is there a tuple (object, relation, user) in the store?
 //  2. Subject-set        — is there a tuple (object, relation, group#rel) where
-//                          user is a member of that group?
+//     user is a member of that group?
 //  3. Rule expansion     — does the permission model say this relation is implied
-//                          by a stronger relation? If so, recurse with that relation.
+//     by a stronger relation? If so, recurse with that relation.
 //  4. Workspace inherit  — (documents only) follow the "workspace" pointer to the
-//                          parent workspace and check the same relation there.
+//     parent workspace and check the same relation there.
 //
 // If any branch returns true, the whole check is allowed.  If every branch is
 // exhausted without finding the user, the check is denied.

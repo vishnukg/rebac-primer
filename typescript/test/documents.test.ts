@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import makeDocuments from "../src/documents-service/core/domain/makeDocuments.ts";
 import makeInMemoryDocumentRepository from
     "../src/documents-service/adapters/db/makeInMemoryDocumentRepository.ts";
+import { document } from "../src/shared/rebac.ts";
 import { alice, bob, productWorkspace, seedPolicyTuples, makeInProcessAuthzClient } from "./fixtures.ts";
 
 const makeService = () =>
@@ -39,6 +40,35 @@ describe("documents domain — create", () => {
             id: "d1", title: "Roadmap", body: "v1",
             workspace: productWorkspace, actor: bob,
         })).rejects.toMatchObject({ name: "ForbiddenError" });
+    });
+
+    it("makes the creator the document owner (grants can_delete)", async () => {
+        // Arrange: share the authz stub so we can inspect the tuples create writes.
+        const authzClient = makeInProcessAuthzClient(seedPolicyTuples());
+        const documents = makeDocuments({
+            repository: makeInMemoryDocumentRepository(),
+            authzClient,
+        });
+
+        // Act: alice (a workspace editor) creates a document.
+        await documents.create({
+            id: "d1", title: "Roadmap", body: "v1",
+            workspace: productWorkspace, actor: alice,
+        });
+
+        // Assert: alice can_delete d1. can_delete requires document owner, and a
+        // workspace editor only inherits document editor (can_edit) — never owner.
+        // So this passes only because create wrote a direct (d1, owner, alice) tuple.
+        const aliceDelete = await authzClient.check({
+            user: alice, relation: "can_delete", object: document("d1"),
+        });
+        expect(aliceDelete.allowed).toBe(true);
+
+        // And bob (a workspace viewer) is not an owner — cannot delete.
+        const bobDelete = await authzClient.check({
+            user: bob, relation: "can_delete", object: document("d1"),
+        });
+        expect(bobDelete.allowed).toBe(false);
     });
 });
 

@@ -63,7 +63,7 @@ curl http://127.0.0.1:4001/health
 In another terminal (after services are running):
 
 ```bash
-npm run cli
+npm run client
 ```
 
 The client is a simple interactive terminal UI. It lets you:
@@ -264,7 +264,7 @@ make go-server  # starts the Go server
 and exercise it with:
 
 ```bash
-npm run cli
+npm run client
 ```
 
 ## Checkpoint

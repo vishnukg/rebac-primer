@@ -106,6 +106,7 @@ var workspaceRules = impliedBy{
 // Hierarchy of base relations: owner ⊇ editor ⊇ viewer
 //
 // Derived permissions:
+//
 //	can_read    ← viewer (and therefore editor and owner)
 //	can_comment ← viewer (and therefore editor and owner)
 //	can_edit    ← editor (and therefore owner)

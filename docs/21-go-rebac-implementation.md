@@ -435,10 +435,14 @@ type ReadOnlyStore struct {
 }
 ```
 
-Embedding `authz.TupleRepository` promotes `Has`, `FindByObjectRelation`, and
-`FindAll` onto `ReadOnlyStore`. The store can be passed anywhere a
-`TupleRepository` is expected. Because `ReadOnlyStore` does not expose `Write`
-or `Delete` as its own methods, callers cannot mutate the store through it.
+Embedding `authz.TupleRepository` promotes *every* method of the interface —
+`Has`, `FindByObjectRelation`, `FindAll`, **and `Write` and `Delete`** — onto
+`ReadOnlyStore`. So the store can be passed anywhere a `TupleRepository` is
+expected, but it is not read-only at the type level: a caller could still invoke
+`Write` or `Delete`. The name signals intent; it is not a compiler-enforced
+guarantee. To make read-only something the compiler checks, embed a narrower
+reader interface (just `Has`/`FindByObjectRelation`/`FindAll`) instead of the
+full `TupleRepository`. Doc 24 covers this trade-off in depth.
 
 ---
 

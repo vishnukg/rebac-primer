@@ -5,12 +5,13 @@ import (
 	"errors"
 	"testing"
 
+	"rebac-primer/internal/authz"
 	authzdb "rebac-primer/internal/authz/adapters/db"
 	"rebac-primer/internal/authz/adapters/graph"
-	"rebac-primer/internal/authz"
-	docsdb "rebac-primer/internal/documents/adapters/db"
 	"rebac-primer/internal/documents"
+	docsdb "rebac-primer/internal/documents/adapters/db"
 	"rebac-primer/internal/fixtures"
+	"rebac-primer/internal/shared"
 )
 
 // newSeededService wires together a documents.Service backed by the standard
@@ -80,6 +81,46 @@ func TestDocumentService_Create_SucceedsForEditor(t *testing.T) {
 	}
 	if doc.UpdatedBy != fixtures.Alice {
 		t.Errorf("expected updatedBy=%q, got %q", fixtures.Alice, doc.UpdatedBy)
+	}
+}
+
+func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
+	// Arrange: wire authz + documents over a shared tuple store so we can inspect
+	// the tuples Create writes.
+	store := authzdb.New(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, graph.NewGraphEvaluator(store))
+	svc := documents.New(docsdb.New(), authzSvc)
+
+	// Act: alice (a workspace editor) creates a document.
+	if _, err := svc.Create(context.Background(), documents.CreateDocumentInput{
+		ID: "d1", Title: "Roadmap", Body: "v1",
+		Workspace: fixtures.ProductWorkspace, Actor: fixtures.Alice,
+	}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	// Assert: alice can_delete d1. can_delete requires document owner, and a
+	// workspace editor only inherits document editor (can_edit) — never owner. So
+	// this passes only because Create wrote a direct (d1, owner, alice) tuple.
+	ownerCheck, err := authzSvc.Check(context.Background(), shared.CheckRequest{
+		User: fixtures.Alice, Relation: shared.RelationDocumentCanDelete, Object: shared.Document("d1"),
+	})
+	if err != nil {
+		t.Fatalf("check alice: %v", err)
+	}
+	if !ownerCheck.Allowed {
+		t.Error("expected creator alice to have can_delete on the document she created")
+	}
+
+	// And bob (a workspace viewer) is not an owner — cannot delete.
+	viewerCheck, err := authzSvc.Check(context.Background(), shared.CheckRequest{
+		User: fixtures.Bob, Relation: shared.RelationDocumentCanDelete, Object: shared.Document("d1"),
+	})
+	if err != nil {
+		t.Fatalf("check bob: %v", err)
+	}
+	if viewerCheck.Allowed {
+		t.Error("expected workspace viewer bob to NOT have can_delete")
 	}
 }
 

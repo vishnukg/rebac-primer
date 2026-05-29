@@ -1,47 +1,25 @@
-// Shared test fixtures and stubs.
+// Test fixtures.
 //
-// fixtures:         demo actors, objects, tokens, and seed policy tuples
-// makeInProcessAuthzClient: a test stub that satisfies the AuthzClient port
-//                  using the real graph evaluator in-process — no HTTP calls,
-//                  but real authz logic.  Shared across documents.test.ts and
-//                  documentsService.test.ts.
+// The demo data (actors, objects, tokens, seed policy tuples) lives in
+// src/demo/fixtures.ts so runtime entrypoints can seed from it too. This file
+// re-exports that data and adds one test-only helper:
+//
+//   makeInProcessAuthzClient — a stub that satisfies the AuthzClient port using
+//   the real graph evaluator in-process (no HTTP), so tests exercise real authz
+//   logic without a network hop. Shared across documents.test.ts and
+//   documentsService.test.ts.
 
-import { subjectSet, team, tuple, user, workspace } from "../src/shared/rebac.ts";
 import type { TupleKey } from "../src/shared/rebac.ts";
 import makeInMemoryTupleRepository from "../src/authz-service/adapters/db/makeInMemoryTupleRepository.ts";
 import makeGraphEvaluator from "../src/authz-service/adapters/graph/makeGraphEvaluator.ts";
 import type { AuthzClient } from "../src/documents-service/core/ports/authzClient.ts";
 
-// ── Demo actors ───────────────────────────────────────────────────────────────
-
-export const alice = user("alice");
-export const bob   = user("bob");
-export const casey = user("casey");
-
-// ── Demo objects ──────────────────────────────────────────────────────────────
-
-export const platformTeam     = team("platformTeam");
-export const productWorkspace = workspace("productWorkspace");
-
-// ── Demo bearer tokens ────────────────────────────────────────────────────────
-
-export const demoTokens: Record<string, { sub: string; scopes: string[] }> = {
-    "demo-token-alice": { sub: "alice", scopes: ["documents:read", "documents:write"] },
-    "demo-token-bob":   { sub: "bob",   scopes: ["documents:read"] },
-    "demo-token-casey": { sub: "casey", scopes: ["documents:read"] },
-};
-
-// ── Policy tuples (workspace/team memberships) ────────────────────────────────
-//
-// These represent what the platform team writes to the authz service.
-// Alice is a platform team member → editors of productWorkspace.
-// Bob is a direct viewer of productWorkspace.
-
-export const seedPolicyTuples = (): TupleKey[] => [
-    tuple(platformTeam, "member", alice),
-    tuple(productWorkspace, "editor", subjectSet(platformTeam, "member")),
-    tuple(productWorkspace, "viewer", bob),
-];
+// Re-export the demo data so tests can keep importing it from "./fixtures.ts".
+export {
+    alice, bob, casey,
+    platformTeam, productWorkspace,
+    demoTokens, seedPolicyTuples,
+} from "../src/demo/fixtures.ts";
 
 // ── AuthzClient stub ──────────────────────────────────────────────────────────
 //

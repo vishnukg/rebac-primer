@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"rebac-primer/internal/authz"
 	authzdb "rebac-primer/internal/authz/adapters/db"
 	"rebac-primer/internal/authz/adapters/graph"
 	authzhttp "rebac-primer/internal/authz/adapters/http"
-	"rebac-primer/internal/authz"
 	"rebac-primer/internal/fixtures"
 	"rebac-primer/internal/shared"
 )

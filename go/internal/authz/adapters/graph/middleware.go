@@ -57,19 +57,25 @@ var _ Checker = (*AuditEvaluator)(nil)
 
 // ── ReadOnlyStore ─────────────────────────────────────────────────────────────
 
-// ReadOnlyStore embeds [authz.TupleRepository] to expose only the read methods.
-// Write and Delete are absent — the compiler enforces that callers cannot mutate
-// the underlying store through this type.
+// ReadOnlyStore embeds [authz.TupleRepository]. Embedding an interface promotes
+// every method of that interface onto the outer struct — including Write and
+// Delete. So ReadOnlyStore is NOT read-only at the type level: a caller could
+// still invoke ro.Write(...) or ro.Delete(...) and it would compile and mutate
+// the underlying store.
 //
-// Embedding promotes all TupleRepository methods onto ReadOnlyStore. Because
-// Write and Delete are not part of the interface, they are not promoted and the
-// type cannot be used as a writable store.
+// The name therefore expresses intent, not a compiler-enforced guarantee: pass
+// a ReadOnlyStore to code that should only read tuples and let naming + review
+// communicate that. To make read-only a guarantee the compiler checks, embed a
+// narrower interface that omits Write and Delete (e.g. a reader interface with
+// just Has/FindByObjectRelation/FindAll) instead of the full TupleRepository.
+// See docs/24-go-interfaces-embedding.md.
 type ReadOnlyStore struct {
 	authz.TupleRepository
 }
 
-// NewReadOnlyStore wraps a repository so it can be passed to code that must not
-// write tuples — for example, a read-only replica or a test spy.
+// NewReadOnlyStore wraps a repository so it can be passed to code that should
+// only read tuples — for example, a read-only replica or a test spy. See the
+// caveat on [ReadOnlyStore]: this signals intent rather than enforcing it.
 func NewReadOnlyStore(r authz.TupleRepository) ReadOnlyStore {
 	return ReadOnlyStore{r}
 }

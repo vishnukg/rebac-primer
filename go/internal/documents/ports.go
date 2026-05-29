@@ -2,6 +2,7 @@ package documents
 
 import (
 	"context"
+	"errors"
 
 	"rebac-primer/internal/shared"
 )
@@ -35,7 +36,6 @@ type CollaborativeDocument struct {
 type DocumentRepository interface {
 	Save(ctx context.Context, doc CollaborativeDocument) error
 	FindByID(ctx context.Context, id string) (*CollaborativeDocument, error)
-	List(ctx context.Context) ([]CollaborativeDocument, error)
 }
 
 // AuthzClient is what the documents domain needs from the authz service.
@@ -70,12 +70,12 @@ type AuthenticationError struct {
 func (e *AuthenticationError) Error() string { return e.Message }
 
 // IsAuthenticationError reports whether err is (or wraps) an [AuthenticationError].
+// It uses errors.As so it still finds the type through a fmt.Errorf("...: %w", err)
+// wrapper — the same unwrapping the HTTP adapter relies on for the other domain
+// errors.
 func IsAuthenticationError(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(*AuthenticationError)
-	return ok
+	var authErr *AuthenticationError
+	return errors.As(err, &authErr)
 }
 
 // Authenticator is the port the HTTP handler calls to establish caller identity.

@@ -157,8 +157,9 @@ export type CheckRequest = {
 Use `interface` when you are describing behavior:
 
 ```ts
-export interface Authorizer {
-  check: (request: CheckRequest) => Promise<CheckResult>;
+// src/authz-service/core/ports/evaluator.ts
+export interface Evaluator {
+  evaluate: (request: CheckRequest) => Promise<CheckResult>;
 }
 ```
 

@@ -12,21 +12,19 @@ to demonstrate the core ideas in both languages.
 ## Repository map
 
 ```
-typescript/       TypeScript implementation
-  src/core/       Ports, ReBAC value helpers, and document domain rules
-  src/adapters/   Authn, authz, db, HTTP, and client adapters
-  src/server/     Server composition root and entry point
-  src/cli/        Terminal client composition root and entry point
-  src/demo/       Small graph-tracing demo and shared demo fixtures
-  test/           Vitest tests
+typescript/                TypeScript implementation
+  src/shared/              ReBAC value helpers (objects, relations, tuples)
+  src/authz-service/       AuthZ service: core/ (domain + ports), adapters/ (db, graph, http)
+  src/documents-service/   Documents service: core/, adapters/ (authn, authz, db, http, client)
+  src/cli/                 Terminal client composition root and entry point
+  test/                    Vitest tests
 
-go/               Go implementation
-  internal/authz/     Authorization types, tuple store, graph evaluator, OpenFGA adapter
-  internal/domain/    Document model and service layer
-  internal/httpserver/ HTTP handler and routing
-  internal/fixtures/  Shared test data
-  internal/app/       Composition root
-  cmd/server/         Entry point
+go/                        Go implementation
+  internal/shared/         ReBAC primitives (Object, Relation, TupleKey, CheckRequest)
+  internal/authz/          AuthZ core (Service, ports) + adapters/ (db, graph, http)
+  internal/documents/      Documents core (Service, ports, use cases) + adapters/ (db, authn, http)
+  internal/fixtures/       Shared test data
+  cmd/server/              Composition root + entry point
 
 docs/             Tutorial chapters (read these in order)
 deployments/      Docker Compose for both implementations + OpenFGA
@@ -38,9 +36,9 @@ Read [docs/00-course-map.md](docs/00-course-map.md) for the full learning path.
 
 Short version:
 
-1. Shared authn/authz and ReBAC concepts -> docs 01-05
-2. TypeScript implementation track -> docs 10-17
-3. Go implementation track -> docs 20-25
+1. Shared concepts: authn/authz, ReBAC, and the architecture -> docs 01-06
+2. TypeScript implementation track -> docs 10-19 (+ doc 29, the authz call flow)
+3. Go implementation track -> docs 20-28
 4. Shared Docker/local services -> docs 30-33
 5. Shared production concerns -> doc 40
 
@@ -64,7 +62,6 @@ make ts-build
 make ts-test
 make ts-coverage
 make ts-check
-cd typescript && npm run demo
 make ts-server
 make ts-client
 ```
@@ -122,21 +119,21 @@ The TypeScript project is organized around a small ports-and-adapters shape:
 adapters -> core <- composition roots
 ```
 
-`src/core` contains the domain language and ports: ReBAC objects, relations,
-tuples, `Authorizer`, `Authenticator`, `DocumentRepository`, and the document
-operations. `src/adapters` contains concrete details: demo token verification,
-the graph/OpenFGA authorizers, in-memory persistence, HTTP, and terminal/HTTP
-clients.
+Each service has a `core/` (the domain language and ports: ReBAC objects,
+relations, tuples, `Evaluator`, `Authenticator`, `DocumentRepository`, and the
+document operations) and an `adapters/` (concrete details: demo token
+verification, the graph evaluator, in-memory persistence, HTTP, and
+terminal/HTTP clients).
 
 Domain code does not import concrete infrastructure. For example, document
-operations receive a repository and authorizer. The server entry point chooses
-the in-memory repository, demo OAuth2 token verifier, and graph authorizer, then
-`src/server/compose.ts` wires them together.
+operations receive a repository and an authz client. Each service's `compose.ts`
+chooses the in-memory repository, demo OAuth2 token verifier, and graph
+evaluator, then wires them together.
 
 Good files to read first:
 
-1. `typescript/src/server/compose.ts`
-2. `typescript/src/core/ports/authz.ts`
-3. `typescript/src/core/domain/documents/makeDocuments.ts`
-4. `typescript/src/adapters/authz/makeGraphAuthorizer.ts`
-5. `typescript/src/adapters/http/makeHttpHandler.ts`
+1. `typescript/src/documents-service/compose.ts`
+2. `typescript/src/authz-service/core/ports/evaluator.ts`
+3. `typescript/src/documents-service/core/domain/makeDocuments.ts`
+4. `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`
+5. `typescript/src/documents-service/adapters/http/makeDocumentsHttpHandler.ts`

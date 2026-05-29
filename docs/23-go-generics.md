@@ -85,9 +85,9 @@ argument list, not after the function name. The compiler infers T from the
 argument type at the call site:
 
 ```go
-r := authz.OK(42)         // T inferred as int
-r := authz.OK("hello")    // T inferred as string
-r := authz.Fail[int](err) // T must be explicit — Fail has no T-typed argument
+r := graph.OK(42)         // T inferred as int
+r := graph.OK("hello")    // T inferred as string
+r := graph.Fail[int](err) // T must be explicit — Fail has no T-typed argument
 ```
 
 When the compiler cannot infer T (as in `Fail`), you must supply it explicitly.
@@ -113,7 +113,7 @@ return type.
 Go 1.18 does not support adding new type parameters in methods — only in top-
 level functions. That is why `Map` and `Collect` are package-level functions
 rather than methods on `Result`. This is a known limitation. In TypeScript you
-can write `result.map(f)` fluently; in Go you write `authz.Map(r, f)`.
+can write `result.map(f)` fluently; in Go you write `graph.Map(r, f)`.
 
 ## `Collect` — the Promise.all of Go generics
 
@@ -155,7 +155,7 @@ The structure is identical. The syntax is Go.
 Most of the time you do not write type arguments:
 
 ```go
-mapped := authz.Map(authz.OK(3), func(n int) string {
+mapped := graph.Map(graph.OK(3), func(n int) string {
     return fmt.Sprintf("item-%d", n)
 })
 // T inferred as int, U inferred as string
@@ -165,7 +165,7 @@ The compiler figures it out from the arguments. You only write type arguments
 when inference fails:
 
 ```go
-r := authz.Fail[int](errors.New("bad"))
+r := graph.Fail[int](errors.New("bad"))
 ```
 
 `Fail` takes only an `error`, so there is nothing to infer `T` from.

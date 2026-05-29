@@ -58,8 +58,8 @@ collector runs the loop after all goroutines have been started:
 
 ```go
 for _, rel := range relations {
-    go func(rel Relation) {
-        result, err := auth.Check(ctx, CheckRequest{User: user, Relation: rel, Object: object})
+    go func(rel shared.Relation) {
+        result, err := auth.Evaluate(ctx, shared.CheckRequest{User: user, Relation: rel, Object: object})
         ch <- outcome{relation: rel, allowed: result.Allowed, err: err}
     }(rel)
 }
@@ -101,15 +101,15 @@ but the explicit argument form is still the clearer idiom — it documents inten
 
 ```go
 // go/internal/authz/adapters/graph/parallel.go
-func BulkCheck(ctx context.Context, auth Authorizer, reqs []CheckRequest) []BulkResult {
+func BulkCheck(ctx context.Context, auth Checker, reqs []shared.CheckRequest) []BulkResult {
     results := make([]BulkResult, len(reqs))
     var wg sync.WaitGroup
 
     for i, req := range reqs {
         wg.Add(1)
-        go func(i int, req CheckRequest) {
+        go func(i int, req shared.CheckRequest) {
             defer wg.Done()
-            result, err := auth.Check(ctx, req)
+            result, err := auth.Evaluate(ctx, req)
             results[i] = BulkResult{Request: req, Result: result, Err: err}
         }(i, req)
     }

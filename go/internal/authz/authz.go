@@ -6,15 +6,15 @@
 //
 // Hexagonal architecture in one diagram:
 //
-//	                    ┌──────────────────────────────┐
-//	   driving adapters │           authz              │  driven adapters
-//	   (HTTP handler)   │                              │  (db, graph, openfga)
-//	        ───────────►│  Service                     │
-//	                    │    Check()                   │──►  Evaluator
-//	                    │    WriteTuples()             │
-//	                    │    DeleteTuples()            │──►  TupleRepository
-//	                    │    ListTuples()              │
-//	                    └──────────────────────────────┘
+//	                 ┌──────────────────────────────┐
+//	driving adapters │           authz              │  driven adapters
+//	(HTTP handler)   │                              │  (db, graph, openfga)
+//	     ───────────►│  Service                     │
+//	                 │    Check()                   │──►  Evaluator
+//	                 │    WriteTuples()             │
+//	                 │    DeleteTuples()            │──►  TupleRepository
+//	                 │    ListTuples()              │
+//	                 └──────────────────────────────┘
 //
 // Mirrors typescript/src/authz-service/core/domain/types.ts
 // and typescript/src/authz-service/core/ports/.

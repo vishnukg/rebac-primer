@@ -204,7 +204,7 @@ look realistic while hiding the one relationship that matters.
 
 Mocks are useful when you want to isolate a unit.
 
-For example, a `DenyAllAuthorizer` can prove the service rejects unauthorized
+For example, a `DenyAllEvaluator` can prove the service rejects unauthorized
 creates without caring about graph traversal.
 
 But this repo mostly uses `makeGraphEvaluator` (via `makeInProcessAuthzClient`)

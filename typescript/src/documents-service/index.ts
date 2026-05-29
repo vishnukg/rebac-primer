@@ -12,7 +12,7 @@
 // Port: DOCUMENTS_PORT (default 4000)
 
 import composeDocumentsService from "./compose.ts";
-import { demoTokens } from "../../test/fixtures.ts";
+import { demoTokens } from "../demo/fixtures.ts";
 
 const { listen, documents } = composeDocumentsService({ tokens: demoTokens });
 
