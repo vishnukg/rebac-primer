@@ -235,10 +235,10 @@ what `test/fixtures.ts` provides via `makeInProcessAuthzClient`:
 ```ts
 // Satisfies AuthzClient port, uses real graph evaluator, no HTTP calls.
 export const makeInProcessAuthzClient = (seed: TupleKey[] = []): AuthzClient => {
-    const repository = makeInMemoryTupleRepository(seed);
+    const repository = makeInMemoryTupleRepository({ seed });
     const evaluator  = makeGraphEvaluator({ repository });
     return {
-        check:       async req  => evaluator.evaluate(req),
+        check:       req => evaluator.evaluate(req),
         writeTuples: async tpls => { for (const t of tpls) repository.write(t); },
     };
 };

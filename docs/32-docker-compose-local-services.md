@@ -87,7 +87,7 @@ That is deliberate for the primer:
 The interface boundary is already there:
 
 ```ts
-interface Authorizer {
+interface AuthzClient {
   check(request: CheckRequest): Promise<CheckResult>;
 }
 ```

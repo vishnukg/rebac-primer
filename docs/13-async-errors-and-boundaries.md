@@ -120,7 +120,7 @@ This service method:
 ```ts
 const update = async (input: UpdateDocumentInput): Promise<CollaborativeDocument> => {
   const existing = await repository.findById(input.id);
-  if (!existing) throw new DocumentNotFoundError(input.id);
+  if (!existing) throw DocumentNotFoundError(input.id);
 
   const { allowed } = await authzClient.check({
     user:     input.actor,
@@ -296,7 +296,7 @@ For most backend service code, `Promise.all` is the one you will use most.
 Inside an async function:
 
 ```ts
-throw new ForbiddenError("not allowed");
+throw ForbiddenError("not allowed");
 ```
 
 is equivalent to returning a rejected promise.
@@ -314,11 +314,13 @@ try {
 Tests can use:
 
 ```ts
-await expect(service.update(input)).rejects.toBeInstanceOf(ForbiddenError);
+await expect(service.update(input)).rejects.toMatchObject({ name: "ForbiddenError" });
 ```
 
 Always `await` async expectations. If you forget, the test can pass before the
-promise rejects.
+promise rejects. (Use `toMatchObject({ name })`, not `toBeInstanceOf` — these
+errors are tagged via a factory, not a `class`, so there is no constructor to
+match against. See doc 12.)
 
 ## Domain errors
 

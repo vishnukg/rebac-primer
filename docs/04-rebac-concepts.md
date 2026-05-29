@@ -214,12 +214,14 @@ Here is the whole story, from request to decision:
 
 ```text
 PATCH /documents/roadmapDocument
-actorId=alice
+Authorization: Bearer demo-token-alice
 body="new roadmap"
 ```
 
-In a production app, `actorId` would come from an authenticated session or token.
-This repo passes it explicitly so the authorization lesson is visible.
+The actor is not passed in the body. It comes from the verified bearer token:
+the demo token verifier maps `demo-token-alice` to `user:alice` (a production app
+would verify a real JWT instead). Either way the domain receives an
+already-verified actor.
 
 ```text
 HTTP handler
@@ -359,15 +361,15 @@ A tuple is one stored fact:
 In TypeScript:
 
 ```ts
-// typescript/test/fixtures.ts
-tuple(workspace("productWorkspace"), "editor", subjectSet(team("platformTeam"), "member"))
+// typescript/src/demo/fixtures.ts
+tuple(productWorkspace, "editor", subjectSet(platformTeam, "member"))
 ```
 
 In Go:
 
 ```go
 // go/internal/fixtures/fixtures.go
-authz.Tuple(ProductWorkspace, authz.RelationWorkspaceEditor, authz.SubjectSet(PlatformTeam, authz.RelationTeamMember))
+shared.Tuple(ProductWorkspace, shared.RelationWorkspaceEditor, shared.SubjectSet(PlatformTeam, shared.RelationTeamMember))
 ```
 
 This means:
@@ -614,7 +616,7 @@ make ts-server   # start the server
 # or inside the container: npm run dev
 ```
 
-Then change `typescript/test/fixtures.ts` so Bob is an editor instead of
+Then change `typescript/src/demo/fixtures.ts` so Bob is an editor instead of
 a viewer:
 
 ```ts

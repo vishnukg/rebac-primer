@@ -8,9 +8,10 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: [
         "src/cli/index.ts",
-        "src/demo/index.ts",
-        "src/server/index.ts",
-        "src/adapters/http/makeHttpServer.ts"
+        "src/authz-service/index.ts",
+        "src/documents-service/index.ts",
+        "src/authz-service/adapters/http/makeAuthzHttpServer.ts",
+        "src/documents-service/adapters/http/makeDocumentsHttpServer.ts"
       ]
     }
   }

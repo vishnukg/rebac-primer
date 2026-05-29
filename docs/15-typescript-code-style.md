@@ -205,7 +205,7 @@ export const relationshipGraphExample = [
 Throw domain errors from domain code:
 
 ```ts
-throw new ForbiddenError(`${actor} cannot edit ${object}`);
+throw ForbiddenError(`${actor} cannot edit ${object}`);
 ```
 
 Do not return booleans for operations where the caller needs to distinguish
@@ -226,7 +226,7 @@ expect(result.allowed).toBe(true);
 For document domain logic, test the business action:
 
 ```ts
-await expect(documents.update(input)).rejects.toBeInstanceOf(ForbiddenError);
+await expect(documents.update(input)).rejects.toMatchObject({ name: "ForbiddenError" });
 ```
 
 Avoid testing private methods directly. Private methods are implementation

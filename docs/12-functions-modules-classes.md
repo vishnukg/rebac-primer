@@ -66,7 +66,8 @@ src/documents-service/adapters/db/       in-memory document repository
 src/documents-service/adapters/http/     Documents HTTP handler and server
 src/documents-service/adapters/client/   HTTP and terminal client adapters
 src/cli                                  terminal-client entrypoint and composition root
-test/fixtures.ts                         shared demo actors, tokens, and seed tuples
+src/demo/fixtures.ts                     shared demo actors, tokens, and seed tuples
+test/fixtures.ts                         test-only in-process authz stub (re-exports demo data)
 ```
 
 Good module boundaries answer this question:
@@ -192,7 +193,7 @@ Concrete examples:
 - `makeGraphEvaluator` is the in-process AuthZ implementation.
 - `makeAuthzServiceClient` is the HTTP AuthZ implementation.
 - `makeInMemoryDocumentRepository` implements `DocumentRepository`.
-- `makeDocumentsServer` wires document domain to the HTTP server.
+- `makeDocumentsHttpServer` wires document domain to the HTTP server.
 - `composeCliApp` wires the terminal client to the HTTP client.
 - HTTP handlers depend on `Documents`, not document implementation details.
 

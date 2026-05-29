@@ -285,7 +285,7 @@ inside policy expressions.
 ReBAC decides from relationships.
 
 ```text
-user:alice member team:platformTeam
+team:platformTeam member user:alice
 workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
 ```
@@ -519,10 +519,10 @@ Only if both are allowed:
 ReBAC can model these relationships too:
 
 ```text
-user:alice member team:platformTeam
+team:platformTeam member user:alice
 workspace:productWorkspace editor team:platformTeam#member
 document:roadmapDocument workspace workspace:productWorkspace
-agent:docAssistant can_use tool:update_document
+tool:update_document can_use agent:docAssistant
 ```
 
 The important production habit is the same as normal web apps:

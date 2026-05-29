@@ -185,7 +185,7 @@ Two details matter:
 
 ## Test data should be readable
 
-Open `test/fixtures.ts`.
+Open `src/demo/fixtures.ts`.
 
 ```ts
 export const seedPolicyTuples = (): TupleKey[] => [

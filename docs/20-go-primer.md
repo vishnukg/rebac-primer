@@ -225,7 +225,7 @@ TypeScript throws and catches exceptions. Go returns errors as values.
 async function requireDocument(id: string): Promise<CollaborativeDocument> {
   const existing = await this.repository.findById(id);
   if (!existing) {
-    throw new DocumentNotFoundError(id);
+    throw DocumentNotFoundError(id);
   }
   return existing;
 }

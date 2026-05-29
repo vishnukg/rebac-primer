@@ -289,8 +289,8 @@ This is fine for an application entrypoint:
 
 ```ts
 // src/authz-service/index.ts
-const authz = composeAuthzService({ seedTuples: seedPolicyTuples() });
-authz.server.listen(authz.port, "127.0.0.1", () => { /* log */ });
+const { listen } = composeAuthzService({ seedTuples: seedPolicyTuples() });
+listen(port => { /* log: listening on `port` */ });
 ```
 
 This would be a poor surprise inside `src/shared/rebac.ts`:
@@ -398,7 +398,7 @@ the default for everything.
 This repo usually prefers explicit composition:
 
 ```ts
-const repository  = makeInMemoryTupleRepository(seedPolicyTuples());
+const repository  = makeInMemoryTupleRepository({ seed: seedPolicyTuples() });
 const evaluator   = makeGraphEvaluator({ repository });
 const domain      = makeAuthzDomain({ repository, evaluator });
 ```

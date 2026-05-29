@@ -718,7 +718,7 @@ calls the full stack in-process. No server, no port, no teardown.
 | Port definitions       | `interface` in `core/ports/*.ts`        | `interface` in `authz/ports.go` or `documents/ports.go` |
 | Interface satisfaction | Object shape must match                 | Implicit — method set must match          |
 | Factory functions      | `makeDocuments({ repo, authzClient })`  | `documents.New(repo, authzClient)`        |
-| Error signalling       | `throw new ForbiddenError(...)`         | `return &ForbiddenError{...}`             |
+| Error signalling       | `throw ForbiddenError(...)`             | `return &ForbiddenError{...}`             |
 | Error dispatch         | `instanceof`                            | `errors.As`                               |
 | Immutable copy         | `{ ...existing, body: newBody }`        | `updated := *existing; updated.Body = …`  |
 | Async / cancellation   | `async`/`await`, `Promise`              | Synchronous + `context.Context`           |

@@ -753,8 +753,9 @@ CLI / device          Flow 3: Device Authorization        Or Auth Code with loca
 For this repo:
 - Future browser/server version: Flow 1 (Authorization Code + PKCE + OIDC)
 - Current terminal client: Flow 3 (Device Authorization) or Flow 1 with localhost callback
-- Tutorial mode (current): you type `alice`, `bob`, or `casey` — login is skipped
-  to keep focus on authorization
+- Tutorial mode (current): you paste a demo bearer token (`demo-token-alice`,
+  `demo-token-bob`, or `demo-token-casey`) instead of a real OAuth login, to keep
+  the focus on authorization
 
 ## Two patterns to avoid
 

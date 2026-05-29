@@ -15,5 +15,8 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=build /workspace/src ./src
-EXPOSE 4000
-CMD ["node", "src/server/index.ts"]
+# The TypeScript app is two services: authz (4100) and documents (4000). Both run
+# in this container; the documents service reaches authz on localhost:4100 (the
+# default AUTHZ_URL). Only 4000 needs publishing for clients; 4100 is internal.
+EXPOSE 4000 4100
+CMD ["npm", "run", "start"]

@@ -215,7 +215,7 @@ that the program does what the domain requires.
 
 ## Exercise
 
-1. Open `test/fixtures.ts`.
+1. Open `src/demo/fixtures.ts`.
 2. Change `"editor"` to `"edtor"` in one tuple.
 3. Run `npm run build`.
 4. Read the compiler error.

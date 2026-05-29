@@ -152,7 +152,7 @@ Open `test/fixtures.ts`.
 
 ```ts
 export const makeInProcessAuthzClient = (seed: TupleKey[] = []): AuthzClient => {
-    const repository = makeInMemoryTupleRepository(seed);
+    const repository = makeInMemoryTupleRepository({ seed });
     const evaluator  = makeGraphEvaluator({ repository });
     return {
         check:       req  => evaluator.evaluate(req),

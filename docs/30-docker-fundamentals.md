@@ -35,8 +35,8 @@ The TypeScript Dockerfile has three stages:
 
 ```text
 deps    -> FROM node:22-slim;  install npm dependencies
-build   -> FROM deps;          add src + test, compile TypeScript
-runtime -> FROM node:22-slim;  install prod-only deps, copy /dist, run node
+build   -> FROM deps;          add src + test, type-check (npm run build = tsc)
+runtime -> FROM node:22-slim;  install prod-only deps, copy src, run the services
 ```
 
 Two things to notice: `build` extends `deps` (so it inherits `node_modules`
@@ -44,14 +44,18 @@ without reinstalling), and `runtime` starts fresh from `node:22-slim` and
 re-installs with `--omit=dev` so the final image carries no build tools or
 test code.
 
-The runtime stage does not run `tsx`. It runs compiled JavaScript:
+`npm run build` here is `tsc` with `noEmit: true` — it type-checks rather than
+emitting JavaScript. Node runs the TypeScript sources directly (it strips types
+at load time), so the runtime stage copies `src/` and runs the entrypoints with
+`node`. The TypeScript app is two services, so the container starts both:
 
 ```dockerfile
-CMD ["node", "src/authz-service/index.ts"]
+EXPOSE 4000 4100
+CMD ["npm", "run", "start"]   # runs authz (4100) and documents (4000) together
 ```
 
-That is the production-shaped path. `tsx` is useful during development, but a
-container should usually run built output.
+Inside the container the documents service reaches authz on `localhost:4100`
+(the default `AUTHZ_URL`); only 4000 is published to the host for clients.
 
 The Go Dockerfile follows the same idea with different tooling:
 
@@ -170,13 +174,14 @@ reuse the npm install layer.
 
 ## Ports
 
-The TypeScript app listens on port `4000` inside the container:
+The TypeScript container runs both services and listens on `4000` (documents)
+and `4100` (authz, internal):
 
 ```dockerfile
-EXPOSE 4000
+EXPOSE 4000 4100
 ```
 
-Compose publishes it to your host:
+Compose publishes the documents port to your host (authz stays internal):
 
 ```yaml
 ports:
@@ -201,23 +206,17 @@ ports:
 
 ## Environment variables
 
-Both apps read:
-
-```text
-PORT
-```
-
-Compose sets `4000` for TypeScript and `4001` for Go:
+The Go app reads `PORT` (default `4001`):
 
 ```yaml
-ts-app:
-  environment:
-    PORT: "4000"
-
 go-app:
   environment:
     PORT: "4001"
 ```
+
+The TypeScript services read `DOCUMENTS_PORT` (default `4000`) and `AUTHZ_PORT`
+(default `4100`). Those defaults already match the published ports, so `ts-app`
+needs no port env to run the demo.
 
 Keep configuration in environment variables when it changes per environment.
 Keep code and images the same.

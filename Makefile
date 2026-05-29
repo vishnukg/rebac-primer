@@ -1,5 +1,11 @@
 SHELL := /bin/sh
 
+# Disable Docker Compose's interactive navigation menu. It adds nothing for
+# these targets and, on terminals its TUI library does not recognise, prints a
+# noisy "could not start menu ... termbox: unsupported terminal" warning.
+COMPOSE_MENU ?= false
+export COMPOSE_MENU
+
 COMPOSE ?= docker compose -f deployments/docker-compose.yml
 
 TS_TOOLS := $(COMPOSE) --profile ts-tools run --rm ts-tools

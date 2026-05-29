@@ -119,7 +119,7 @@ should receive typed dependencies, not `process.env` or `os.Getenv` directly.
 The tutorial seeds a static fixture at startup:
 
 ```ts
-const repository = makeInMemoryTupleRepository(seedPolicyTuples());
+const repository = makeInMemoryTupleRepository({ seed: seedPolicyTuples() });
 ```
 
 In production, tuples are written in response to domain events:
@@ -345,14 +345,15 @@ Use this when a single UI action needs multiple permission answers at once.
 
 ## Gap 6: Token propagation
 
-The tutorial identifies actors by a string passed in a request field:
+The tutorial already authenticates with a bearer token, but takes one shortcut:
+the demo token verifier looks the token up in a static map instead of verifying
+a signed JWT.
 
-```json
-{ "actorId": "alice" }
+```text
+Authorization: Bearer demo-token-alice  ->  static map lookup  ->  user:alice
 ```
 
-In production, the actor identity comes from a verified token, not a request
-field. The flow is:
+In production, the actor identity comes from a *verified* token. The flow is:
 
 ```text
 Client sends:   Authorization: Bearer <JWT>
@@ -746,7 +747,7 @@ tool permissions.
 
 These are acceptable for learning and unacceptable as-is in production:
 
-- actor IDs supplied by request body or query string
+- a static demo-token map standing in for real JWT/session verification
 - in-memory document repositories
 - in-memory tuple stores
 - OpenFGA running with the memory datastore

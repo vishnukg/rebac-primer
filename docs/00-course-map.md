@@ -249,7 +249,7 @@ TypeScript:
 
 1. Read `14-testing-with-vitest.md`.
 2. Run `make ts-test`.
-3. Change `seedPolicyTuples()` in `typescript/test/fixtures.ts` and predict which tests fail.
+3. Change `seedPolicyTuples()` in `typescript/src/demo/fixtures.ts` and predict which tests fail.
 
 Go:
 

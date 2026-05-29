@@ -82,56 +82,61 @@ casey -> Casey, denied by default
 
 ## API routes
 
-Both servers share the same resource shape, but the two implementations use
-different authentication styles:
-
-- **TypeScript** identifies the caller via an `actorId` query param or JSON body field.
-- **Go** uses a standard `Authorization: Bearer <token>` header. Demo tokens are
-  `demo-token-alice`, `demo-token-bob`, and `demo-token-casey`.
+Both servers share the same resource shape **and the same authentication
+style**: a standard `Authorization: Bearer <token>` header. The demo tokens are
+`demo-token-alice`, `demo-token-bob`, and `demo-token-casey` in both
+implementations. (The demo token verifier is a stand-in for real JWT
+verification — see doc 01.)
 
 ```text
-TypeScript (port 4000)                Go (port 4001)
+TypeScript (documents :4000)          Go (:4001)
 ──────────────────────────────────    ──────────────────────────────────
-GET  /health                          GET  /health
-                                      GET  /whoami
-POST /documents                       POST /documents
-GET  /documents/:id?actorId=alice     GET  /documents/{id}
+GET   /health                         GET   /health
+GET   /whoami                         GET   /whoami
+POST  /documents                      POST  /documents
+GET   /documents/:id                  GET   /documents/{id}
 PATCH /documents/:id                  PATCH /documents/{id}
 ```
 
-Example read:
+(The TypeScript documents service talks to the AuthZ service on :4100 behind the
+scenes; the client only ever calls :4000.)
+
+Example read (Bob is a workspace viewer — 200):
 
 ```bash
-# TypeScript — actor in query string
-curl "http://127.0.0.1:4000/documents/roadmapDocument?actorId=bob"
+# TypeScript
+curl "http://127.0.0.1:4000/documents/roadmapDocument" \
+  -H "Authorization: Bearer demo-token-bob"
 
-# Go — actor in Authorization header
+# Go
 curl "http://127.0.0.1:4001/documents/roadmapDocument" \
   -H "Authorization: Bearer demo-token-bob"
 ```
 
-Example update:
+Example update (Alice can edit via team → workspace editor — 200):
 
 ```bash
-# TypeScript — actor in JSON body
+# TypeScript
 curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
+  -H "Authorization: Bearer demo-token-alice" \
   -H "content-type: application/json" \
-  -d '{"actorId":"alice","body":"Updated from curl"}'
+  -d '{"body":"Updated from curl"}'
 
-# Go — actor in Authorization header
+# Go
 curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
   -H "Authorization: Bearer demo-token-alice" \
   -H "content-type: application/json" \
   -d '{"body":"Updated from curl"}'
 ```
 
-Bob can read but cannot update:
+Bob can read but cannot update (403):
 
 ```bash
 # TypeScript
 curl -X PATCH "http://127.0.0.1:4000/documents/roadmapDocument" \
+  -H "Authorization: Bearer demo-token-bob" \
   -H "content-type: application/json" \
-  -d '{"actorId":"bob","body":"Should fail"}'
+  -d '{"body":"Should fail"}'
 
 # Go
 curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
@@ -140,12 +145,14 @@ curl -X PATCH "http://127.0.0.1:4001/documents/roadmapDocument" \
   -d '{"body":"Should fail"}'
 ```
 
-Verify your identity (Go only):
+Verify your identity (both implementations expose `/whoami`):
 
 ```bash
-curl "http://127.0.0.1:4001/whoami" \
-  -H "Authorization: Bearer demo-token-alice"
-# → {"user":"alice","scopes":["documents:read","documents:write"]}
+# TypeScript
+curl "http://127.0.0.1:4000/whoami" -H "Authorization: Bearer demo-token-alice"
+# Go
+curl "http://127.0.0.1:4001/whoami" -H "Authorization: Bearer demo-token-alice"
+# → {"user":"user:alice","scopes":["documents:read","documents:write"]}
 ```
 
 ## Where ReBAC is enforced
