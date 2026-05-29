@@ -47,11 +47,13 @@ test code.
 `npm run build` here is `tsc` with `noEmit: true` — it type-checks rather than
 emitting JavaScript. Node runs the TypeScript sources directly (it strips types
 at load time), so the runtime stage copies `src/` and runs the entrypoints with
-`node`. The TypeScript app is two services, so the container starts both:
+`node`. The TypeScript app is two services; the image's default `CMD` runs both
+in one process (handy for a quick `docker run`), while compose runs them as two
+separate containers by overriding `command` per service:
 
 ```dockerfile
 EXPOSE 4000 4100
-CMD ["npm", "run", "start"]   # runs authz (4100) and documents (4000) together
+CMD ["npm", "run", "start"]   # default: both authz (4100) + documents (4000)
 ```
 
 Inside the container the documents service reaches authz on `localhost:4100`
@@ -174,14 +176,16 @@ reuse the npm install layer.
 
 ## Ports
 
-The TypeScript container runs both services and listens on `4000` (documents)
-and `4100` (authz, internal):
+The TypeScript image exposes both service ports — `4000` (documents) and `4100`
+(authz):
 
 ```dockerfile
 EXPOSE 4000 4100
 ```
 
-Compose publishes the documents port to your host (authz stays internal):
+Compose runs the two services as separate containers: `ts-documents` publishes
+`4000` to your host, and `ts-authz` publishes `4100`. The documents service
+reaches authz by its compose service name (`ts-authz:4100`):
 
 ```yaml
 ports:
@@ -215,8 +219,8 @@ go-app:
 ```
 
 The TypeScript services read `DOCUMENTS_PORT` (default `4000`) and `AUTHZ_PORT`
-(default `4100`). Those defaults already match the published ports, so `ts-app`
-needs no port env to run the demo.
+(default `4100`). Those defaults already match the published ports, so the
+`ts-documents` and `ts-authz` services need no port env to run the demo.
 
 Keep configuration in environment variables when it changes per environment.
 Keep code and images the same.

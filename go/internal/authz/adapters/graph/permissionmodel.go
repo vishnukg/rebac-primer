@@ -117,9 +117,9 @@ var workspaceRules = impliedBy{
 //	type document
 //	  relations
 //	    define workspace:   [workspace]
-//	    define owner:       [user] or workspace#owner from workspace
-//	    define editor:      [user] or workspace#editor from workspace or owner
-//	    define viewer:      [user] or workspace#viewer from workspace or editor
+//	    define owner:       [user] or owner from workspace
+//	    define editor:      [user] or editor from workspace or owner
+//	    define viewer:      [user] or viewer from workspace or editor
 //	    define can_read:    viewer
 //	    define can_comment: viewer
 //	    define can_edit:    editor

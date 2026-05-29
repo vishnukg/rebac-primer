@@ -106,7 +106,7 @@ team.
 object, then check X there":
 
 ```text
-define editor: workspace#editor from workspace
+define editor: editor from workspace
 ```
 
 Find the object this document points to via its `workspace` relation, then check
@@ -195,9 +195,9 @@ Without it, you would have to write one tuple per user.
 type document
   relations
     define workspace: [workspace]
-    define owner: [user] or workspace#owner from workspace
-    define editor: [user] or workspace#editor from workspace or owner
-    define viewer: [user] or workspace#viewer from workspace or editor
+    define owner: [user] or owner from workspace
+    define editor: [user] or editor from workspace or owner
+    define viewer: [user] or viewer from workspace or editor
     define can_read: viewer
     define can_comment: viewer
     define can_edit: editor
@@ -214,7 +214,7 @@ access from its parent workspace.
 This line deserves attention:
 
 ```text
-define editor: [user] or workspace#editor from workspace or owner
+define editor: [user] or editor from workspace or owner
 ```
 
 Read it as:
@@ -229,7 +229,7 @@ A document editor is:
 The phrase:
 
 ```text
-workspace#editor from workspace
+editor from workspace
 ```
 
 means:
@@ -316,7 +316,7 @@ document editor includes workspace editor from workspace
 Then write the OpenFGA DSL:
 
 ```text
-define editor: [user] or workspace#editor from workspace or owner
+define editor: [user] or editor from workspace or owner
 ```
 
 Do not start by typing DSL. Start with the rule.
@@ -383,7 +383,7 @@ stay in sync — which is the real cost of running dual implementations.
 Read this line out loud:
 
 ```text
-define editor: [user] or workspace#editor from workspace or owner
+define editor: [user] or editor from workspace or owner
 ```
 
 If you can explain it as a graph path, you understand the model. If you cannot,

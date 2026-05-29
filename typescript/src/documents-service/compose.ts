@@ -36,7 +36,10 @@ const composeDocumentsService = ({
     const server  = makeDocumentsHttpServer({ handler });
 
     const listen = (onReady: (port: number) => Promise<void>) => {
-        server.listen(port, "127.0.0.1", () => {
+        // Bind all interfaces (0.0.0.0), not just loopback, so the service is
+        // reachable across containers and via Docker published ports. Matches the
+        // Go server's ":port" bind.
+        server.listen(port, "0.0.0.0", () => {
             onReady(port).catch(err => {
                 console.error("Startup error:", err);
                 process.exit(1);

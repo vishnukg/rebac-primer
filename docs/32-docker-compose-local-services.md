@@ -13,10 +13,14 @@ but because boring startup is what lets you focus on the authorization model.
 ## Services in this repo
 
 ```text
-ts-app   -> TypeScript ReBAC HTTP server
-go-app   -> Go ReBAC HTTP server
-openfga  -> local OpenFGA server
+ts-authz      -> TypeScript AuthZ service (port 4100)
+ts-documents  -> TypeScript Documents service (port 4000)
+go-app        -> Go ReBAC server (port 4001)
+openfga       -> local OpenFGA server
 ```
+
+The two TypeScript services share the `ts-app` profile, so `--profile ts-app`
+starts both.
 
 The app services are behind profiles so you can choose whether to run either app
 in Docker or directly on your host.
@@ -135,7 +139,7 @@ docker compose -f deployments/docker-compose.yml down
 View logs:
 
 ```bash
-docker compose -f deployments/docker-compose.yml logs -f ts-app
+docker compose -f deployments/docker-compose.yml logs -f ts-documents
 docker compose -f deployments/docker-compose.yml logs -f go-app
 ```
 

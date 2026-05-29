@@ -90,7 +90,10 @@ Common OpenFGA ports:
 The app services use profiles:
 
 ```yaml
-ts-app:
+ts-authz:        # both TypeScript services share the ts-app profile
+  profiles:
+    - ts-app
+ts-documents:
   profiles:
     - ts-app
 

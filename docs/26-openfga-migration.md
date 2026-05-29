@@ -70,9 +70,9 @@ The same rules in OpenFGA DSL:
 type document
   relations
     define workspace:  [workspace]
-    define owner:      [user] or workspace#owner from workspace
-    define editor:     [user] or workspace#editor from workspace or owner
-    define viewer:     [user] or workspace#viewer from workspace or editor
+    define owner:      [user] or owner from workspace
+    define editor:     [user] or editor from workspace or owner
+    define viewer:     [user] or viewer from workspace or editor
     define can_read:    viewer
     define can_comment: viewer
     define can_edit:    editor
@@ -91,7 +91,7 @@ workspace inheritance logic in Go. In OpenFGA, the `from` keyword in the DSL
 handles that:
 
 ```text
-define editor: [user] or workspace#editor from workspace or owner
+define editor: [user] or editor from workspace or owner
                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
                          OpenFGA traverses this; we wrote it in Go
 ```
@@ -134,6 +134,30 @@ cmd/server/main.go   ← only place that knows about concrete types
 
 ---
 
+## How to use the OpenFGA backend
+
+**This is already implemented.** The OpenFGA adapter and the flag-driven wiring
+ship in the repo, so the swap is a runtime flag, not a code change:
+
+- Go adapter: `go/internal/authz/adapters/openfga/openfga.go` (implements `authz.Service`)
+- TS adapter: `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts`
+- Model: `deployments/openfga/model.fga` · Seed: `deployments/openfga/seed.sh`
+
+The composition root reads `AUTHZ_BACKEND`: `openfga` selects the adapter (using
+`OPENFGA_API_URL` / `OPENFGA_STORE_ID` / `OPENFGA_MODEL_ID`); anything else uses
+the in-process graph evaluator. Both return an `authz.Service` / `AuthzService`,
+so the documents domain, HTTP handlers, and tests are unchanged.
+
+Run it (the make target sets the flag for you):
+
+```bash
+make openfga-up         # OpenFGA on :8080 (memory datastore)
+make openfga-seed       # create store, write model.fga, seed policy tuples (needs fga CLI + jq)
+make go-server-openfga  # or: make ts-server-openfga
+```
+
+The sections below explain what each step does under the hood.
+
 ## How to migrate to OpenFGA
 
 ### Step 1 — run the OpenFGA server
@@ -168,17 +192,20 @@ fga model write --store-id 01JXYZ... --file model.fga
 
 Note both IDs — you will need them in Step 4.
 
-### Step 3 — restore the OpenFGA adapter
+### Step 3 — the OpenFGA adapter
 
-The adapter was removed from the repo to keep things simple, but it is easy to
-restore. Add `github.com/openfga/go-sdk` back to `go.mod`:
+The adapter ships at `go/internal/authz/adapters/openfga/openfga.go` (and the TS
+equivalent), and `github.com/openfga/go-sdk` is already in `go.mod`. It implements
+the full `authz.Service` driving port — `Check`, `WriteTuples`, `DeleteTuples`,
+`ListTuples` — **not** the inner `Evaluator` port. That choice is deliberate:
+`Evaluator` only covers checks, and the in-memory `TupleRepository.Write` is
+synchronous with no `ctx`/error, a poor fit for a network backend. `authz.Service`
+has `ctx` + error on every method, so it is the right seam to back the whole authz
+service with OpenFGA — checks and tuple writes both go to the store, staying
+consistent.
 
-```bash
-cd go
-go get github.com/openfga/go-sdk
-```
-
-Then create `go/internal/authz/adapters/openfga/authorizer.go`:
+Here is the shape of the check path (the real file also implements the write/read
+methods):
 
 ```go
 package openfga
@@ -200,27 +227,27 @@ type Config struct {
     AuthorizationModelID string
 }
 
-// Authorizer satisfies authz.Evaluator by delegating to an OpenFGA server.
-type Authorizer struct {
+// Service satisfies authz.Service by delegating to an OpenFGA server.
+type Service struct {
     client *fgaclient.OpenFgaClient
 }
 
-var _ authz.Evaluator = (*Authorizer)(nil)
+var _ authz.Service = (*Service)(nil)
 
-func New(cfg Config) (*Authorizer, error) {
+func New(cfg Config) (*Service, error) {
     sdk, err := fgaclient.NewSdkClient(&fgaclient.ClientConfiguration{
         ApiUrl:               cfg.APIURL,
         StoreId:              cfg.StoreID,
-        AuthorizationModelId: cfg.AuthorizationModelID,
+        AuthorizationModelId: cfg.ModelID,
     })
     if err != nil {
-        return nil, fmt.Errorf("openfga: create sdk client: %w", err)
+        return nil, fmt.Errorf("openfga: new client: %w", err)
     }
-    return &Authorizer{client: sdk}, nil
+    return &Service{client: sdk}, nil
 }
 
-func (a *Authorizer) Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
-    resp, err := a.client.Check(ctx).Body(fgaclient.ClientCheckRequest{
+func (s *Service) Check(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
+    resp, err := s.client.Check(ctx).Body(fgaclient.ClientCheckRequest{
         User:     string(req.User),
         Relation: string(req.Relation),
         Object:   string(req.Object),
@@ -228,25 +255,22 @@ func (a *Authorizer) Evaluate(ctx context.Context, req shared.CheckRequest) (sha
     if err != nil {
         return shared.CheckResult{}, fmt.Errorf("openfga: check: %w", err)
     }
-    return shared.CheckResult{
-        Allowed: resp.GetAllowed(),
-        Trace:   []string{"OpenFGA evaluated the relationship graph remotely"},
-    }, nil
+    return shared.CheckResult{Allowed: resp.GetAllowed(), Trace: []string{"OpenFGA evaluated remotely"}}, nil
 }
 ```
 
-The adapter also needs a `WriteTuples` method if you want the OpenFGA server to
-hold the tuples (rather than keeping the in-memory store):
+`WriteTuples` (and `DeleteTuples`, `ListTuples`) round-trip to the store so that
+tuples written at runtime are visible to subsequent checks:
 
 ```go
-func (a *Authorizer) WriteTuples(ctx context.Context, tuples []shared.TupleKey) error {
-    sdkTuples := make([]fgaclient.ClientTupleKey, 0, len(tuples))
+func (s *Service) WriteTuples(ctx context.Context, tuples []shared.TupleKey) error {
+    writes := make([]fgaclient.ClientTupleKey, 0, len(tuples))
     for _, t := range tuples {
-        sdkTuples = append(sdkTuples, *openfga.NewTupleKey(
-            string(t.User), string(t.Relation), string(t.Object),
-        ))
+        writes = append(writes, fgaclient.ClientTupleKey{
+            User: string(t.User), Relation: string(t.Relation), Object: string(t.Object),
+        })
     }
-    _, err := a.client.WriteTuples(ctx).Body(sdkTuples).Execute()
+    _, err := s.client.Write(ctx).Body(fgaclient.ClientWriteRequest{Writes: writes}).Execute()
     if err != nil {
         return fmt.Errorf("openfga: write tuples: %w", err)
     }
@@ -254,63 +278,37 @@ func (a *Authorizer) WriteTuples(ctx context.Context, tuples []shared.TupleKey) 
 }
 ```
 
-### Step 4 — swap the evaluator in main.go
+### Step 4 — select the backend (already wired)
 
-Open `go/cmd/server/main.go`. In `buildHandler`, find these two lines:
-
-```go
-tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
-evaluator  := graph.NewGraphEvaluator(tupleStore)
-```
-
-Replace them with:
+`go/cmd/server/main.go` chooses the backend from `AUTHZ_BACKEND` in
+`buildAuthzService` — no hand-editing required:
 
 ```go
-evaluator, err := openfga.New(openfga.Config{
-    APIURL:               "http://localhost:8080",
-    StoreID:              "<your-store-id>",
-    AuthorizationModelID: "<your-model-id>",
-})
-if err != nil {
-    return nil, fmt.Errorf("openfga evaluator: %w", err)
+func buildAuthzService() (authz.Service, error) {
+    if os.Getenv("AUTHZ_BACKEND") == "openfga" {
+        return authzopenfga.New(authzopenfga.Config{
+            APIURL:  envOr("OPENFGA_API_URL", "http://127.0.0.1:8080"),
+            StoreID: os.Getenv("OPENFGA_STORE_ID"),
+            ModelID: os.Getenv("OPENFGA_MODEL_ID"),
+        })
+    }
+    tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
+    return authz.New(tupleStore, graph.NewGraphEvaluator(tupleStore)), nil
 }
 ```
 
-Also update the `authz.New` call — the tuple store is no longer needed because
-OpenFGA stores the tuples:
+The TypeScript side does the same in `authz-service/compose.ts`. Everything else
+— the documents service, the HTTP handler, the tests — is unchanged.
 
-```go
-// Before (in-memory store)
-authzSvc := authz.New(tupleStore, evaluator)
+### Step 5 — seed the store
 
-// After (OpenFGA holds the tuples; pass a no-op store or nil if you refactor the port)
-authzSvc := authz.New(openfgaStore, evaluator)
-```
-
-> **Note** — `authz.New` takes a `TupleRepository` because our from-scratch service
-> uses it for writes too. With OpenFGA you can either:
-> - wire the `Authorizer` as both `TupleRepository` (via `WriteTuples`) and
->   `Evaluator` (a single struct satisfying both interfaces), or
-> - keep a thin in-memory store for writes and let the graph evaluator read back
->   from OpenFGA (a hybrid, useful during migration).
-
-Everything else — the documents service, the HTTP handler, the tests — stays
-exactly as it is.
-
-### Step 5 — seed the OpenFGA store
-
-The fixture tuples need to be written to OpenFGA once (or on each deploy). You
-can do this via the CLI:
-
-```bash
-fga tuple write --store-id 01JXYZ... \
-  '{"object":"team:platformTeam","relation":"member","user":"user:alice"}' \
-  '{"object":"workspace:productWorkspace","relation":"editor","user":"team:platformTeam#member"}' \
-  '{"object":"workspace:productWorkspace","relation":"viewer","user":"user:bob"}' \
-  '{"object":"document:roadmapDocument","relation":"workspace","user":"workspace:productWorkspace"}'
-```
-
-Or write a small seed script that calls `WriteTuples` via the adapter.
+`deployments/openfga/seed.sh` (run via `make openfga-seed`) creates the store,
+writes `model.fga`, and seeds the workspace/team **policy** tuples — the same ones
+`fixtures.SeedRelationshipTuples` / `seedPolicyTuples` hold for the in-memory
+backend. The **document-level** tuples (`workspace`, `owner`) are written at
+runtime by the documents service on create; with OpenFGA they just land in the
+store. Because the demo OpenFGA uses the ephemeral `memory` datastore, re-run the
+seed whenever you restart OpenFGA.
 
 ---
 

@@ -5,3 +5,4 @@ go/bin/
 .env
 .data/
 *.log
+deployments/openfga/.ids.env

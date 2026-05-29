@@ -103,9 +103,10 @@ Read these after the shared ReBAC track if Go is your implementation language.
 | 23 | Go generics: type parameters, constraints, Result[T] | `go/internal/authz/adapters/graph/result.go` |
 | 24 | Go interfaces and embedding: decorator pattern | `go/internal/authz/adapters/graph/middleware.go` |
 | 25 | Go testing: AAA, table-driven, benchmarks, fuzz | `go/internal/authz/adapters/graph/evaluator_test.go` |
-| 26 | From-scratch ReBAC vs OpenFGA: concept mapping and migration guide | `go/internal/authz/adapters/graph/evaluator.go`, `go/internal/authz/adapters/graph/permissionmodel.go` |
+| 26 | From-scratch ReBAC vs OpenFGA: concept mapping + the shipped, flag-driven OpenFGA adapter | `go/internal/authz/adapters/openfga/openfga.go`, `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts`, `deployments/openfga/model.fga` |
 | 27 | Graph evaluator deep dive: step-by-step walkthrough for non-graph-theory readers | `go/internal/authz/adapters/graph/evaluator.go` |
 | 28 | Authz call flow: tracing a request through every layer (in-process) | `go/cmd/server/main.go`, `go/internal/documents/read.go`, `go/internal/authz/domain.go` |
+| 34 | OpenFGA adapter walkthrough: a check through the OpenFGA backend (both languages) | `go/internal/authz/adapters/openfga/openfga.go`, `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts` |
 
 ## Shared track: Docker and local services
 
@@ -125,6 +126,22 @@ Read these after the shared ReBAC track if Go is your implementation language.
 ---
 
 ## Reading paths
+
+### Minimal core path (start here)
+
+The shortest route to understanding ReBAC and reading it work. ~8 docs:
+
+```
+01 → 02 → 03 → 04 → 05             Concepts: authn, authz, graphs, ReBAC, the model
+then ONE implementation:
+  Go:          20 → 21 → 27        primer → implementation → evaluator trace
+  TypeScript:  10 → 11 → 12 → 18   foundations → types → factories → implementation
+run it:        make go-test && make go-server   (or the ts- equivalents)
+```
+
+Everything in the tracks below is **optional depth** — the other language, the
+Go language deep-dives (22-25), the OpenFGA backend (26, 34), Docker (30-33), and
+production/agentic (40). Read them when a need arises, not as prerequisites.
 
 ### TypeScript path
 
@@ -153,6 +170,7 @@ concepts directly through the implementation code.
 26                                  From-scratch ReBAC vs OpenFGA (optional but recommended)
 27                                  Graph evaluator deep dive (read alongside evaluator.go)
 28                                  Authz call flow across every layer (request → decision → status)
+34                                  OpenFGA adapter walkthrough (the AUTHZ_BACKEND=openfga path)
 06                                  Architecture synthesis: ports & adapters, dependency direction
 22                                  Concurrency: goroutines and channels
 23                                  Generics: Result[T] and Map
@@ -204,7 +222,7 @@ Checkpoint: explain why Bob can read but cannot edit.
 4. (Go track) Read `docs/27-graph-evaluator-walkthrough.md` — it traces every step of the
    `alice / can_edit / roadmapDocument` check through the actual evaluator code.
 
-Checkpoint: explain `workspace#editor from workspace` as a graph path.
+Checkpoint: explain `editor from workspace` as a graph path.
 
 ### Day 4: Choose an implementation track
 

@@ -17,10 +17,10 @@ GO_APP    := $(COMPOSE) --profile go-app
 
 .PHONY: help \
         ts-deps ts-build ts-test ts-test-watch ts-coverage ts-check ts-shell \
-        ts-server ts-server-down ts-client \
+        ts-server ts-server-down ts-client ts-server-openfga \
         go-build go-test go-vet go-check go-shell \
-        go-server go-server-down \
-        openfga-up openfga-down compose-config clean
+        go-server go-server-down go-server-openfga \
+        openfga-up openfga-down openfga-seed compose-config clean
 
 help:
 	@printf '%s\n' 'ReBAC Primer — TypeScript and Go implementations'
@@ -49,6 +49,11 @@ help:
 	@printf '%s\n' '  make openfga-up     Start local OpenFGA'
 	@printf '%s\n' '  make openfga-down   Stop local OpenFGA'
 	@printf '%s\n' '  make clean          Remove containers, volumes, and build output'
+	@printf '%s\n' ''
+	@printf '%s\n' 'Real OpenFGA backend (swap the from-scratch evaluator for OpenFGA):'
+	@printf '%s\n' '  make openfga-up && make openfga-seed   Start + seed model/tuples (needs fga + jq)'
+	@printf '%s\n' '  make go-server-openfga                 Go app, AUTHZ_BACKEND=openfga'
+	@printf '%s\n' '  make ts-server-openfga                 TS app, AUTHZ_BACKEND=openfga'
 
 # TypeScript targets
 ts-deps:
@@ -73,7 +78,7 @@ ts-shell:
 	$(TS_TOOLS) sh
 
 ts-server:
-	$(TS_APP) up --build ts-app
+	$(TS_APP) up --build ts-authz ts-documents
 
 ts-server-down:
 	$(TS_APP) down
@@ -109,6 +114,24 @@ openfga-up:
 
 openfga-down:
 	$(COMPOSE) down
+
+# Create the store, write the model, and seed policy tuples into the running
+# OpenFGA (needs the fga CLI + jq). Writes deployments/openfga/.ids.env.
+openfga-seed:
+	deployments/openfga/seed.sh
+
+# Run the apps against the real OpenFGA backend. Requires `make openfga-up`
+# and `make openfga-seed` first. The app containers reach OpenFGA by its compose
+# service name (openfga:8080); the store/model IDs come from .ids.env.
+go-server-openfga:
+	@test -f deployments/openfga/.ids.env || { echo "Run 'make openfga-up && make openfga-seed' first."; exit 1; }
+	set -a; . deployments/openfga/.ids.env; set +a; \
+	AUTHZ_BACKEND=openfga OPENFGA_API_URL=http://openfga:8080 $(GO_APP) up --build go-app
+
+ts-server-openfga:
+	@test -f deployments/openfga/.ids.env || { echo "Run 'make openfga-up && make openfga-seed' first."; exit 1; }
+	set -a; . deployments/openfga/.ids.env; set +a; \
+	AUTHZ_BACKEND=openfga OPENFGA_API_URL=http://openfga:8080 $(TS_APP) up --build ts-authz ts-documents
 
 compose-config:
 	$(COMPOSE) --profile ts-app --profile ts-tools --profile go-app --profile go-tools config
