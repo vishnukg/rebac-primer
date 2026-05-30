@@ -51,4 +51,19 @@ describe("makeInMemoryDocumentRepository", () => {
             body: "v2",
         });
     });
+
+    it("returns a snapshot so mutating the result does not affect the store", async () => {
+        // Arrange
+        const repository = makeInMemoryDocumentRepository();
+        await repository.save(sampleDoc());
+
+        // Act: mutate the value handed back by findById.
+        const first = await repository.findById("roadmapDocument");
+        first!.body = "mutated via returned reference";
+
+        // Assert: a fresh read is unaffected.
+        await expect(repository.findById("roadmapDocument")).resolves.toMatchObject({
+            body: "v1",
+        });
+    });
 });
