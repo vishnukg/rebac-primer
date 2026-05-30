@@ -41,4 +41,15 @@ describe("makeDemoTokenVerifier", () => {
         await expect(authenticator.verifyAccessToken("Bearer nope"))
             .rejects.toMatchObject({ name: "AuthenticationError" });
     });
+
+    it("throws AuthenticationError when the header has no Bearer prefix", async () => {
+        // Arrange
+        const authenticator = makeDemoTokenVerifier({
+            tokens: { "token-alice": { sub: "alice", scopes: ["documents:read"] } },
+        });
+
+        // Act + Assert: a bare token without the "Bearer " scheme is rejected.
+        await expect(authenticator.verifyAccessToken("token-alice"))
+            .rejects.toMatchObject({ name: "AuthenticationError" });
+    });
 });
