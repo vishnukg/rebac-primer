@@ -38,10 +38,36 @@ A channel is a typed pipe. One goroutine sends; another receives. The send
 blocks until a receiver is ready, and the receive blocks until a sender is ready.
 That blocking is not a bug — it is how goroutines synchronise.
 
+A mental model: a channel is a conveyor belt between workers.
+
+```text
+goroutine A  ──ch<- value──►  [ channel ]  ──<-ch──►  goroutine B
+   (sender)                  (the belt)              (receiver)
+```
+
+- **Send** (`ch <- v`) puts one value on the belt.
+- **Receive** (`v := <-ch`) takes one value off the belt.
+- An **unbuffered** belt has no space to set things down: the sender must wait
+  until the receiver picks the value straight out of their hand (a handoff). This
+  is why an unbuffered channel synchronises two goroutines in time — neither
+  proceeds until both are ready.
+- A **buffered** belt has N slots: the sender can drop up to N values and keep
+  working without waiting for anyone. Only when the buffer is full does the next
+  send block.
+
 ```go
-ch := make(chan int)     // unbuffered: send blocks until received
+ch := make(chan int)     // unbuffered: send blocks until received (handoff)
 ch := make(chan int, 5)  // buffered: first 5 sends do not block
 ```
+
+Two more facts you will rely on:
+
+- Receiving from a channel that has no value yet **blocks** the receiver until
+  one arrives. That is how the collector below waits for results without a busy
+  loop.
+- A channel can be **closed** (`close(ch)`) to signal "no more values"; ranging
+  over a channel (`for v := range ch`) stops when it is closed. We do not need
+  close here because we collect an exact, known number of results.
 
 `AllPermissions` uses a **buffered channel** whose capacity equals the number of
 relations (`parallel.go:32`):
@@ -66,14 +92,30 @@ for _, rel := range relations {
 
 summary := make(PermissionSummary, len(relations))
 for range len(relations) {
-    out := <-ch
-    // ...
+    select {
+    case out := <-ch:
+        // a result arrived
+        summary[out.relation] = out.allowed
+    case <-ctx.Done():
+        // the caller cancelled or timed out
+        return nil, ctx.Err()
+    }
 }
 ```
 
-The outer loop starts N goroutines; the inner loop collects N results. When the
-inner loop finishes, every goroutine has sent its result and exited. No goroutine
-leaks.
+The outer loop starts N goroutines; the inner loop collects N results. Each
+iteration of the inner loop blocks in the `select` until **either** the next
+result arrives **or** the context is cancelled (see
+[`select`](#select-waiting-on-multiple-channels) below). In the happy path the
+context is never cancelled, so it collects all N results and every goroutine has
+sent its value and exited — no goroutine leaks.
+
+If the caller *does* cancel, the loop returns early. The goroutines that are
+still running each send one value into `ch`, but because the channel is buffered
+with room for every result, those sends succeed against the buffer instead of
+blocking forever on a receiver that has gone away. That is the subtle reason the
+buffer matters: it guarantees no goroutine leaks *even when we stop receiving
+early*.
 
 ## Why the goroutine captures `rel` as an argument
 
@@ -145,13 +187,20 @@ their input requests.
 
 ## Context cancellation: letting callers abort
 
-Both functions accept a `context.Context` as their first parameter. Context
-carries a cancellation signal — when the caller cancels, goroutines that check
-`ctx.Done()` can stop early.
+Both functions accept a `context.Context` as their first parameter. A context
+carries a cancellation signal: the caller can cancel it (or set a timeout/
+deadline), and code that watches `ctx.Done()` can then stop early instead of
+doing work nobody is waiting for anymore.
 
-`GraphEvaluator.Evaluate` currently ignores the context (it is an in-memory
-traversal, so cancellation is not worth the complexity). A real network call
-would pass `ctx` to the HTTP client and abort automatically. The interface
+`ctx.Done()` returns a channel. It is the idiomatic Go cancellation pattern: the
+channel stays open (blocks any receive) while the context is live, and is closed
+the moment the context is cancelled. A receive on a closed channel returns
+immediately — so `<-ctx.Done()` is "block until cancelled." After that,
+`ctx.Err()` tells you why (`context.Canceled` or `context.DeadlineExceeded`).
+
+`GraphEvaluator.Evaluate` itself currently ignores the context (it is an
+in-memory traversal, so cancellation is not worth the complexity). A real network
+call would pass `ctx` to the HTTP client and abort automatically. The interface
 requires the parameter so swapping in the real OpenFGA client later needs no
 changes at the call site.
 
@@ -160,24 +209,40 @@ changes at the call site.
 result, err := ev.Evaluate(context.Background(), req)
 ```
 
+But `AllPermissions` *does* act on the context, even though the underlying
+evaluator ignores it — it stops collecting and returns as soon as the caller
+cancels. It does that with `select`.
+
 ## `select`: waiting on multiple channels
 
-For completeness — `select` is Go's channel-aware switch. It blocks until one
-of its cases can proceed:
+`select` is Go's channel-aware switch. It blocks until one of its cases can
+proceed; if several are ready at once it picks one at random. This is how a
+goroutine waits on more than one channel at the same time.
+
+`AllPermissions` uses it in the collector loop to wait on two things at once: the
+next result, or the caller giving up.
 
 ```go
 select {
-case result := <-resultCh:
-    // process result
+case out := <-ch:
+    // a result arrived — record it
+    summary[out.relation] = out.allowed
 case <-ctx.Done():
-    return nil, ctx.Err()  // caller cancelled
+    // the caller cancelled or timed out — stop early
+    return nil, ctx.Err()
 }
 ```
 
-`AllPermissions` does not need `select` because it is collecting a fixed number
-of results and uses a buffered channel (no blocking). You would add `select` to
-handle early cancellation in a production service where the context might time
-out mid-flight.
+Without the `ctx.Done()` case, a slow or hung backend would force the caller to
+wait for every check no matter what — even after they timed out. With it, the
+function returns the moment the context is cancelled.
+
+Why is returning early still leak-free? The result channel is **buffered** with
+one slot per relation, so the goroutines that are still in flight can each finish
+their one send into the buffer and exit, even though nobody is receiving anymore.
+An *unbuffered* channel would be a bug here: those orphaned goroutines would block
+forever on a send with no receiver, leaking one goroutine per outstanding check.
+This is the concrete payoff of choosing a buffered channel.
 
 ## Race detector
 

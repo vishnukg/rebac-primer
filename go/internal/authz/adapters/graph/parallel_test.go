@@ -2,12 +2,42 @@ package graph_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"rebac-primer/internal/authz/adapters/graph"
 	"rebac-primer/internal/fixtures"
 	"rebac-primer/internal/shared"
 )
+
+// blockingEvaluator is a fake Checker whose Evaluate does no work until the
+// context is cancelled, then reports the context error. It lets us exercise
+// AllPermissions' cancellation path deterministically.
+type blockingEvaluator struct{}
+
+func (blockingEvaluator) Evaluate(ctx context.Context, _ shared.CheckRequest) (shared.CheckResult, error) {
+	<-ctx.Done()
+	return shared.CheckResult{}, ctx.Err()
+}
+
+func TestAllPermissions_CancelledContextReturnsError(t *testing.T) {
+	// Arrange: a context that is already cancelled, and an evaluator that only
+	// unblocks once the context is done.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Act
+	summary, err := graph.AllPermissions(ctx, blockingEvaluator{}, fixtures.Alice, fixtures.RoadmapDocument)
+
+	// Assert: AllPermissions must surface the cancellation, not block or return a
+	// partial summary. (-race confirms no goroutine writes after we return.)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	if summary != nil {
+		t.Errorf("expected nil summary on cancellation, got %v", summary)
+	}
+}
 
 func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
 	ev := newEvaluator()

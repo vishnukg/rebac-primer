@@ -623,6 +623,36 @@ For OpenFGA specifically:
 - avoid using production tuples in uncontrolled developer environments
 - treat tuple exports as sensitive data
 
+### Resource existence disclosure
+
+There is a subtler leak in how a denied request is reported. The tutorial's read
+path (`go/internal/documents/read.go`, `makeReadDocument.ts`) checks existence
+*before* authorization, so the caller can tell two cases apart:
+
+```text
+document exists, actor not allowed   -> 403 Forbidden
+document does not exist              -> 404 Not Found
+```
+
+An attacker who is denied either way can still enumerate which ids exist by
+watching for 403 vs 404. For most products that is an acceptable tradeoff —
+distinct errors are easier to debug and explain. But for sensitive resources
+(private repos, medical records, anything where the *name* itself is secret),
+return the same response for "missing" and "forbidden" so the two are
+indistinguishable:
+
+```text
+document missing OR actor not allowed -> 404 Not Found
+```
+
+To do that, run the authorization check first, then collapse a denial into the
+same not-found error a missing document would produce. The cost is a slightly
+less precise error for legitimate-but-unauthorized users; the benefit is that the
+existence of a resource is itself protected by the authorization check.
+
+This is a per-resource policy decision, not a global one — apply it where the
+resource's existence is sensitive, and keep the clearer 403/404 split elsewhere.
+
 Authorization data reveals organization structure. Even if a tuple does not
 contain document content, it may reveal who works with whom and which resources
 exist.

@@ -1,3 +1,15 @@
+// Read returns a document if the actor has can_read access.
+//
+// Existence is checked before authorization so the error is accurate: a missing
+// document throws not-found, not forbidden.
+//
+// Security tradeoff: this ordering leaks existence. A denied actor gets 403 for a
+// document that exists but 404 for one that does not, so they can probe which ids
+// exist even without access. That is fine for this tutorial — clear errors aid
+// learning — but high-security systems return 404 for both cases so the two are
+// indistinguishable (check authorization first, then map a denial to not-found).
+// See docs/40-production-readiness.md (Gap 13).
+
 import { document } from "../../../shared/rebac.ts";
 import type { AuthzClient } from "../ports/authzClient.ts";
 import type { DocumentRepository } from "../ports/documentRepository.ts";

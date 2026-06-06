@@ -50,11 +50,21 @@ func AllPermissions(ctx context.Context, auth Checker, user shared.Object, objec
 
 	summary := make(PermissionSummary, len(relations))
 	for range len(relations) {
-		out := <-ch
-		if out.err != nil {
-			return nil, fmt.Errorf("check %s: %w", out.relation, out.err)
+		// select waits on whichever happens first: the next result arriving, or
+		// the caller's context being cancelled / timing out.
+		select {
+		case out := <-ch:
+			if out.err != nil {
+				return nil, fmt.Errorf("check %s: %w", out.relation, out.err)
+			}
+			summary[out.relation] = out.allowed
+		case <-ctx.Done():
+			// Caller cancelled or timed out. Return its reason immediately.
+			// The still-running goroutines each send one value into ch, which is
+			// buffered with room for every result, so they finish and exit
+			// without blocking — no goroutine leak even though we stopped early.
+			return nil, ctx.Err()
 		}
-		summary[out.relation] = out.allowed
 	}
 
 	return summary, nil
