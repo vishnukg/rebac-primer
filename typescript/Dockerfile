@@ -1,4 +1,4 @@
-FROM node:22-slim AS deps
+FROM node:24-slim AS deps
 WORKDIR /workspace
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -9,7 +9,7 @@ COPY src ./src
 COPY test ./test
 RUN npm run build
 
-FROM node:22-slim AS runtime
+FROM node:24-slim AS runtime
 WORKDIR /workspace
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./

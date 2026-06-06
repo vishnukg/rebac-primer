@@ -26,12 +26,17 @@ const makeDocumentsHttpServer = ({ handler }: DocumentsHttpServerCfg): Server =>
     return server;
 };
 
-const readBody = (req: IncomingMessage): Promise<string> =>
-    new Promise(resolve => {
-        const chunks: Buffer[] = [];
-        req.on("data", c => chunks.push(c));
-        req.on("end", () => resolve(Buffer.concat(chunks).toString()));
-    });
+const readBody = (req: IncomingMessage): Promise<string> => {
+    // Promise.withResolvers (ES2024) hands back the resolve/reject functions so
+    // they can be wired straight to the stream's events — no nested executor, and
+    // a natural place to reject on a stream error.
+    const { promise, resolve, reject } = Promise.withResolvers<string>();
+    const chunks: Buffer[] = [];
+    req.on("data", c => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+    req.on("error", reject);
+    return promise;
+};
 
 const safeParseJson = (text: string): unknown => {
     try { return JSON.parse(text); }

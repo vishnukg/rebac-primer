@@ -28,10 +28,17 @@ const makeHttpDocumentsClient = ({
     fetcher = fetch,
 }: HttpDocumentsClientCfg): DocumentsClient => {
     const request = async (url: URL, init: RequestInit): Promise<unknown> => {
-        const response = await fetcher(url, {
-            ...init,
-            headers: { "content-type": "application/json", ...init.headers },
-        });
+        let response: Response;
+        try {
+            response = await fetcher(url, {
+                ...init,
+                headers: { "content-type": "application/json", ...init.headers },
+            });
+        } catch (error) {
+            // Network-level failure. Preserve the original error via `cause`
+            // (ES2022) so the underlying reason survives the rethrow.
+            throw new Error(`Request to ${url.href} failed`, { cause: error });
+        }
         const body: unknown = await response.json();
         if (!response.ok) {
             throw new Error(hasErrorMessage(body) ? body.error : response.statusText);

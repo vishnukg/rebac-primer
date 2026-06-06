@@ -25,11 +25,14 @@ export const productWorkspace = workspace("productWorkspace");
 
 // ── Demo bearer tokens ────────────────────────────────────────────────────────
 
-export const demoTokens: Record<string, { sub: string; scopes: string[] }> = {
+// `satisfies` validates each entry against the claims shape while preserving the
+// exact literal key type, so `keyof typeof demoTokens` is the union of real token
+// strings rather than a plain `string`.
+export const demoTokens = {
     "demo-token-alice": { sub: "alice", scopes: ["documents:read", "documents:write"] },
     "demo-token-bob":   { sub: "bob",   scopes: ["documents:read"] },
     "demo-token-casey": { sub: "casey", scopes: ["documents:read"] },
-};
+} satisfies Record<string, { sub: string; scopes: string[] }>;
 
 // ── Policy tuples (workspace/team memberships) ────────────────────────────────
 //

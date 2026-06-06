@@ -21,15 +21,18 @@ const makeInMemoryTupleRepository = ({ seed = [] }: InMemoryTupleRepositoryCfg =
     const has = (object: RebacObject, relation: Relation, user: Subject): boolean =>
         store.has(keyFor({ object, relation, user }));
 
+    // Iterator helpers (ES2025): filter the live Map iterator lazily and only
+    // materialise the matches with .toArray(), instead of spreading every value
+    // into an array first.
     const findByObjectRelation = (object: RebacObject, relation: Relation): TupleKey[] =>
-        [...store.values()].filter(t => t.object === object && t.relation === relation);
+        store.values().filter(t => t.object === object && t.relation === relation).toArray();
 
     const findAll = (filter?: TupleFilter): TupleKey[] => {
-        if (!filter) return [...store.values()];
-        return [...store.values()].filter(t =>
+        if (!filter) return store.values().toArray();
+        return store.values().filter(t =>
             (!filter.object   || t.object   === filter.object) &&
             (!filter.relation || t.relation === filter.relation),
-        );
+        ).toArray();
     };
 
     const deleteFn = (t: TupleKey): void => { store.delete(keyFor(t)); };

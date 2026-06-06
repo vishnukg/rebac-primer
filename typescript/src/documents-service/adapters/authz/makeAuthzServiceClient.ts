@@ -21,11 +21,18 @@ const makeAuthzServiceClient = ({
     fetcher = fetch,
 }: AuthzServiceClientCfg): AuthzClient => {
     const post = async (path: string, body: unknown): Promise<unknown> => {
-        const response = await fetcher(new URL(path, baseUrl), {
-            method:  "POST",
-            headers: { "content-type": "application/json" },
-            body:    JSON.stringify(body),
-        });
+        let response: Response;
+        try {
+            response = await fetcher(new URL(path, baseUrl), {
+                method:  "POST",
+                headers: { "content-type": "application/json" },
+                body:    JSON.stringify(body),
+            });
+        } catch (error) {
+            // Network-level failure (DNS, connection refused, timeout). Preserve
+            // the original error via `cause` (ES2022) so the reason is not lost.
+            throw new Error(`AuthZ service unreachable at ${baseUrl}${path}`, { cause: error });
+        }
         const json: unknown = await response.json();
         if (!response.ok) {
             const msg = isErrorBody(json) ? json.error : response.statusText;
