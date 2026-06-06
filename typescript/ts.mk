@@ -1,9 +1,10 @@
-# TypeScript targets — included by the root Makefile.
+# TypeScript targets — a fragment included by the root Makefile. NOT standalone:
+# run `make ts/test` (etc.) from the repo root, never `make -f typescript/ts.mk` here.
 #
-# Relies on variables defined in the root Makefile before the include:
+# It relies on variables defined in the root Makefile before the include:
 #   TS_TOOLS  containerized Node toolchain runner (deps/build/test/shell/client)
 #   TS_APP    docker compose invocation for the TS app profile
-# All commands run from the repo root, so relative paths (deployments/...) work.
+# Every recipe runs from the repo root, so relative paths (deployments/...) work.
 
 .PHONY: ts/deps ts/build ts/test ts/test-watch ts/coverage ts/check ts/shell \
         ts/server ts/server-down ts/client ts/server-openfga ts/help

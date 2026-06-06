@@ -9,7 +9,7 @@ export COMPOSE_MENU
 COMPOSE ?= docker compose -f deployments/docker-compose.yml
 
 # Containerized tool/app runners shared by the language-specific makefiles.
-# Defined here (before the includes) so make/go.mk and make/ts.mk can use them.
+# Defined here (before the includes) so go/go.mk and typescript/ts.mk can use them.
 TS_TOOLS := $(COMPOSE) --profile ts-tools run --rm ts-tools
 GO_TOOLS  := $(COMPOSE) --profile go-tools run --rm go-tools
 TS_APP    := $(COMPOSE) --profile ts-app
@@ -17,12 +17,13 @@ GO_APP    := $(COMPOSE) --profile go-app
 
 .DEFAULT_GOAL := help
 
-# Language-specific targets live in their own makefiles. This root ties them
-# together and owns the shared (OpenFGA / cleanup) targets. They are namespaced
-# with a slash — `make go/test`, `make ts/server`, etc. — and defined in
-# make/go.mk and make/ts.mk. Everything still runs from the repo root.
-include make/go.mk
-include make/ts.mk
+# Language-specific targets live alongside each implementation (go/go.mk,
+# typescript/ts.mk). This root ties them together and owns the shared (OpenFGA /
+# cleanup) targets. They are namespaced with a slash — `make go/test`,
+# `make ts/server`, etc. The fragments are NOT standalone: they are included here
+# and every recipe runs from the repo root (so deployments/... paths resolve).
+include go/go.mk
+include typescript/ts.mk
 
 .PHONY: help openfga/up openfga/down openfga/seed compose/config clean
 

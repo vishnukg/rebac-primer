@@ -1,9 +1,10 @@
-# Go targets — included by the root Makefile.
+# Go targets — a fragment included by the root Makefile. NOT standalone:
+# run `make go/test` (etc.) from the repo root, never `make -f go/go.mk` here.
 #
-# Relies on variables defined in the root Makefile before the include:
+# It relies on variables defined in the root Makefile before the include:
 #   GO_TOOLS  containerized Go toolchain runner (build/test/vet/shell)
 #   GO_APP    docker compose invocation for the Go app profile
-# All commands run from the repo root, so relative paths (deployments/...) work.
+# Every recipe runs from the repo root, so relative paths (deployments/...) work.
 
 .PHONY: go/build go/test go/vet go/check go/shell \
         go/server go/server-down go/server-openfga go/help
