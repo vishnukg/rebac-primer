@@ -240,7 +240,7 @@ answers; one is in your process, one is a real service.
 
 - [play.fga.dev](https://play.fga.dev) — paste a model + tuples, run checks in a
   browser, see the resolution visually. Try pasting `model.fga`.
-- Then `make openfga-up && make openfga-seed && make go-server-openfga`.
+- Then `make openfga/up && make openfga/seed && make go/server-openfga`.
 
 ---
 

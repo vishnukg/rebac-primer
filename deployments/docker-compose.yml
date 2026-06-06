@@ -23,7 +23,7 @@ services:
     command: ["node", "src/authz-service/index.ts"]
     environment:
       AUTHZ_PORT: "4100"
-      # Authorization backend. Default "graph" (in-process). The ts-server-openfga
+      # Authorization backend. Default "graph" (in-process). The ts/server-openfga
       # make target sets AUTHZ_BACKEND=openfga and the OPENFGA_* vars below.
       AUTHZ_BACKEND: "${AUTHZ_BACKEND:-graph}"
       OPENFGA_API_URL: "${OPENFGA_API_URL:-http://openfga:8080}"
@@ -74,7 +74,7 @@ services:
       dockerfile: Dockerfile
     environment:
       PORT: "4001"
-      # Authorization backend. Default "graph" (in-process). The go-server-openfga
+      # Authorization backend. Default "graph" (in-process). The go/server-openfga
       # make target sets AUTHZ_BACKEND=openfga and the OPENFGA_* vars below.
       AUTHZ_BACKEND: "${AUTHZ_BACKEND:-graph}"
       OPENFGA_API_URL: "${OPENFGA_API_URL:-http://openfga:8080}"

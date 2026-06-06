@@ -42,7 +42,7 @@ If you just want to understand ReBAC and read it working, you only need ~8 docs:
 2. **One implementation** (pick a language):
    - Go: 20 → 21 → 27 (primer → implementation → a step-by-step evaluator trace)
    - TypeScript: 10 → 11 → 12 → 18
-3. **Run it**: `make go-test` then `make go-server` (or `make ts-test` / `make ts-server`)
+3. **Run it**: `make go/test` then `make go/server` (or `make ts/test` / `make ts/server`)
 
 Everything below is **optional depth** — read it when you want it, not before.
 
@@ -71,30 +71,30 @@ make → docker compose → containerized tools
 **TypeScript** (server on port 4000):
 
 ```bash
-make ts-deps
-make ts-build
-make ts-test
-make ts-coverage
-make ts-check
-make ts-server
-make ts-client
+make ts/deps
+make ts/build
+make ts/test
+make ts/coverage
+make ts/check
+make ts/server
+make ts/client
 ```
 
 **Go** (server on port 4001):
 
 ```bash
-make go-build
-make go-test
-make go-vet
-make go-check
-make go-server
+make go/build
+make go/test
+make go/vet
+make go/check
+make go/server
 ```
 
 **Shared**:
 
 ```bash
-make openfga-up    # start local OpenFGA
-make openfga-down  # stop everything
+make openfga/up    # start local OpenFGA
+make openfga/down  # stop everything
 make clean         # remove containers, volumes, and build output
 ```
 
@@ -102,9 +102,9 @@ make clean         # remove containers, volumes, and build output
 the `fga` CLI + `jq`):
 
 ```bash
-make openfga-up && make openfga-seed   # start OpenFGA, write model.fga + policy tuples
-make go-server-openfga                 # Go app with AUTHZ_BACKEND=openfga
-make ts-server-openfga                 # TS app with AUTHZ_BACKEND=openfga
+make openfga/up && make openfga/seed   # start OpenFGA, write model.fga + policy tuples
+make go/server-openfga                 # Go app with AUTHZ_BACKEND=openfga
+make ts/server-openfga                 # TS app with AUTHZ_BACKEND=openfga
 ```
 
 Run `make` with no arguments to see all targets.

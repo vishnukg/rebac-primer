@@ -612,7 +612,7 @@ broad "agent is trusted" flag.
 **TypeScript:** run the demo and read the trace:
 
 ```bash
-make ts-server   # start the server
+make ts/server   # start the server
 # or inside the container: npm run dev
 ```
 
@@ -626,7 +626,7 @@ tuple(productWorkspace, "editor", bob)
 **Go:** run the graph test with verbose output and read every trace line:
 
 ```bash
-make go-test
+make go/test
 # or: go test -v ./internal/authz/...
 ```
 

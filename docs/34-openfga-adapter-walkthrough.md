@@ -35,8 +35,8 @@ authz.Service (Go) / AuthzService (TS):  Check · WriteTuples · DeleteTuples ·
 ## Setup (one time)
 
 ```bash
-make openfga-up     # OpenFGA on :8080 (ephemeral memory datastore)
-make openfga-seed   # create store, write model.fga, seed the policy tuples
+make openfga/up     # OpenFGA on :8080 (ephemeral memory datastore)
+make openfga/seed   # create store, write model.fga, seed the policy tuples
                     # → writes deployments/openfga/.ids.env (store + model IDs)
 ```
 
@@ -107,7 +107,7 @@ visible to the next check.
 ## Run it and compare
 
 ```bash
-make go-server-openfga      # or: make ts-server-openfga
+make go/server-openfga      # or: make ts/server-openfga
 
 # Bob can read (viewer) → 200
 curl localhost:4001/documents/roadmapDocument -H "Authorization: Bearer demo-token-bob"

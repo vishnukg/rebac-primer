@@ -40,7 +40,7 @@ npm run documents   # Documents service on port 4000
 Go:
 
 ```bash
-make go-server
+make go/server
 ```
 
 The servers listen on:
@@ -265,7 +265,7 @@ You can still run the services normally on your machine:
 
 ```bash
 npm run dev     # starts both TypeScript services
-make go-server  # starts the Go server
+make go/server  # starts the Go server
 ```
 
 and exercise it with:

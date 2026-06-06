@@ -268,7 +268,7 @@ and a network call.
 
 ## Try it
 
-1. Start the server: `make go-server` (listens on 4001).
+1. Start the server: `make go/server` (listens on 4001).
 2. Read as Bob (allowed): `curl :4001/documents/roadmapDocument -H "Authorization: Bearer demo-token-bob"` → 200.
 3. Edit as Bob (denied): `curl -X PATCH :4001/documents/roadmapDocument -H "Authorization: Bearer demo-token-bob" -H "content-type: application/json" -d '{"body":"x"}'` → 403.
 4. Open `documents/domain.go` and add a `log.Printf` inside `requireAllowed` printing the `CheckRequest`. Re-run both curls and watch the relation change from `can_read` to `can_edit`.

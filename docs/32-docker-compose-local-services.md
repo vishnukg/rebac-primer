@@ -34,21 +34,21 @@ This is the default workflow for this repo.
 Build and test without local Node or Go:
 
 ```bash
-make ts-check
-make go-check
+make ts/check
+make go/check
 ```
 
 Run an app container:
 
 ```bash
-make ts-server
-make go-server
+make ts/server
+make go/server
 ```
 
 Run the TypeScript terminal client in another terminal:
 
 ```bash
-make ts-client
+make ts/client
 ```
 
 ### Workflow B: OpenFGA only
@@ -56,13 +56,13 @@ make ts-client
 Start OpenFGA without the app container:
 
 ```bash
-make openfga-up
+make openfga/up
 ```
 
 Stop it:
 
 ```bash
-make openfga-down
+make openfga/down
 ```
 
 ### Workflow C: raw Compose
@@ -101,11 +101,11 @@ interface AuthzClient {
 Prefer the Make targets:
 
 ```bash
-make compose-config
-make ts-server
-make ts-server-down
-make go-server
-make go-server-down
+make compose/config
+make ts/server
+make ts/server-down
+make go/server
+make go/server-down
 ```
 
 Raw Compose equivalents:

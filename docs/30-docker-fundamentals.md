@@ -80,8 +80,8 @@ Docker         -> repeatable execution environment
 The point is simple: a developer and CI should run the same command shape.
 
 ```bash
-make ts-test
-make go-test
+make ts/test
+make go/test
 ```
 
 do not call local test tools directly. They run through Compose tool containers:
@@ -116,7 +116,7 @@ not pollute your host machine.
 Use:
 
 ```bash
-make ts-deps
+make ts/deps
 ```
 
 to refresh dependencies in that volume.
@@ -230,30 +230,30 @@ Keep code and images the same.
 Run the normal project lifecycle:
 
 ```bash
-make ts-deps
-make ts-check
-make go-check
+make ts/deps
+make ts/check
+make go/check
 ```
 
 Open a shell in the tool container:
 
 ```bash
-make ts-shell
-make go-shell
+make ts/shell
+make go/shell
 ```
 
 Run an app profile:
 
 ```bash
-make ts-server
-make go-server
+make ts/server
+make go/server
 ```
 
 Stop an app profile:
 
 ```bash
-make ts-server-down
-make go-server-down
+make ts/server-down
+make go/server-down
 ```
 
 ## What to remember

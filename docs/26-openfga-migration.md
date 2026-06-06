@@ -151,9 +151,9 @@ so the documents domain, HTTP handlers, and tests are unchanged.
 Run it (the make target sets the flag for you):
 
 ```bash
-make openfga-up         # OpenFGA on :8080 (memory datastore)
-make openfga-seed       # create store, write model.fga, seed policy tuples (needs fga CLI + jq)
-make go-server-openfga  # or: make ts-server-openfga
+make openfga/up         # OpenFGA on :8080 (memory datastore)
+make openfga/seed       # create store, write model.fga, seed policy tuples (needs fga CLI + jq)
+make go/server-openfga  # or: make ts/server-openfga
 ```
 
 The sections below explain what each step does under the hood.
@@ -302,7 +302,7 @@ The TypeScript side does the same in `authz-service/compose.ts`. Everything else
 
 ### Step 5 — seed the store
 
-`deployments/openfga/seed.sh` (run via `make openfga-seed`) creates the store,
+`deployments/openfga/seed.sh` (run via `make openfga/seed`) creates the store,
 writes `model.fga`, and seeds the workspace/team **policy** tuples — the same ones
 `fixtures.SeedRelationshipTuples` / `seedPolicyTuples` hold for the in-memory
 backend. The **document-level** tuples (`workspace`, `owner`) are written at

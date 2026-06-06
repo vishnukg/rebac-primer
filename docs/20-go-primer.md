@@ -651,7 +651,7 @@ func newSeededService(t *testing.T) documents.Service {
 Run all tests:
 
 ```bash
-make go-test
+make go/test
 # or inside the container:
 go test ./...
 # with verbose output showing each test name:
@@ -691,7 +691,7 @@ Open `go/internal/authz/adapters/graph/evaluator_test.go`.
    tuple, then verify they can `can_delete` `roadmapDocument`. Use the AAA
    structure with `// Arrange`, `// Act`, `// Assert` comments.
 
-3. Run it: `make go-test`. Read the trace output and match each line to the
+3. Run it: `make go/test`. Read the trace output and match each line to the
    expansion rules in `go/internal/authz/adapters/graph/evaluator.go`.
 
 ---

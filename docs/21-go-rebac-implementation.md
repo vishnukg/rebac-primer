@@ -732,7 +732,7 @@ calls the full stack in-process. No server, no port, no teardown.
 ## Running the Go server
 
 ```bash
-make go-server   # starts the server on port 4001
+make go/server   # starts the server on port 4001
 ```
 
 Then test the API:

@@ -136,7 +136,7 @@ The shortest route to understanding ReBAC and reading it work. ~8 docs:
 then ONE implementation:
   Go:          20 → 21 → 27        primer → implementation → evaluator trace
   TypeScript:  10 → 11 → 12 → 18   foundations → types → factories → implementation
-run it:        make go-test && make go-server   (or the ts- equivalents)
+run it:        make go/test && make go/server   (or the ts- equivalents)
 ```
 
 Everything in the tracks below is **optional depth** — the other language, the
@@ -180,7 +180,7 @@ concepts directly through the implementation code.
 40                                  Production gaps
 ```
 
-Start with `make go-test` to confirm the setup works, then open
+Start with `make go/test` to confirm the setup works, then open
 `go/internal/authz/adapters/graph/evaluator.go` alongside `docs/21-go-rebac-implementation.md`.
 Read `docs/27-graph-evaluator-walkthrough.md` for a step-by-step trace of the traversal
 algorithm if the evaluator code feels hard to follow.
@@ -229,14 +229,14 @@ Checkpoint: explain `editor from workspace` as a graph path.
 TypeScript:
 
 1. Read `10-typescript-foundations.md` and `11-types-and-values.md`.
-2. Run `make ts-build`.
+2. Run `make ts/build`.
 3. Break one relation name in `typescript/src/shared/rebac.ts`.
-4. Restore the code and run `make ts-test`.
+4. Restore the code and run `make ts/test`.
 
 Go:
 
 1. Read `20-go-primer.md`.
-2. Run `make go-test`.
+2. Run `make go/test`.
 3. Open `go/internal/authz/adapters/graph/evaluator_test.go`.
 4. Break one tuple in `go/internal/fixtures/fixtures.go` and predict which tests fail.
 
@@ -266,13 +266,13 @@ Checkpoint: explain why the domain depends on `AuthzClient`, not the graph evalu
 TypeScript:
 
 1. Read `14-testing-with-vitest.md`.
-2. Run `make ts-test`.
+2. Run `make ts/test`.
 3. Change `seedPolicyTuples()` in `typescript/src/demo/fixtures.ts` and predict which tests fail.
 
 Go:
 
 1. Open `go/internal/authz/adapters/graph/evaluator_test.go` — read each AAA section.
-2. Run `make go-test`.
+2. Run `make go/test`.
 3. Change `SeedRelationshipTuples()` in `go/internal/fixtures/fixtures.go` and predict which tests fail.
 
 Checkpoint: explain why Bob can read but cannot edit.
@@ -289,7 +289,7 @@ Go:
 
 1. Read `22-go-concurrency.md`, `23-go-generics.md`, and `24-go-interfaces-embedding.md`.
 2. Inspect `go/internal/authz/adapters/graph/parallel.go`, `go/internal/authz/adapters/graph/result.go`, and `go/internal/authz/adapters/graph/middleware.go`.
-3. Run `make go-test` and explain which tests document each language feature.
+3. Run `make go/test` and explain which tests document each language feature.
 
 Checkpoint: explain why relative ESM imports use explicit extensions, or
 why Go passes `context.Context` through the authorization boundary.
@@ -299,8 +299,8 @@ why Go passes `context.Context` through the authorization boundary.
 1. Read `30-docker-fundamentals.md`.
 2. Read `31-docker-networking.md`.
 3. Read `32-docker-compose-local-services.md`.
-4. Start the TypeScript server with `make ts-server` or the Go server with `make go-server`.
-5. Run the terminal client with `make ts-client`.
+4. Start the TypeScript server with `make ts/server` or the Go server with `make go/server`.
+5. Run the terminal client with `make ts/client`.
 
 Checkpoint: explain what changes when the app runs on your host versus inside
 Docker Compose.
@@ -321,30 +321,30 @@ swap the in-process evaluator for a real AuthZ service in a production deploymen
 TypeScript (from `typescript/` or via Docker):
 
 ```bash
-make ts-deps
-make ts-build
-make ts-test
-make ts-coverage
-make ts-check
-make ts-server
-make ts-client
+make ts/deps
+make ts/build
+make ts/test
+make ts/coverage
+make ts/check
+make ts/server
+make ts/client
 ```
 
 Go (via Docker):
 
 ```bash
-make go-build
-make go-test
-make go-vet
-make go-check
-make go-server
+make go/build
+make go/test
+make go/vet
+make go/check
+make go/server
 ```
 
 Shared:
 
 ```bash
-make openfga-up
-make openfga-down
+make openfga/up
+make openfga/down
 make clean
 ```
 

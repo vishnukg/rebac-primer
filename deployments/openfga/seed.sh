@@ -6,12 +6,12 @@
 # and tuples live in the OpenFGA store instead.
 #
 # Prerequisites:
-#   - OpenFGA running:  make openfga-up        (listens on $OPENFGA_API_URL)
+#   - OpenFGA running:  make openfga/up        (listens on $OPENFGA_API_URL)
 #   - fga CLI:          brew install openfga/tap/fga
 #   - jq:               brew install jq
 #
 # It writes the resulting store/model IDs to deployments/openfga/.ids.env, which
-# the `make ts-server-openfga` / `make go-server-openfga` targets source so the
+# the `make ts/server-openfga` / `make go/server-openfga` targets source so the
 # apps know which store/model to talk to.
 set -euo pipefail
 
@@ -49,4 +49,4 @@ echo
 echo "Wrote $IDS_FILE:"
 cat "$IDS_FILE"
 echo
-echo "Now run:  make go-server-openfga   (or)   make ts-server-openfga"
+echo "Now run:  make go/server-openfga   (or)   make ts/server-openfga"
