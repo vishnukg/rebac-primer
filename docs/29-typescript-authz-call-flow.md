@@ -51,7 +51,7 @@ authz service are **separate processes** that talk over HTTP:
                                                                    │ POST /check
                                                                    ▼
  ┌──────────────────────── authz-service (port 4100) ─────────────────────────┐
- │  makeAuthzHttpServer  →  makeAuthzHttpHandler  →  makeAuthzDomain           │
+ │  makeAuthzHttpServer  →  makeAuthzHttpHandler  →  composeAuthzDomain           │
  │   (node http)             (routing)               (check)                  │
  │                                                       │ evaluate()           │
  │                                              makeGraphEvaluator → repository │
@@ -158,7 +158,7 @@ if (request.method === "POST" && request.path === "/check") {
 }
 ```
 
-### 7. Authz core — `authz-service/core/domain/makeAuthzDomain.ts`
+### 7. Authz core — `authz-service/core/domain/composeAuthzDomain.ts`
 
 ```ts
 const check = (request) => evaluator.evaluate(request);   // delegate to the Evaluator port
@@ -179,7 +179,7 @@ The recursion is the same algorithm `docs/18` and (in Go terms)
 
 ```text
 makeGraphEvaluator.evaluate → { allowed: true }      (authz-service)
-  makeAuthzDomain.check returns it
+  composeAuthzDomain.check returns it
     authz handler → json(200, { allowed, trace })
       ── HTTP response :4100 ──►
         makeAuthzServiceClient.check parses { allowed:true }   (documents-service)
@@ -229,7 +229,7 @@ thrown as a generic `unknown` in `catch`.
 | Use case | `core/domain/makeReadDocument.ts` | exists? allowed? | `authzClient.check` |
 | **Boundary** | `adapters/authz/makeAuthzServiceClient.ts` | **`fetch` POST /check** | the authz service |
 | Authz HTTP in | `authz-service/adapters/http/makeAuthzHttpHandler.ts` | route `/check` | `authz.check` |
-| Authz core | `core/domain/makeAuthzDomain.ts` | delegate to evaluator | `evaluator.evaluate` |
+| Authz core | `core/domain/composeAuthzDomain.ts` | delegate to evaluator | `evaluator.evaluate` |
 | Evaluator | `adapters/graph/makeGraphEvaluator.ts` | traverse the tuple graph | repository reads |
 
 ---

@@ -1,6 +1,6 @@
 // OpenFGA adapter for the AuthZ service.
 //
-// This implements the same `AuthzService` driving port as makeAuthzDomain (the
+// This implements the same `AuthzService` driving port as composeAuthzDomain (the
 // from-scratch graph version), but answers checks and stores tuples in a real
 // OpenFGA server instead of the in-process graph evaluator + in-memory store.
 // composeAuthzService picks between the two based on AUTHZ_BACKEND, so nothing

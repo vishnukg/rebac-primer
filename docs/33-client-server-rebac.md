@@ -204,7 +204,7 @@ The object graphs are assembled in the composition roots:
 composeAuthzService (authz-service/compose.ts)
   -> makeInMemoryTupleRepository (seeded with policy tuples)
   -> makeGraphEvaluator
-  -> makeAuthzDomain
+  -> composeAuthzDomain
   -> makeAuthzHttpHandler + makeAuthzHttpServer
 
 composeDocumentsService (documents-service/compose.ts)

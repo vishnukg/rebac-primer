@@ -140,7 +140,7 @@ authz service. Same port, two transports — see `docs/28` / `docs/29`.
 | Shared vocabulary (the "SDK") | `internal/shared/rebac.go` | `src/shared/rebac.ts` |
 | AuthZ driving port | `authz.Service` (`internal/authz/authz.go`) | `AuthzService` (`authz-service/core/domain/types.ts`) |
 | AuthZ driven ports | `TupleRepository`, `Evaluator` (`internal/authz/ports.go`) | `TupleRepository`, `Evaluator` (`authz-service/core/ports/`) |
-| AuthZ core impl | `internal/authz/domain.go` | `authz-service/core/domain/makeAuthzDomain.ts` |
+| AuthZ core impl | `internal/authz/domain.go` | `authz-service/core/domain/composeAuthzDomain.ts` |
 | AuthZ adapters | `internal/authz/adapters/{db,graph,http}` | `authz-service/adapters/{db,graph,http}` |
 | Documents driving port | `documents.Service` (`internal/documents/documents.go`) | `Documents` (`documents-service/core/domain/types.ts`) |
 | Documents driven ports | `DocumentRepository`, `AuthzClient`, `Authenticator` (`internal/documents/ports.go`) | same names (`documents-service/core/ports/`) |
@@ -203,7 +203,7 @@ HTTP one without changing.
 ### 4. Constructors return the interface; the root wires concretes
 
 `documents.New(...)` returns `Service` (the interface), not `*documentService`.
-`makeAuthzDomain(...)` returns `AuthzService`. Callers hold a port, never a
+`composeAuthzDomain(...)` returns `AuthzService`. Callers hold a port, never a
 concrete struct. Go adds compile-time assertions (`var _ Port = (*Impl)(nil)`)
 so a missing method fails at build time, not at the first call.
 

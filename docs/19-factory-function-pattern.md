@@ -162,17 +162,15 @@ it does **not** build those operations from other factories; it defines them
 inline. The return type annotation names the port:
 
 ```ts
-const makeGraphEvaluator   = ({ repository }: ...): Evaluator           => { ... }
-const makeAuthzHttpHandler = ({ authz }: ...): AuthzHttpHandler         => { ... }
-const makeAuthzHttpServer  = ({ handler }: ...): Server                 => { ... }
+const makeCheck            = ({ evaluator }: ...): AuthzService["check"]  => { ... }
+const makeGraphEvaluator   = ({ repository }: ...): Evaluator            => { ... }
+const makeAuthzHttpHandler = ({ authz }: ...): AuthzHttpHandler          => { ... }
 const makeCreateDocument   = ({ repository, authzClient }: ...): CreateDocumentFn => { ... }
 
-// The object literal IS the AuthzService — its methods are written inline here.
-const makeAuthzDomain = ({ repository, evaluator }: ...): AuthzService => {
-    const check       = (req)   => evaluator.evaluate(req);
-    const writeTuples = async (ts) => { for (const t of ts) repository.write(t); };
-    // ...deleteTuples, listTuples...
-    return { check, writeTuples, deleteTuples, listTuples };
+// A multi-method port can still be a make* — as long as its methods are inline:
+const makeInMemoryTupleRepository = ({ seed }: ...): TupleRepository => {
+    // write / delete / findAll defined inline over a private Map — calls no factory
+    return { write, delete: del, findAll };
 };
 ```
 
@@ -225,26 +223,30 @@ may return either of two shapes:
 > select a concrete adapter) and wire them together?_
 >
 > - **No** — it receives its deps ready-made and returns one port with its
->   operations defined inline → it is a **`make*`** (`makeAuthzDomain`,
+>   operations defined inline → it is a **`make*`** (`makeCheck`,
 >   `makeGraphEvaluator`, `makeCreateDocument`, `makeAuthzHttpServer`).
 > - **Yes** — it assembles pieces built elsewhere → it is a **`compose*`**
->   (`composeDocuments`, `composeAuthzBackend`, `composeAuthzService`).
+>   (`composeAuthzDomain`, `composeDocuments`, `composeAuthzBackend`,
+>   `composeAuthzService`).
 
 The deciding factor is **building your own collaborators**, *not* the return
-type. `makeAuthzDomain` and `composeDocuments` both return a single domain port —
-yet `makeAuthzDomain` defines its operations inline (a `make*`), while
-`composeDocuments` builds them from `make*` factories (a `compose*`). This is the
-same rule the ModulePattern reference repo uses to separate `makeRestaurant`
-(bundles ready-made operations) from `composeRestaurant` (builds them).
+type. `makeCheck` defines its one operation inline (a `make*`); `composeAuthzDomain`
+calls `makeCheck` / `makeWriteTuples` / `makeDeleteTuples` / `makeListTuples` and
+bundles them into the `AuthzService` port (a `compose*`) — both concern the same
+domain, but only one builds its parts. This is the same rule the ModulePattern
+reference repo uses to separate `makeRestaurant` (bundles ready-made operations)
+from `composeRestaurant` (builds them).
 
 #### This repo, function by function
 
 | Function | Kind | Why |
 | --- | --- | --- |
-| `makeAuthzDomain` | `make*` | defines `check`/`writeTuples`/… inline — calls no factory |
-| `makeGraphEvaluator`, `makeCreateDocument`/`Read`/`Update`, `makeAuthzHttpHandler`/`Server`, `makeInMemory*`, … | `make*` | define their behaviour inline |
-| `composeDocuments` | `compose*` | calls `makeCreateDocument` / `makeReadDocument` / `makeUpdateDocument` |
-| `composeAuthzBackend` | `compose*` | selects the backend, calls `makeInMemoryTupleRepository` / `makeGraphEvaluator` / `makeAuthzDomain` (or `makeOpenFgaAuthzService`) |
+| `makeCheck`, `makeWriteTuples`, `makeDeleteTuples`, `makeListTuples` | `make*` | one authz operation each, defined inline |
+| `makeCreateDocument`, `makeReadDocument`, `makeUpdateDocument` | `make*` | one documents operation each, defined inline |
+| `makeGraphEvaluator`, `makeAuthzHttpHandler`/`Server`, `makeInMemory*`, … | `make*` | define their behaviour inline |
+| `composeAuthzDomain` | `compose*` | calls `makeCheck` / `makeWriteTuples` / `makeDeleteTuples` / `makeListTuples`, bundles into `AuthzService` |
+| `composeDocuments` | `compose*` | calls `makeCreateDocument` / `makeReadDocument` / `makeUpdateDocument`, bundles into `Documents` |
+| `composeAuthzBackend` | `compose*` | selects the backend, calls `makeInMemoryTupleRepository` / `makeGraphEvaluator` / `composeAuthzDomain` (or `makeOpenFgaAuthzService`) |
 | `composeAuthzService`, `composeDocumentsService`, `composeCliApp` | `compose*` | call the above + adapters; return only what the entry point drives (`{ listen }`, `{ listen }`, `{ run }`) |
 
 #### A third kind: plain functions

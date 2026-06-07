@@ -16,7 +16,7 @@ Here is exactly where each question is answered in this codebase:
 |---|---|
 | **Authentication** — "who are you?" | `documents-service/core/ports/authenticator.ts` (port) |
 | Bearer token extraction + verification | `documents-service/adapters/authn/makeDemoTokenVerifier.ts` |
-| **Authorization** — "what can you do?" | `authz-service/core/domain/makeAuthzDomain.ts` |
+| **Authorization** — "what can you do?" | `authz-service/core/domain/composeAuthzDomain.ts` |
 | Relationship tuple store | `authz-service/adapters/db/makeInMemoryTupleRepository.ts` |
 | Graph traversal (ReBAC evaluation) | `authz-service/adapters/graph/makeGraphEvaluator.ts` |
 | Permission model (who implies what) | `authz-service/adapters/graph/permissionModel.ts` |
@@ -157,7 +157,11 @@ src/
 │   ├── core/
 │   │   ├── domain/
 │   │   │   ├── types.ts         ← AuthzService interface + errors
-│   │   │   └── makeAuthzDomain.ts ← check / writeTuples / deleteTuples / listTuples
+│   │   │   ├── composeAuthzDomain.ts ← assembles check/writeTuples/deleteTuples/listTuples
+│   │   │   ├── makeCheck.ts
+│   │   │   ├── makeWriteTuples.ts
+│   │   │   ├── makeDeleteTuples.ts
+│   │   │   └── makeListTuples.ts
 │   │   └── ports/
 │   │       └── tupleRepository.ts ← what the domain needs from storage
 │   └── adapters/

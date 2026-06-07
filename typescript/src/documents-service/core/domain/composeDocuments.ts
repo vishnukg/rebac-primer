@@ -2,9 +2,10 @@
 // the repository and authz client, and returns them as the Documents port.
 //
 // This is a compose* (not a make*) because it builds its own collaborators via
-// make* factories — the same role composeRestaurant plays in the ModulePattern
-// reference repo. makeAuthzDomain, by contrast, defines its operations inline
-// and so stays a make*.
+// make* factories (makeCreateDocument / makeReadDocument / makeUpdateDocument),
+// then bundles them into the Documents port — the same role composeRestaurant
+// plays in the ModulePattern reference repo, and composeAuthzDomain on the authz
+// side. The per-operation make* factories it calls are the leaves.
 
 import type { AuthzClient } from "../ports/authzClient.ts";
 import type { DocumentRepository } from "../ports/documentRepository.ts";

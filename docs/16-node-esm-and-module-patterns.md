@@ -400,7 +400,7 @@ This repo usually prefers explicit composition:
 ```ts
 const repository  = makeInMemoryTupleRepository({ seed: seedPolicyTuples() });
 const evaluator   = makeGraphEvaluator({ repository });
-const domain      = makeAuthzDomain({ repository, evaluator });
+const domain      = composeAuthzDomain({ repository, evaluator });
 ```
 
 Or on the documents side:
