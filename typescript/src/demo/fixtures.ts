@@ -11,6 +11,7 @@
 
 import { subjectSet, team, tuple, user, workspace } from "../shared/rebac.ts";
 import type { TupleKey } from "../shared/rebac.ts";
+import type { CreateDocumentInput } from "../documents-service/core/domain/types.ts";
 
 // ── Demo actors ───────────────────────────────────────────────────────────────
 
@@ -44,4 +45,22 @@ export const seedPolicyTuples = (): TupleKey[] => [
     tuple(platformTeam, "member", alice),
     tuple(productWorkspace, "editor", subjectSet(platformTeam, "member")),
     tuple(productWorkspace, "viewer", bob),
+];
+
+// ── Demo documents ──────────────────────────────────────────────────────────────
+//
+// Seed documents the documents service creates on startup so the running server
+// has something to explore. Unlike policy tuples (which seed the authz store at
+// construction), each of these is created through the domain at startup —
+// create → authz.check → repo.save → authz.writeTuples — so the authz service
+// must already be reachable.
+
+export const seedDocuments = (): CreateDocumentInput[] => [
+    {
+        id:        "roadmapDocument",
+        title:     "Roadmap",
+        body:      "Initial roadmap document",
+        workspace: productWorkspace,
+        actor:     alice,
+    },
 ];

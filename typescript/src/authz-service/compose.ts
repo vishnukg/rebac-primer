@@ -69,7 +69,7 @@ const composeAuthzService = ({
         server.listen(port, "0.0.0.0", () => onReady(port));
     };
 
-    return { listen, domain };
+    return { listen };
 };
 
 export default composeAuthzService;

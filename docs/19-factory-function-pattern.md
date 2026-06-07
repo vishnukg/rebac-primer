@@ -195,19 +195,29 @@ may return either of two shapes:
   };
   ```
 
-- **An unnamed bag of independent peers**, when it is an entry point's
-  composition root. `composeAuthzService` selects the backend, then wires the
-  domain, HTTP handler, and server, returning `{ listen, domain }` for
-  `index.ts` to drive:
+- **A named bag of peers**, *if* an entry point genuinely drives more than one
+  capability. In this repo none do — each service root returns the single thing
+  its `index.ts` runs (`composeAuthzService` → `{ listen }`,
+  `composeDocumentsService` → `{ listen }`, `composeCliApp` → `{ run }`):
 
   ```ts
-  const composeAuthzService = ({ port?, seedTuples? } = {}) => {
-      const domain  = composeAuthzBackend(seedTuples); // selects backend, builds the domain
-      const handler = makeAuthzHttpHandler({ authz: domain });
-      const server  = makeAuthzHttpServer({ handler });
-      return { listen, domain };  // independent peers; callers pick what they need
+  const composeDocumentsService = ({ port?, authzUrl?, tokens?, seedDocuments? } = {}) => {
+      const authzClient   = makeAuthzServiceClient({ baseUrl: authzUrl });
+      const authenticator = makeDemoTokenVerifier({ tokens });
+      const repository    = makeInMemoryDocumentRepository();
+      const documents     = composeDocuments({ repository, authzClient });
+      const handler = makeDocumentsHttpHandler({ authenticator, documents });
+      const server  = makeDocumentsHttpServer({ handler });
+      // seedDocuments are created inside listen() at startup, so the domain is
+      // never handed back out — return only what the entry point drives.
+      return { listen };
   };
   ```
+
+  **Return only what the entry point actually drives — never expose the domain
+  for a startup side-task or a test.** Startup data comes *in* as config
+  (`seedTuples`, `seedDocuments`) and the root seeds it internally. This is a
+  deliberate decision; see [ADR 0001](./adr/0001-composition-roots-return-only-what-is-driven.md).
 
 ### Which one am I writing? The one-question test
 
@@ -235,7 +245,7 @@ same rule the ModulePattern reference repo uses to separate `makeRestaurant`
 | `makeGraphEvaluator`, `makeCreateDocument`/`Read`/`Update`, `makeAuthzHttpHandler`/`Server`, `makeInMemory*`, … | `make*` | define their behaviour inline |
 | `composeDocuments` | `compose*` | calls `makeCreateDocument` / `makeReadDocument` / `makeUpdateDocument` |
 | `composeAuthzBackend` | `compose*` | selects the backend, calls `makeInMemoryTupleRepository` / `makeGraphEvaluator` / `makeAuthzDomain` (or `makeOpenFgaAuthzService`) |
-| `composeAuthzService`, `composeDocumentsService`, `composeCliApp` | `compose*` | call the above + adapters, return a bag of peers |
+| `composeAuthzService`, `composeDocumentsService`, `composeCliApp` | `compose*` | call the above + adapters; return only what the entry point drives (`{ listen }`, `{ listen }`, `{ run }`) |
 
 #### A third kind: plain functions
 
@@ -306,7 +316,8 @@ they call no other factory. `composeAuthzService` is a `compose*` because it
 `makeAuthzHttpHandler`, `makeAuthzHttpServer`) and wires them together. That —
 calling other factories — is what makes it a compose, not the shape of what it
 returns (a compose may return one named port, like `composeDocuments` →
-`Documents`, or a bag of peers, like `composeAuthzService` → `{ listen, domain }`).
+`Documents`, or a single capability, like `composeAuthzService` → `{ listen }`;
+it could return a bag of several peers, but only if the entry point drives them).
 The `compose.ts` file is the composition root — the one place in the codebase
 that knows which concrete adapter goes behind each port.
 
