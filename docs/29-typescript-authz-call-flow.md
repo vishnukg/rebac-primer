@@ -79,12 +79,12 @@ The composition root picks the concrete adapters:
 const authzClient   = makeAuthzServiceClient({ baseUrl: authzUrl }); // HTTP to :4100
 const authenticator = makeDemoTokenVerifier({ tokens });
 const repository    = makeInMemoryDocumentRepository();
-const documents     = makeDocuments({ repository, authzClient });    // domain gets the port
+const documents     = composeDocuments({ repository, authzClient }); // domain gets the port
 const handler = makeDocumentsHttpHandler({ authenticator, documents });
 const server  = makeDocumentsHttpServer({ handler });
 ```
 
-`makeDocuments` receives `authzClient` as a plain object satisfying the
+`composeDocuments` receives `authzClient` as a plain object satisfying the
 `AuthzClient` interface. It never learns whether that object talks HTTP or runs
 in-process.
 

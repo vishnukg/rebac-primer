@@ -510,7 +510,7 @@ Each use case lives in its own file, mirroring the TypeScript structure.
 
 | Go file       | TypeScript file               | What it does              |
 |---------------|-------------------------------|---------------------------|
-| `domain.go`   | `makeDocuments.ts`            | Interface + struct + `New` |
+| `domain.go`   | `composeDocuments.ts`         | Interface + struct + `New` |
 | `create.go`   | `makeCreateDocument.ts`       | Create use case           |
 | `read.go`     | `makeReadDocument.ts`         | Read use case             |
 | `update.go`   | `makeUpdateDocument.ts`       | Update use case           |
@@ -717,7 +717,7 @@ calls the full stack in-process. No server, no port, no teardown.
 | Relation constants     | Union type `"can_edit" \| ...`          | `const` block with named `Relation` type  |
 | Port definitions       | `interface` in `core/ports/*.ts`        | `interface` in `authz/ports.go` or `documents/ports.go` |
 | Interface satisfaction | Object shape must match                 | Implicit — method set must match          |
-| Factory functions      | `makeDocuments({ repo, authzClient })`  | `documents.New(repo, authzClient)`        |
+| Factory functions      | `composeDocuments({ repo, authzClient })` | `documents.New(repo, authzClient)`       |
 | Error signalling       | `throw ForbiddenError(...)`             | `return &ForbiddenError{...}`             |
 | Error dispatch         | `instanceof`                            | `errors.As`                               |
 | Immutable copy         | `{ ...existing, body: newBody }`        | `updated := *existing; updated.Body = …`  |

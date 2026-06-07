@@ -1,24 +1,24 @@
 // Unit tests for the documents domain.
-// The AuthzClient port is satisfied by makeInProcessAuthzClient — a test stub
+// The AuthzClient port is satisfied by composeInProcessAuthzClient — a test stub
 // that runs the real graph evaluator in-process instead of making HTTP calls.
 // See test/documentsService.test.ts for HTTP-level integration tests.
 import { describe, expect, it } from "vitest";
-import makeDocuments from "../src/documents-service/core/domain/makeDocuments.ts";
+import composeDocuments from "../src/documents-service/core/domain/composeDocuments.ts";
 import makeInMemoryDocumentRepository from
     "../src/documents-service/adapters/db/makeInMemoryDocumentRepository.ts";
 import { document } from "../src/shared/rebac.ts";
-import { alice, bob, productWorkspace, seedPolicyTuples, makeInProcessAuthzClient } from "./fixtures.ts";
+import { alice, bob, productWorkspace, seedPolicyTuples, composeInProcessAuthzClient } from "./fixtures.ts";
 
-const makeService = () =>
-    makeDocuments({
+const composeService = () =>
+    composeDocuments({
         repository:  makeInMemoryDocumentRepository(),
-        authzClient: makeInProcessAuthzClient(seedPolicyTuples()),
+        authzClient: composeInProcessAuthzClient(seedPolicyTuples()),
     });
 
 describe("documents domain — create", () => {
     it("creates a document when the actor is a workspace editor", async () => {
         // Arrange
-        const documents = makeService();
+        const documents = composeService();
 
         // Act
         const doc = await documents.create({
@@ -33,7 +33,7 @@ describe("documents domain — create", () => {
 
     it("throws ForbiddenError when the actor is only a workspace viewer", async () => {
         // Arrange: bob is a viewer, not an editor.
-        const documents = makeService();
+        const documents = composeService();
 
         // Act + Assert
         await expect(documents.create({
@@ -44,8 +44,8 @@ describe("documents domain — create", () => {
 
     it("makes the creator the document owner (grants can_delete)", async () => {
         // Arrange: share the authz stub so we can inspect the tuples create writes.
-        const authzClient = makeInProcessAuthzClient(seedPolicyTuples());
-        const documents = makeDocuments({
+        const authzClient = composeInProcessAuthzClient(seedPolicyTuples());
+        const documents = composeDocuments({
             repository: makeInMemoryDocumentRepository(),
             authzClient,
         });
@@ -76,7 +76,7 @@ describe("documents domain — read", () => {
     it("allows a workspace viewer to read after the creator writes ownership tuples", async () => {
         // Arrange: alice creates the document, which writes workspace + owner tuples
         //          to the shared authz stub.
-        const documents = makeService();
+        const documents = composeService();
         await documents.create({
             id: "d1", title: "Roadmap", body: "v1",
             workspace: productWorkspace, actor: alice,
@@ -93,7 +93,7 @@ describe("documents domain — read", () => {
 describe("documents domain — update", () => {
     it("allows the document owner to update the body", async () => {
         // Arrange
-        const documents = makeService();
+        const documents = composeService();
         await documents.create({
             id: "d1", title: "Roadmap", body: "v1",
             workspace: productWorkspace, actor: alice,
@@ -109,7 +109,7 @@ describe("documents domain — update", () => {
 
     it("throws ForbiddenError when a viewer tries to edit", async () => {
         // Arrange
-        const documents = makeService();
+        const documents = composeService();
         await documents.create({
             id: "d1", title: "Roadmap", body: "v1",
             workspace: productWorkspace, actor: alice,

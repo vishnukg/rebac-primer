@@ -229,7 +229,7 @@ import { makeService } from "./service.js";
 ```
 
 This repo uses named exports for shared core APIs and default exports for
-single factory functions such as `makeGraphEvaluator` and `makeDocuments`.
+single factory functions such as `makeGraphEvaluator` and `composeDocuments`.
 
 Named exports are easier to search, easier to refactor, and harder to rename
 accidentally at the import site.
@@ -408,7 +408,7 @@ Or on the documents side:
 ```ts
 const authzClient = makeAuthzServiceClient({ baseUrl: "http://127.0.0.1:4100" });
 const docRepo     = makeInMemoryDocumentRepository();
-const documents   = makeDocuments({ repository: docRepo, authzClient });
+const documents   = composeDocuments({ repository: docRepo, authzClient });
 ```
 
 Pros:
@@ -469,7 +469,7 @@ export function createServices(): AppServices {
 
   return {
     authzClient,
-    documents: makeDocuments({ repository, authzClient }),
+    documents: composeDocuments({ repository, authzClient }),
   };
 }
 ```
@@ -597,7 +597,7 @@ export type DocumentsServices = Readonly<{
 export async function createDocumentsServices(authzUrl: string): Promise<DocumentsServices> {
   const authzClient = makeAuthzServiceClient({ baseUrl: authzUrl });
   const repository  = makeInMemoryDocumentRepository();
-  const documents   = makeDocuments({ repository, authzClient });
+  const documents   = composeDocuments({ repository, authzClient });
 
   // Seed the initial document through the service so its authz check runs.
   await documents.create({ /* ... */ });

@@ -15,7 +15,7 @@ const workspaceTpl = tuple(roadmapDoc, "workspace", productWorkspace);
 const q            = new URLSearchParams();
 
 // Builds a fully wired handler, optionally pre-seeded with extra tuples.
-const makeHandler = (extra: ReturnType<typeof seedPolicyTuples> = []): AuthzHttpHandler => {
+const composeHandler = (extra: ReturnType<typeof seedPolicyTuples> = []): AuthzHttpHandler => {
     const repository      = makeInMemoryTupleRepository({ seed: [...seedPolicyTuples(), ...extra] });
     const evaluator       = makeGraphEvaluator({ repository });
     const domain          = makeAuthzDomain({ repository, evaluator });
@@ -25,7 +25,7 @@ const makeHandler = (extra: ReturnType<typeof seedPolicyTuples> = []): AuthzHttp
 describe("AuthZ service — GET /health", () => {
     it("returns 200 ok", async () => {
         // Arrange
-        const handler = makeHandler();
+        const handler = composeHandler();
 
         // Act
         const response = await handler({ method: "GET", path: "/health", query: q });
@@ -39,7 +39,7 @@ describe("AuthZ service — GET /health", () => {
 describe("AuthZ service — POST /check", () => {
     it("returns allowed:true when the graph permits", async () => {
         // Arrange: workspace tuple links document to its parent workspace.
-        const handler = makeHandler([workspaceTpl]);
+        const handler = composeHandler([workspaceTpl]);
 
         // Act
         const response = await handler({
@@ -54,7 +54,7 @@ describe("AuthZ service — POST /check", () => {
 
     it("returns allowed:false when the graph denies", async () => {
         // Arrange: bob is workspace viewer, not editor.
-        const handler = makeHandler([workspaceTpl]);
+        const handler = composeHandler([workspaceTpl]);
 
         // Act
         const response = await handler({
@@ -69,7 +69,7 @@ describe("AuthZ service — POST /check", () => {
 
     it("includes a human-readable trace in the response", async () => {
         // Arrange
-        const handler = makeHandler([workspaceTpl]);
+        const handler = composeHandler([workspaceTpl]);
 
         // Act
         const response = await handler({
@@ -86,7 +86,7 @@ describe("AuthZ service — POST /check", () => {
 describe("AuthZ service — POST /tuples then POST /check", () => {
     it("makes a permission available immediately after writing a tuple", async () => {
         // Arrange: start with no document-workspace link.
-        const handler = makeHandler();
+        const handler = composeHandler();
 
         // Act: write the workspace tuple (simulates what documents service does on create).
         const writeResponse = await handler({
@@ -112,7 +112,7 @@ describe("AuthZ service — POST /tuples then POST /check", () => {
 describe("AuthZ service — DELETE /tuples", () => {
     it("revokes a permission after its tuple is deleted", async () => {
         // Arrange: bob can read because the workspace tuple exists.
-        const handler = makeHandler([workspaceTpl]);
+        const handler = composeHandler([workspaceTpl]);
         const beforeResponse = await handler({
             method: "POST", path: "/check", query: q,
             body: { user: bob, relation: "can_read", object: roadmapDoc },

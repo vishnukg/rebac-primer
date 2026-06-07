@@ -211,7 +211,7 @@ composeDocumentsService (documents-service/compose.ts)
   -> makeAuthzServiceClient (HTTP to authz :4100)
   -> makeDemoTokenVerifier
   -> makeInMemoryDocumentRepository
-  -> makeDocuments
+  -> composeDocuments
   -> makeDocumentsHttpHandler + makeDocumentsHttpServer
 
 composeCliApp (cli/compose.ts)

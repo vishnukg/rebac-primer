@@ -176,7 +176,7 @@ src/
 │   ├── core/
 │   │   ├── domain/
 │   │   │   ├── types.ts         ← Documents interface + errors
-│   │   │   ├── makeDocuments.ts ← assembles create/read/update
+│   │   │   ├── composeDocuments.ts ← assembles create/read/update
 │   │   │   ├── makeCreateDocument.ts
 │   │   │   ├── makeReadDocument.ts
 │   │   │   └── makeUpdateDocument.ts

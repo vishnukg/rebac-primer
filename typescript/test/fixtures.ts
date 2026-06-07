@@ -4,7 +4,7 @@
 // src/demo/fixtures.ts so runtime entrypoints can seed from it too. This file
 // re-exports that data and adds one test-only helper:
 //
-//   makeInProcessAuthzClient — a stub that satisfies the AuthzClient port using
+//   composeInProcessAuthzClient — a stub that satisfies the AuthzClient port using
 //   the real graph evaluator in-process (no HTTP), so tests exercise real authz
 //   logic without a network hop. Shared across documents.test.ts and
 //   documentsService.test.ts.
@@ -28,7 +28,7 @@ export {
 // The shared repository means tuples written by domain.create() are immediately
 // visible to subsequent domain.read() calls — same behaviour as the real service.
 
-export const makeInProcessAuthzClient = (seed: TupleKey[] = []): AuthzClient => {
+export const composeInProcessAuthzClient = (seed: TupleKey[] = []): AuthzClient => {
     const repository = makeInMemoryTupleRepository({ seed });
     const evaluator  = makeGraphEvaluator({ repository });
     return {

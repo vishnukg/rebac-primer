@@ -15,7 +15,8 @@ import makeDemoTokenVerifier from "./adapters/authn/makeDemoTokenVerifier.ts";
 import makeInMemoryDocumentRepository from "./adapters/db/makeInMemoryDocumentRepository.ts";
 import makeDocumentsHttpHandler from "./adapters/http/makeDocumentsHttpHandler.ts";
 import makeDocumentsHttpServer from "./adapters/http/makeDocumentsHttpServer.ts";
-import makeDocuments from "./core/domain/makeDocuments.ts";
+import composeDocuments from "./core/domain/composeDocuments.ts";
+import readPort from "../shared/readPort.ts";
 
 type DocumentsServiceCfg = {
     port?:     number;
@@ -31,7 +32,7 @@ const composeDocumentsService = ({
     const authzClient   = makeAuthzServiceClient({ baseUrl: authzUrl });
     const authenticator = makeDemoTokenVerifier({ tokens });
     const repository    = makeInMemoryDocumentRepository();
-    const documents     = makeDocuments({ repository, authzClient });
+    const documents     = composeDocuments({ repository, authzClient });
     const handler = makeDocumentsHttpHandler({ authenticator, documents });
     const server  = makeDocumentsHttpServer({ handler });
 
@@ -48,13 +49,6 @@ const composeDocumentsService = ({
     };
 
     return { listen, documents };
-};
-
-const readPort = (value: string | undefined, fallback: number): number => {
-    if (!value?.trim()) return fallback;
-    const p = Number(value);
-    if (!Number.isInteger(p) || p < 1 || p > 65_535) throw new Error(`Invalid port: ${value}`);
-    return p;
 };
 
 export default composeDocumentsService;

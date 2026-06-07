@@ -99,7 +99,7 @@ framework, no class instantiation. The factory is just a function call.
 
 ```ts
 // In a test — wire it directly
-const documents = makeDocuments({
+const documents = composeDocuments({
     repository:  makeInMemoryDocumentRepository(),
     authzClient: makeInProcessAuthzClient(seedPolicyTuples()),
 });
@@ -155,59 +155,98 @@ const create = makeCreateDocument({ repository, authzClient });
 const create = makeCreateDocument(repository, authzClient);
 ```
 
-**`make` functions always carry an explicit return type annotation.**
-The annotation names the port or type the factory builds. This is the
-clearest signal that the function returns one thing:
+**`make*` functions return one port, with their operations defined inline.**
+A `make*` receives its dependencies ready-made and returns a single port — a
+function, or an object whose keys are the *methods of one interface*. Crucially,
+it does **not** build those operations from other factories; it defines them
+inline. The return type annotation names the port:
 
 ```ts
-const makeGraphEvaluator   = ({ repository }: ...): Evaluator          => { ... }
-const makeAuthzDomain      = ({ repository, evaluator }: ...): AuthzService    => { ... }
-const makeAuthzHttpHandler = ({ authz }: ...): AuthzHttpHandler        => { ... }
-const makeAuthzHttpServer  = ({ handler }: ...): Server                => { ... }
+const makeGraphEvaluator   = ({ repository }: ...): Evaluator           => { ... }
+const makeAuthzHttpHandler = ({ authz }: ...): AuthzHttpHandler         => { ... }
+const makeAuthzHttpServer  = ({ handler }: ...): Server                 => { ... }
 const makeCreateDocument   = ({ repository, authzClient }: ...): CreateDocumentFn => { ... }
-```
 
-The return statement may look like an object literal with multiple keys —
-but those keys are the *methods of a single interface*, not independent
-peers. The return type annotation is what makes that explicit:
-
-```ts
-// The object literal IS the AuthzService — the type annotation proves it.
-const makeAuthzDomain = (...): AuthzService => {
+// The object literal IS the AuthzService — its methods are written inline here.
+const makeAuthzDomain = ({ repository, evaluator }: ...): AuthzService => {
+    const check       = (req)   => evaluator.evaluate(req);
+    const writeTuples = async (ts) => { for (const t of ts) repository.write(t); };
+    // ...deleteTuples, listTuples...
     return { check, writeTuples, deleteTuples, listTuples };
 };
 ```
 
-Returning the value directly (no wrapper) means the variable at the call
-site names the thing, and the function name already tells you what it makes:
+**`compose*` functions build their own collaborators and wire them together.**
+A `compose*` calls `make*` factories (and may select a concrete adapter from the
+environment), then assembles the results. *That* — building your own
+collaborators — is the deciding difference, not the return shape. A `compose*`
+may return either of two shapes:
 
-```ts
-const repository = makeInMemoryTupleRepository({ seed: seedTuples });
-const evaluator  = makeGraphEvaluator({ repository });
-const domain     = makeAuthzDomain({ repository, evaluator });
-const handler    = makeAuthzHttpHandler({ authz: domain });
-const server     = makeAuthzHttpServer({ handler });
-```
+- **A single named port**, when its only job is to assemble one domain from
+  smaller factories. `composeDocuments` builds `create`/`read`/`update` and
+  returns them as `Documents`:
 
-**`compose` functions have no return type annotation** — because no named
-type exists for the bag they return. That absence is itself a signal:
-these functions wire together independent peers, not a single interface.
-The returned bag exists purely for the caller's convenience:
+  ```ts
+  const composeDocuments = ({ repository, authzClient }: DocumentsCfg): Documents => {
+      const create = makeCreateDocument({ repository, authzClient });
+      const read   = makeReadDocument({ repository, authzClient });
+      const update = makeUpdateDocument({ repository, authzClient });
+      return { create, read, update }; // one named port — but BUILT from make* → compose*
+  };
+  ```
 
-```ts
-// No return type annotation — the bag has no name.
-const composeAuthzService = ({ port?, seedTuples? } = {}) => {
-    // ...wiring...
-    return { listen, domain };   // independent peers; callers pick what they need
-};
-```
+- **An unnamed bag of independent peers**, when it is an entry point's
+  composition root. `composeAuthzService` selects the backend, then wires the
+  domain, HTTP handler, and server, returning `{ listen, domain }` for
+  `index.ts` to drive:
 
-The rule of thumb:
+  ```ts
+  const composeAuthzService = ({ port?, seedTuples? } = {}) => {
+      const domain  = composeAuthzBackend(seedTuples); // selects backend, builds the domain
+      const handler = makeAuthzHttpHandler({ authz: domain });
+      const server  = makeAuthzHttpServer({ handler });
+      return { listen, domain };  // independent peers; callers pick what they need
+  };
+  ```
 
-| Prefix | Has return type annotation? | Returns |
-|---|---|---|
-| `make*` | ✓ always | the thing itself — one named type |
-| `compose*` | ✗ never | a bag of independent peers |
+### Which one am I writing? The one-question test
+
+> _Does the function build its own collaborators — call `make*` factories (or
+> select a concrete adapter) and wire them together?_
+>
+> - **No** — it receives its deps ready-made and returns one port with its
+>   operations defined inline → it is a **`make*`** (`makeAuthzDomain`,
+>   `makeGraphEvaluator`, `makeCreateDocument`, `makeAuthzHttpServer`).
+> - **Yes** — it assembles pieces built elsewhere → it is a **`compose*`**
+>   (`composeDocuments`, `composeAuthzBackend`, `composeAuthzService`).
+
+The deciding factor is **building your own collaborators**, *not* the return
+type. `makeAuthzDomain` and `composeDocuments` both return a single domain port —
+yet `makeAuthzDomain` defines its operations inline (a `make*`), while
+`composeDocuments` builds them from `make*` factories (a `compose*`). This is the
+same rule the ModulePattern reference repo uses to separate `makeRestaurant`
+(bundles ready-made operations) from `composeRestaurant` (builds them).
+
+#### This repo, function by function
+
+| Function | Kind | Why |
+| --- | --- | --- |
+| `makeAuthzDomain` | `make*` | defines `check`/`writeTuples`/… inline — calls no factory |
+| `makeGraphEvaluator`, `makeCreateDocument`/`Read`/`Update`, `makeAuthzHttpHandler`/`Server`, `makeInMemory*`, … | `make*` | define their behaviour inline |
+| `composeDocuments` | `compose*` | calls `makeCreateDocument` / `makeReadDocument` / `makeUpdateDocument` |
+| `composeAuthzBackend` | `compose*` | selects the backend, calls `makeInMemoryTupleRepository` / `makeGraphEvaluator` / `makeAuthzDomain` (or `makeOpenFgaAuthzService`) |
+| `composeAuthzService`, `composeDocumentsService`, `composeCliApp` | `compose*` | call the above + adapters, return a bag of peers |
+
+#### A third kind: plain functions
+
+Not every function is a factory. A function that takes data and returns data — a
+transform, a formatter, a validator (e.g. `readPort`, `toErrorResponse`) — is
+just an ordinary function. Don't give it a `make*` / `compose*` prefix; those are
+only for the wiring layer (building and connecting ports).
+
+> Helpers shared between composition roots (such as `readPort`, used by both the
+> authz and documents services) live in `src/shared/` so the parsing logic is
+> defined once.
 
 ## Where this lives in the repo
 
@@ -261,13 +300,15 @@ separates wiring from execution.
 Also explain why the file is named `compose.ts` and the function is named
 `composeAuthzService` rather than `makeAuthzService`:
 
-Good answer: `make*` functions build one thing and return it directly —
-they always have an explicit return type annotation naming the port or type
-they produce. `compose*` functions wire multiple independent peers together,
-return a named bag, and carry no return type annotation (because no single
-named type covers the bag). The `compose.ts` file is the composition root —
-the one place in the codebase that knows which concrete adapter goes behind
-each port.
+Good answer: `make*` functions define one capability inline and return it —
+they call no other factory. `composeAuthzService` is a `compose*` because it
+**builds its collaborators by calling other factories** (`composeAuthzBackend`,
+`makeAuthzHttpHandler`, `makeAuthzHttpServer`) and wires them together. That —
+calling other factories — is what makes it a compose, not the shape of what it
+returns (a compose may return one named port, like `composeDocuments` →
+`Documents`, or a bag of peers, like `composeAuthzService` → `{ listen, domain }`).
+The `compose.ts` file is the composition root — the one place in the codebase
+that knows which concrete adapter goes behind each port.
 
 ## Further reading
 

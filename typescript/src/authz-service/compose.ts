@@ -18,6 +18,7 @@ import makeOpenFgaAuthzService from "./adapters/openfga/makeOpenFgaAuthzService.
 import makeAuthzHttpHandler from "./adapters/http/makeAuthzHttpHandler.ts";
 import makeAuthzHttpServer from "./adapters/http/makeAuthzHttpServer.ts";
 import makeAuthzDomain from "./core/domain/makeAuthzDomain.ts";
+import readPort from "../shared/readPort.ts";
 import type { AuthzService } from "./core/index.ts";
 import type { TupleKey } from "../shared/rebac.ts";
 
@@ -26,11 +27,14 @@ type AuthzServiceCfg = {
     seedTuples?:  TupleKey[];
 };
 
-// buildAuthzService selects the authorization backend from the environment:
+// composeAuthzBackend selects the authorization backend from the environment and
+// wires it into an AuthzService:
 //   AUTHZ_BACKEND=openfga → a real OpenFGA server (OPENFGA_API_URL/STORE_ID/MODEL_ID)
 //   otherwise (default)   → the in-process graph evaluator over an in-memory store
-// Both return an AuthzService, so the HTTP handler below is identical for either.
-const buildAuthzService = (seedTuples: TupleKey[]): AuthzService => {
+// It is a compose* (not a make*) because it builds its own collaborators via make*
+// factories and selects a concrete adapter. Both branches return an AuthzService,
+// so the HTTP handler below is identical for either.
+const composeAuthzBackend = (seedTuples: TupleKey[]): AuthzService => {
     if (process.env.AUTHZ_BACKEND === "openfga") {
         const apiUrl  = process.env.OPENFGA_API_URL ?? "http://127.0.0.1:8080";
         const storeId = process.env.OPENFGA_STORE_ID;
@@ -54,7 +58,7 @@ const composeAuthzService = ({
     port        = readPort(process.env.AUTHZ_PORT, 4100),
     seedTuples  = [],
 }: AuthzServiceCfg = {}) => {
-    const domain  = buildAuthzService(seedTuples);
+    const domain  = composeAuthzBackend(seedTuples);
     const handler = makeAuthzHttpHandler({ authz: domain });
     const server  = makeAuthzHttpServer({ handler });
 
@@ -66,13 +70,6 @@ const composeAuthzService = ({
     };
 
     return { listen, domain };
-};
-
-const readPort = (value: string | undefined, fallback: number): number => {
-    if (!value?.trim()) return fallback;
-    const p = Number(value);
-    if (!Number.isInteger(p) || p < 1 || p > 65_535) throw new Error(`Invalid port: ${value}`);
-    return p;
 };
 
 export default composeAuthzService;

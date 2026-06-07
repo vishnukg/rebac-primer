@@ -98,10 +98,10 @@ It only cares that the dependency satisfies `AuthzClient`.
 
 ## Dependency injection without a framework
 
-From `src/documents-service/core/domain/makeDocuments.ts`:
+From `src/documents-service/core/domain/composeDocuments.ts`:
 
 ```ts
-const makeDocuments = ({ repository, authzClient }: DocumentsCfg): Documents => ({
+const composeDocuments = ({ repository, authzClient }: DocumentsCfg): Documents => ({
     create: makeCreateDocument({ repository, authzClient }),
     read:   makeReadDocument({ repository, authzClient }),
     update: makeUpdateDocument({ repository, authzClient }),
@@ -109,15 +109,17 @@ const makeDocuments = ({ repository, authzClient }: DocumentsCfg): Documents => 
 ```
 
 This is dependency injection in plain TypeScript. No container is required. No
-decorators are required. The factory simply receives the dependencies the domain
-needs.
+decorators are required. It simply receives the dependencies the domain needs.
+(It is named `compose*`, not `make*`, because it builds its own collaborators —
+the `create`/`read`/`update` factories — and wires them into the `Documents`
+port; see [19-factory-function-pattern](./19-factory-function-pattern.md).)
 
 That keeps tests simple:
 
 ```ts
 const repository  = makeInMemoryDocumentRepository();
 const authzClient = makeInProcessAuthzClient(seedPolicyTuples());
-const documents   = makeDocuments({ repository, authzClient });
+const documents   = composeDocuments({ repository, authzClient });
 ```
 
 ## Factories are enough for stateful adapters
@@ -256,7 +258,7 @@ Requirements:
 
 1. the actor must have `can_delete` on the document
 2. the repository should expose a delete method
-3. `makeDocuments` should return the new operation
+3. `composeDocuments` should return the new operation
 4. tests should cover owner allowed and viewer denied
 
 Keep the shape consistent with `read` and `update`. The goal is making the new
