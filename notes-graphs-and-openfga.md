@@ -226,9 +226,9 @@ read?"), `BatchCheck` (many checks at once), `Expand` (debug a relation).
 
 | Concept | From-scratch code | OpenFGA |
 |---------|-------------------|---------|
-| the rules | `permissionmodel.go` tables | `model.fga` DSL |
-| the facts | in-memory tuple store (`db/store.go`) | OpenFGA's datastore |
-| `X from Y` inheritance | `expandDocument` in `evaluator.go` | the `from` keyword |
+| the rules | `internal/authz/model.go` tables | `model.fga` DSL |
+| the facts | in-memory tuple store (`internal/authz/store.go`) | OpenFGA's datastore |
+| `X from Y` inheritance | `expandDocument` in `internal/authz/evaluator.go` | the `from` keyword |
 | computed permission | `documentRules[can_edit] = {editor}` | `define can_edit: editor` |
 | the Check | `GraphEvaluator.Evaluate` | OpenFGA `/check` |
 

@@ -43,8 +43,7 @@ ReBAC algorithm.
 ## Three Commands
 
 ```bash
-
-go test ./...
+make test
 go test -v -run TestTrace ./internal/authz
 go test -v -run TestGraphEvaluator_TeamMemberCanEditDocument ./internal/authz
 ```

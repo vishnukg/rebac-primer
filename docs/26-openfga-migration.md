@@ -14,7 +14,7 @@ Both satisfy the same app-facing `authz.Service` shape.
 | `rebac.TupleKey` | relationship tuple |
 | `rebac.Object` | object ID, e.g. `document:roadmapDocument` |
 | `rebac.Subject` with `#` | subject set, e.g. `team:platformTeam#member` |
-| `authz/model.go` | authorization model DSL |
+| `internal/authz/model.go` | authorization model DSL |
 | `authz.InMemoryStore` | OpenFGA tuple store |
 | `authz.GraphEvaluator` | OpenFGA check engine |
 | `openfga.Service` | SDK-backed `authz.Service` |
