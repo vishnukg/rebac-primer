@@ -236,7 +236,7 @@ type CachingEvaluator struct {
 ```
 
 Add the compile-time assertion (`var _ Checker = (*CachingEvaluator)(nil)`).
-Wire it between `AuditEvaluator` and `GraphEvaluator` in `buildHandler()`:
+Wire it between `AuditEvaluator` and `GraphEvaluator` in `main()`:
 
 ```go
 base    := authz.NewGraphEvaluator(tupleStore)

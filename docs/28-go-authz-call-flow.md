@@ -70,8 +70,8 @@ Each step names the file and function, the call it makes, and what comes back.
 
 ### 0. Wiring — `cmd/server/main.go`
 
-`buildHandler` is the composition root. It is the only place that knows the
-concrete types:
+`main` is the composition root. It is the only place that knows the
+concrete types, wiring them directly:
 
 ```go
 tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)

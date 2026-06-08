@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"testing"
 )
 
@@ -38,16 +37,5 @@ func TestReadPort_RejectsInvalidPort(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected error")
-	}
-}
-
-func TestBuildHandler_ReturnsHandler(t *testing.T) {
-	handler, err := buildHandler(context.Background())
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if handler == nil {
-		t.Fatal("expected non-nil handler")
 	}
 }

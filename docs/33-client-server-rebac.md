@@ -195,7 +195,7 @@ The executable files stay intentionally thin:
 src/authz-service/index.ts     -> composeAuthzService(), then listen()
 src/documents-service/index.ts -> composeDocumentsService(), then listen()
 src/cli/index.ts               -> composeCliApp(), then run()
-go/cmd/server/main.go          -> buildHandler(), then ListenAndServe()
+go/cmd/server/main.go          -> wires the graph in main(), then ListenAndServe()
 ```
 
 The object graphs are assembled in the composition roots:
@@ -219,12 +219,12 @@ composeCliApp (cli/compose.ts)
   -> Node readline terminal
   -> makeTerminalClient
 
-go buildHandler() (cmd/server/main.go)
-  -> authz.New (in-memory tuple store, seeded)
+main() (cmd/server/main.go) — wires directly, no build/compose function
+  -> authz.NewInMemoryStore (in-memory tuple store, seeded)
   -> authz.NewGraphEvaluator
   -> authz.New (authz service)
-  -> documents.New (in-memory document repository)
-  -> documents.New (demo token verifier)
+  -> documents.NewInMemoryRepository
+  -> documents.NewDemoTokenVerifier
   -> documents.New (documents service)
   -> api.NewServer (HTTP handler)
 ```

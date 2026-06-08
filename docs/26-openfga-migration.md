@@ -280,20 +280,20 @@ func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) erro
 
 ### Step 4 — select the backend (already wired)
 
-`go/cmd/server/main.go` chooses the backend from `AUTHZ_BACKEND` in
-`buildAuthzService` — no hand-editing required:
+`go/cmd/server/main.go` chooses the backend from `AUTHZ_BACKEND` inline — no
+hand-editing required:
 
 ```go
-func buildAuthzService() (authz.Service, error) {
-    if os.Getenv("AUTHZ_BACKEND") == "openfga" {
-        return openfga.New(openfga.Config{
-            APIURL:  envOr("OPENFGA_API_URL", "http://127.0.0.1:8080"),
-            StoreID: os.Getenv("OPENFGA_STORE_ID"),
-            ModelID: os.Getenv("OPENFGA_MODEL_ID"),
-        })
-    }
-    tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
-    return authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore)), nil
+var authzService authz.Service
+if os.Getenv("AUTHZ_BACKEND") == "openfga" {
+    authzService, err = openfga.New(openfga.Config{
+        APIURL:  envOr("OPENFGA_API_URL", "http://127.0.0.1:8080"),
+        StoreID: os.Getenv("OPENFGA_STORE_ID"),
+        ModelID: os.Getenv("OPENFGA_MODEL_ID"),
+    })
+} else {
+    store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+    authzService = authz.New(store, authz.NewGraphEvaluator(store))
 }
 ```
 

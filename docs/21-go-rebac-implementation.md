@@ -618,41 +618,42 @@ is wrapped inside a `fmt.Errorf("...: %w", err)` call.
 ## `cmd/server/main.go` — composition root
 
 Open `go/cmd/server/main.go`. This is the **only** file that imports every
-concrete type. Everything else depends only on interfaces.
+concrete type; everything else depends on interfaces. There is no separate
+`build`/`compose` step — `main` wires the graph directly and starts the server:
 
 ```go
-func buildHandler(ctx context.Context) (http.Handler, error) {
-    // ── Authz service ─────────────────────────────────────────────────────────
-    tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
-    evaluator  := authz.NewGraphEvaluator(tupleStore)
-    authzSvc   := authz.New(tupleStore, evaluator)
+func main() {
+    // ── Authz service: in-process graph evaluator over an in-memory store ───────
+    store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+    authzService := authz.New(store, authz.NewGraphEvaluator(store))
 
-    // ── Documents service ─────────────────────────────────────────────────────
-    docRepo       := documents.NewInMemoryRepository()
-    tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
-    docsSvc       := documents.New(docRepo, authzSvc)   // authzSvc satisfies AuthzClient
+    // ── Documents service over the chosen authz backend ─────────────────────────
+    documentsService := documents.New(documents.NewInMemoryRepository(), authzService)
+    verifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
 
-    // seed
-    _, err := docsSvc.Create(ctx, documents.CreateDocumentInput{ ... })
-
-    // ── HTTP layer ────────────────────────────────────────────────────────────
-    return api.NewServer(tokenVerifier, docsSvc), nil
+    // ── HTTP layer ───────────────────────────────────────────────────────────────
+    log.Fatal(http.ListenAndServe(addr, api.NewServer(verifier, documentsService)))
 }
 ```
 
-To swap `GraphEvaluator` for a real OpenFGA server, change only these lines:
+(The real `main` also reads `PORT`, seeds a demo document, and branches on
+`AUTHZ_BACKEND` to pick the OpenFGA backend.)
+
+To run against a real OpenFGA server instead, `authzService` is built from the
+OpenFGA adapter — which implements the same `authz.Service` interface — and
+nothing downstream changes:
 
 ```go
-// Replace this:
-evaluator := authz.NewGraphEvaluator(tupleStore)
-authzSvc  := authz.New(tupleStore, evaluator)
+// in-process (default):
+store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+authzService := authz.New(store, authz.NewGraphEvaluator(store))
 
-// With this (after restoring the openfga adapter — see docs/26-openfga-migration.md):
-evaluator, err := openfga.New(openfga.Config{
-    APIURL:  "http://localhost:8080",
+// OpenFGA (AUTHZ_BACKEND=openfga):
+authzService, err := openfga.New(openfga.Config{
+    APIURL:  "http://127.0.0.1:8080",
     StoreID: "your-store-id",
+    ModelID: "your-model-id",
 })
-authzSvc := authz.New(openfgaStore, evaluator)
 ```
 
 Nothing else changes. The documents domain and HTTP layer never find out.
