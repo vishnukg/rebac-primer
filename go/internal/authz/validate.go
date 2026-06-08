@@ -3,7 +3,7 @@ package authz
 import (
 	"fmt"
 
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // validateTuple checks that a tuple is well-formed before it is written.
@@ -20,8 +20,8 @@ import (
 // strings. A tuple like {Object: "roadmap"} (missing "document:") would be stored
 // happily but never match any check — a silent authorization bug. Rejecting it at
 // write time turns that latent bug into an immediate, explicit error.
-func validateTuple(t shared.TupleKey) error {
-	if _, _, err := shared.ParseObject(string(t.Object)); err != nil {
+func validateTuple(t rebac.TupleKey) error {
+	if _, _, err := rebac.ParseObject(string(t.Object)); err != nil {
 		return &TupleValidationError{Message: fmt.Sprintf("object %q is not a valid type:id (%v)", t.Object, err)}
 	}
 	if t.Relation == "" {
@@ -35,11 +35,11 @@ func validateTuple(t shared.TupleKey) error {
 
 // validateSubject accepts either a plain object ("user:alice") or a subject set
 // ("team:platform#member"), matching the two shapes the User field can take.
-func validateSubject(s shared.Subject) error {
-	if shared.IsSubjectSet(s) {
-		_, _, err := shared.ParseSubjectSet(s)
+func validateSubject(s rebac.Subject) error {
+	if rebac.IsSubjectSet(s) {
+		_, _, err := rebac.ParseSubjectSet(s)
 		return err
 	}
-	_, _, err := shared.ParseObject(string(s))
+	_, _, err := rebac.ParseObject(string(s))
 	return err
 }

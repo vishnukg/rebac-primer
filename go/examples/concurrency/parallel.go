@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"rebac-primer/internal/authz"
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // Checker is a minimal interface for permission evaluation.
@@ -20,7 +20,7 @@ type Checker = authz.Evaluator
 
 // PermissionSummary maps a Relation to whether it is allowed for a given user
 // and object.  It is the return type of [AllPermissions].
-type PermissionSummary map[shared.Relation]bool
+type PermissionSummary map[rebac.Relation]bool
 
 // AllPermissions checks every computed permission on an object for a user
 // concurrently.  It spawns one goroutine per relation and collects results
@@ -28,14 +28,14 @@ type PermissionSummary map[shared.Relation]bool
 //
 // Use this to build a "what can this user do?" summary — for example, when a
 // UI needs to know which action buttons to render.
-func AllPermissions(ctx context.Context, auth Checker, user shared.Object, object shared.Object) (PermissionSummary, error) {
+func AllPermissions(ctx context.Context, auth Checker, user rebac.Object, object rebac.Object) (PermissionSummary, error) {
 	relations := computedRelationsFor(object)
 	if len(relations) == 0 {
 		return PermissionSummary{}, nil
 	}
 
 	type outcome struct {
-		relation shared.Relation
+		relation rebac.Relation
 		allowed  bool
 		err      error
 	}
@@ -44,8 +44,8 @@ func AllPermissions(ctx context.Context, auth Checker, user shared.Object, objec
 	ch := make(chan outcome, len(relations))
 
 	for _, rel := range relations {
-		go func(rel shared.Relation) {
-			result, err := auth.Evaluate(ctx, shared.CheckRequest{User: user, Relation: rel, Object: object})
+		go func(rel rebac.Relation) {
+			result, err := auth.Evaluate(ctx, rebac.CheckRequest{User: user, Relation: rel, Object: object})
 			ch <- outcome{relation: rel, allowed: result.Allowed, err: err}
 		}(rel)
 	}
@@ -79,13 +79,13 @@ func AllPermissions(ctx context.Context, auth Checker, user shared.Object, objec
 // If any check returns an error the corresponding Err field is set; the other
 // results are still returned.  The caller decides whether to treat any error as
 // fatal.
-func BulkCheck(ctx context.Context, auth Checker, reqs []shared.CheckRequest) []BulkResult {
+func BulkCheck(ctx context.Context, auth Checker, reqs []rebac.CheckRequest) []BulkResult {
 	results := make([]BulkResult, len(reqs))
 	var wg sync.WaitGroup
 
 	for i, req := range reqs {
 		wg.Add(1)
-		go func(i int, req shared.CheckRequest) {
+		go func(i int, req rebac.CheckRequest) {
 			defer wg.Done()
 			result, err := auth.Evaluate(ctx, req)
 			results[i] = BulkResult{Request: req, Result: result, Err: err}
@@ -98,24 +98,24 @@ func BulkCheck(ctx context.Context, auth Checker, reqs []shared.CheckRequest) []
 
 // BulkResult holds the outcome of one check from a [BulkCheck] call.
 type BulkResult struct {
-	Request shared.CheckRequest
-	Result  shared.CheckResult
+	Request rebac.CheckRequest
+	Result  rebac.CheckResult
 	Err     error
 }
 
 // computedRelationsFor returns the computed (action) relations that make sense
 // to check for a given object type.
-func computedRelationsFor(object shared.Object) []shared.Relation {
-	typ, _, err := shared.ParseObject(string(object))
+func computedRelationsFor(object rebac.Object) []rebac.Relation {
+	typ, _, err := rebac.ParseObject(string(object))
 	if err != nil {
 		return nil
 	}
-	if typ == shared.ObjectTypeDocument {
-		return []shared.Relation{
-			shared.RelationDocumentCanRead,
-			shared.RelationDocumentCanComment,
-			shared.RelationDocumentCanEdit,
-			shared.RelationDocumentCanDelete,
+	if typ == rebac.ObjectTypeDocument {
+		return []rebac.Relation{
+			rebac.RelationDocumentCanRead,
+			rebac.RelationDocumentCanComment,
+			rebac.RelationDocumentCanEdit,
+			rebac.RelationDocumentCanDelete,
 		}
 	}
 	return nil

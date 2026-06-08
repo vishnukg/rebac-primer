@@ -5,7 +5,7 @@ This chapter traces the same request through the **OpenFGA adapter** — the
 alternative backend you select with `AUTHZ_BACKEND=openfga`. Read it after doc 26
 (the concept mapping + the flag) and alongside the adapter source:
 
-- Go: `go/internal/authz/adapters/openfga/openfga.go`
+- Go: `go/internal/openfga/openfga.go`
 - TS: `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts`
 - Model: `deployments/openfga/model.fga` · Seed: `deployments/openfga/seed.sh`
 
@@ -77,7 +77,7 @@ Step by step:
    resp, err := s.client.Check(ctx).Body(openfga.ClientCheckRequest{
        User: string(req.User), Relation: string(req.Relation), Object: string(req.Object),
    }).Execute()
-   return shared.CheckResult{Allowed: resp.GetAllowed(), Trace: [...]}, nil
+   return rebac.CheckResult{Allowed: resp.GetAllowed(), Trace: [...]}, nil
    ```
    ```ts
    // TS — makeOpenFgaAuthzService.ts

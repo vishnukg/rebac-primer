@@ -3,7 +3,7 @@ package documents
 import (
 	"context"
 
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // Create saves a new document if the actor has editor access to the workspace.
@@ -18,12 +18,10 @@ import (
 //
 // This is the write-back pattern: the documents service owns document-level
 // tuples; the authz service owns workspace/team tuples.
-//
-// Mirrors typescript/src/documents-service/core/domain/makeCreateDocument.ts.
 func (s *documentService) Create(ctx context.Context, input CreateDocumentInput) (*CollaborativeDocument, error) {
 	if err := s.requireAllowed(ctx,
 		input.Actor,
-		shared.RelationWorkspaceEditor,
+		rebac.RelationWorkspaceEditor,
 		input.Workspace,
 		"create documents in",
 	); err != nil {
@@ -44,16 +42,16 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 	// Register the document relationships so the graph evaluator can resolve
 	// can_read / can_edit for workspace members and owner-only actions for the
 	// creator.
-	if err := s.authzClient.WriteTuples(ctx, []shared.TupleKey{
-		shared.Tuple(
-			shared.Document(input.ID),
-			shared.RelationDocumentWorkspace,
-			shared.Subject(input.Workspace),
+	if err := s.authzClient.WriteTuples(ctx, []rebac.TupleKey{
+		rebac.Tuple(
+			rebac.Document(input.ID),
+			rebac.RelationDocumentWorkspace,
+			rebac.Subject(input.Workspace),
 		),
-		shared.Tuple(
-			shared.Document(input.ID),
-			shared.RelationDocumentOwner,
-			shared.Subject(input.Actor),
+		rebac.Tuple(
+			rebac.Document(input.ID),
+			rebac.RelationDocumentOwner,
+			rebac.Subject(input.Actor),
 		),
 	}); err != nil {
 		return nil, err

@@ -7,30 +7,29 @@ import (
 	"testing"
 
 	"rebac-primer/examples/middleware"
-	authzdb "rebac-primer/internal/authz/adapters/db"
-	"rebac-primer/internal/authz/adapters/graph"
+	"rebac-primer/internal/authz"
 	"rebac-primer/internal/fixtures"
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // seedStore builds a tuple store from the standard fixture tuples.
-func seedStore(extra ...shared.TupleKey) *authzdb.InMemoryTupleStore {
+func seedStore(extra ...rebac.TupleKey) *authz.InMemoryStore {
 	all := append(fixtures.SeedRelationshipTuples(), extra...)
-	return authzdb.New(all...)
+	return authz.NewInMemoryStore(all...)
 }
 
 // newEvaluator wraps seedStore + the real graph evaluator.
-func newEvaluator(extra ...shared.TupleKey) *graph.GraphEvaluator {
-	return graph.NewGraphEvaluator(seedStore(extra...))
+func newEvaluator(extra ...rebac.TupleKey) *authz.GraphEvaluator {
+	return authz.NewGraphEvaluator(seedStore(extra...))
 }
 
 func TestAuditEvaluator_DelegatesResultToInner(t *testing.T) {
 	ev := newEvaluator()
 	var buf bytes.Buffer
 	audit := middleware.NewAuditEvaluator(ev, &buf)
-	req := shared.CheckRequest{
+	req := rebac.CheckRequest{
 		User:     fixtures.Alice,
-		Relation: shared.RelationDocumentCanEdit,
+		Relation: rebac.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	}
 
@@ -47,9 +46,9 @@ func TestAuditEvaluator_WritesLogLine(t *testing.T) {
 	ev := newEvaluator()
 	var buf bytes.Buffer
 	audit := middleware.NewAuditEvaluator(ev, &buf)
-	req := shared.CheckRequest{
+	req := rebac.CheckRequest{
 		User:     fixtures.Bob,
-		Relation: shared.RelationDocumentCanEdit,
+		Relation: rebac.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	}
 
@@ -73,9 +72,9 @@ func TestAuditEvaluator_SatisfiesCheckerInterface(t *testing.T) {
 	// Assign to Checker (= authz.Evaluator) — if the interface is not satisfied, this fails.
 	var c middleware.Checker = middleware.NewAuditEvaluator(ev, &buf)
 
-	result, err := c.Evaluate(context.Background(), shared.CheckRequest{
+	result, err := c.Evaluate(context.Background(), rebac.CheckRequest{
 		User:     fixtures.Alice,
-		Relation: shared.RelationDocumentCanRead,
+		Relation: rebac.RelationDocumentCanRead,
 		Object:   fixtures.RoadmapDocument,
 	})
 	if err != nil {
@@ -93,8 +92,8 @@ func TestReadOnlyStore_ExposesReadMethods(t *testing.T) {
 	found, err := ro.Has(
 		context.Background(),
 		fixtures.PlatformTeam,
-		shared.RelationTeamMember,
-		shared.Subject(fixtures.Alice),
+		rebac.RelationTeamMember,
+		rebac.Subject(fixtures.Alice),
 	)
 	if err != nil {
 		t.Fatalf("Has returned unexpected error: %v", err)
@@ -108,10 +107,10 @@ func TestReadOnlyStore_CanDriveGraphEvaluator(t *testing.T) {
 	store := seedStore()
 	ro := middleware.NewReadOnlyStore(store)
 
-	ev := graph.NewGraphEvaluator(ro)
-	result, err := ev.Evaluate(context.Background(), shared.CheckRequest{
+	ev := authz.NewGraphEvaluator(ro)
+	result, err := ev.Evaluate(context.Background(), rebac.CheckRequest{
 		User:     fixtures.Alice,
-		Relation: shared.RelationDocumentCanEdit,
+		Relation: rebac.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	})
 	if err != nil {

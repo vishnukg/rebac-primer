@@ -3,12 +3,10 @@ package documents
 import (
 	"context"
 
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // Update saves new body text if the actor has can_edit access.
-//
-// Mirrors typescript/src/documents-service/core/domain/makeUpdateDocument.ts.
 func (s *documentService) Update(ctx context.Context, input UpdateDocumentInput) (*CollaborativeDocument, error) {
 	existing, err := s.requireDocument(ctx, input.ID)
 	if err != nil {
@@ -17,8 +15,8 @@ func (s *documentService) Update(ctx context.Context, input UpdateDocumentInput)
 
 	if err := s.requireAllowed(ctx,
 		input.Actor,
-		shared.RelationDocumentCanEdit,
-		shared.Document(input.ID),
+		rebac.RelationDocumentCanEdit,
+		rebac.Document(input.ID),
 		"edit",
 	); err != nil {
 		return nil, err

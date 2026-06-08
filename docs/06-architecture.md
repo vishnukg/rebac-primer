@@ -137,15 +137,15 @@ authz service. Same port, two transports — see `docs/28` / `docs/29`.
 
 | Concept | Go | TypeScript |
 |---|---|---|
-| Shared vocabulary (the "SDK") | `internal/shared/rebac.go` | `src/shared/rebac.ts` |
+| Shared vocabulary (the "SDK") | `internal/rebac/rebac.go` | `src/shared/rebac.ts` |
 | AuthZ driving port | `authz.Service` (`internal/authz/authz.go`) | `AuthzService` (`authz-service/core/domain/types.ts`) |
-| AuthZ driven ports | `TupleRepository`, `Evaluator` (`internal/authz/ports.go`) | `TupleRepository`, `Evaluator` (`authz-service/core/ports/`) |
-| AuthZ core impl | `internal/authz/domain.go` | `authz-service/core/domain/composeAuthzDomain.ts` |
-| AuthZ adapters | `internal/authz/adapters/{db,graph,http}` | `authz-service/adapters/{db,graph,http}` |
+| AuthZ driven ports | `TupleRepository`, `Evaluator` (`internal/authz/authz.go`) | `TupleRepository`, `Evaluator` (`authz-service/core/ports/`) |
+| AuthZ core impl | `internal/authz/service.go` | `authz-service/core/domain/makeAuthzService.ts` |
+| AuthZ implementations | `internal/authz/{store,evaluator,model}.go` + `internal/openfga` | `authz-service/adapters/{db,graph,http}` |
 | Documents driving port | `documents.Service` (`internal/documents/documents.go`) | `Documents` (`documents-service/core/domain/types.ts`) |
-| Documents driven ports | `DocumentRepository`, `AuthzClient`, `Authenticator` (`internal/documents/ports.go`) | same names (`documents-service/core/ports/`) |
-| Documents use cases | `internal/documents/{create,read,update}.go` | `documents-service/core/domain/make{Create,Read,Update}Document.ts` |
-| Documents adapters | `internal/documents/adapters/{db,authn,http}` | `documents-service/adapters/{db,authn,authz,http,client}` |
+| Documents driven ports | `DocumentRepository`, `AuthzClient`, `Authenticator` (`internal/documents/documents.go`) | same names (`documents-service/core/ports/`) |
+| Documents use cases | `internal/documents/{create,read,update}.go` (one file each) | `documents-service/core/domain/makeDocuments.ts` (`create`/`read`/`update` methods, inline) |
+| Documents implementations | `internal/documents/{store,token}.go` + `internal/api` | `documents-service/adapters/{db,authn,authz,http,client}` |
 | Composition root | `cmd/server/main.go` | `*/compose.ts` (+ `index.ts` entrypoints) |
 
 The names line up almost one-to-one on purpose — reading the two side by side is
@@ -155,23 +155,32 @@ part of the lesson.
 
 ## The rules — and the proof they hold
 
-### 1. Dependencies point inward: the core never imports an adapter
+### 1. Dependencies point inward: callers depend on interfaces, not concretes
 
-This is the defining property. You can verify it yourself:
+This is the defining property. The two codebases express it differently:
 
-```bash
-# Go — should print nothing (excluding _test.go, which are composition roots):
-grep -rn '/adapters/' go/internal/authz/*.go go/internal/documents/*.go | grep -v _test.go
+- **TypeScript** keeps a literal `adapters/` directory, so "the core never imports
+  an adapter" is a grep you can run:
 
-# TypeScript — should print nothing:
-grep -rn 'adapters/' typescript/src/authz-service/core/ typescript/src/documents-service/core/
-```
+  ```bash
+  # should print nothing:
+  grep -rn 'adapters/' typescript/src/authz-service/core/ typescript/src/documents-service/core/
+  ```
 
-Both come back empty. The cores import only their own ports and `shared`.
-Adapters import the core (to implement its ports); the composition roots import
-everything. The rule is also stated at the source: `internal/authz/ports.go` and
-`internal/documents/ports.go` ("the domain never imports adapters"), and
-`docs/18` ("the rule: core never imports adapters").
+- **Go** has no `adapters/` directory. Each package keeps its concrete types beside
+  the interfaces they satisfy (e.g. `authz.InMemoryStore` lives in the same package
+  as the `TupleRepository` interface it implements), and only `cmd/server/main.go`
+  wires them. The swappable backends that *do* get their own packages —
+  `internal/openfga` and `internal/api` — are imported only by `cmd/`:
+
+  ```bash
+  # should print nothing — only cmd/ imports these:
+  grep -rn 'internal/openfga\|internal/api' go/internal/
+  ```
+
+Either way the principle is the same: the service logic names interfaces it owns,
+and the concrete graph is assembled at the composition root (`cmd/server/main.go`
+in Go; each `compose.ts` in TypeScript).
 
 ### 2. Ports are owned by the core that needs them
 
@@ -187,7 +196,7 @@ The documents service needs only two things from authz — "check a permission"
 and "write tuples on create". So it defines its **own** 2-method port:
 
 ```go
-// internal/documents/ports.go
+// internal/documents/documents.go
 type AuthzClient interface {
     Check(ctx, req) (CheckResult, error)
     WriteTuples(ctx, tuples) error
@@ -203,7 +212,7 @@ HTTP one without changing.
 ### 4. Constructors return the interface; the root wires concretes
 
 `documents.New(...)` returns `Service` (the interface), not `*documentService`.
-`composeAuthzDomain(...)` returns `AuthzService`. Callers hold a port, never a
+`makeAuthzService(...)` returns `AuthzService`. Callers hold a port, never a
 concrete struct. Go adds compile-time assertions (`var _ Port = (*Impl)(nil)`)
 so a missing method fails at build time, not at the first call.
 
@@ -286,8 +295,9 @@ Good answers:
    `WriteTuples`, so it depends on a 2-method port. `authz.Service` satisfies it
    structurally, but the narrow port is what lets the in-process and HTTP authz
    clients be interchangeable.
-2. `grep -rn '/adapters/' go/internal/{authz,documents}/*.go | grep -v _test.go`
-   (and the TS equivalent on `core/`) — both return nothing, proving the core
+2. In Go, `grep -rn 'internal/openfga\|internal/api' go/internal/` returns nothing
+   (only `cmd/` imports the swappable backends); in TS, `grep -rn 'adapters/' …/core/`
+   returns nothing — both prove the core
    never imports an adapter.
 3. `Result[T]` is a generic utility unrelated to authorization. Keeping it in
    `examples/generics/` (not `internal/`) means the engine has no dependency on a

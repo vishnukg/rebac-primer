@@ -40,8 +40,8 @@ authz service are **separate processes** that talk over HTTP:
         │  HTTP :4000
         ▼
  ┌──────────────────────── documents-service (port 4000) ─────────────────────┐
- │  makeDocumentsHttpServer  →  makeDocumentsHttpHandler  →  makeReadDocument  │
- │   (node http)                 (authn + routing)            (domain)         │
+ │  makeDocumentsHttpServer  →  makeDocumentsHttpHandler  →  makeDocuments     │
+ │   (node http)                 (authn + routing)           (domain.read)     │
  │                                                               │ check()      │
  │                                                         AuthzClient port     │
  │                                                               │              │
@@ -51,8 +51,8 @@ authz service are **separate processes** that talk over HTTP:
                                                                    │ POST /check
                                                                    ▼
  ┌──────────────────────── authz-service (port 4100) ─────────────────────────┐
- │  makeAuthzHttpServer  →  makeAuthzHttpHandler  →  composeAuthzDomain           │
- │   (node http)             (routing)               (check)                  │
+ │  makeAuthzHttpServer  →  makeAuthzHttpHandler  →  makeAuthzService          │
+ │   (node http)             (routing)               (domain.check)           │
  │                                                       │ evaluate()           │
  │                                              makeGraphEvaluator → repository │
  └────────────────────────────────────────────────────────────────────────────┘
@@ -79,12 +79,12 @@ The composition root picks the concrete adapters:
 const authzClient   = makeAuthzServiceClient({ baseUrl: authzUrl }); // HTTP to :4100
 const authenticator = makeDemoTokenVerifier({ tokens });
 const repository    = makeInMemoryDocumentRepository();
-const documents     = composeDocuments({ repository, authzClient }); // domain gets the port
+const documents     = makeDocuments({ repository, authzClient }); // domain gets the port
 const handler = makeDocumentsHttpHandler({ authenticator, documents });
 const server  = makeDocumentsHttpServer({ handler });
 ```
 
-`composeDocuments` receives `authzClient` as a plain object satisfying the
+`makeDocuments` receives `authzClient` as a plain object satisfying the
 `AuthzClient` interface. It never learns whether that object talks HTTP or runs
 in-process.
 
@@ -115,7 +115,7 @@ status codes by `toErrorResponse` (see the 403 section).
 *what may they do* question is the authz check in step 5.** A missing/invalid
 token throws `AuthenticationError` → 401.
 
-### 4. Use case — `core/domain/makeReadDocument.ts`
+### 4. Use case — `core/domain/makeDocuments.ts` (the `read` method)
 
 ```ts
 const read = async ({ id, actor }) => {
@@ -158,7 +158,7 @@ if (request.method === "POST" && request.path === "/check") {
 }
 ```
 
-### 7. Authz core — `authz-service/core/domain/composeAuthzDomain.ts`
+### 7. Authz core — `authz-service/core/domain/makeAuthzService.ts` (the `check` method)
 
 ```ts
 const check = (request) => evaluator.evaluate(request);   // delegate to the Evaluator port
@@ -179,11 +179,11 @@ The recursion is the same algorithm `docs/18` and (in Go terms)
 
 ```text
 makeGraphEvaluator.evaluate → { allowed: true }      (authz-service)
-  composeAuthzDomain.check returns it
+  makeAuthzService.check returns it
     authz handler → json(200, { allowed, trace })
       ── HTTP response :4100 ──►
         makeAuthzServiceClient.check parses { allowed:true }   (documents-service)
-          makeReadDocument: allowed → returns the document
+          makeDocuments.read: allowed → returns the document
             documents handler → json(200, { document })
               ── HTTP response :4000 ──► client
 ```
@@ -192,7 +192,7 @@ makeGraphEvaluator.evaluate → { allowed: true }      (authz-service)
 
 ## Where the 403 comes from (the same flow, denied)
 
-For `PATCH` as Bob, step 4 is `makeUpdateDocument` and step 5 checks `can_edit`.
+For `PATCH` as Bob, step 4 is `makeDocuments`'s `update` method and step 5 checks `can_edit`.
 Bob is a viewer, so the authz service returns `{ allowed: false }`, and:
 
 ```ts
@@ -226,18 +226,18 @@ thrown as a generic `unknown` in `catch`.
 | HTTP in | `documents-service/adapters/http/makeDocumentsHttpServer.ts` | Node socket → `HttpRequest` | the handler |
 | Routing + errors | `.../makeDocumentsHttpHandler.ts` | route, map thrown errors→status | authn, then domain |
 | Authn | `.../adapters/authn/makeDemoTokenVerifier.ts` | token → identity | (returns) |
-| Use case | `core/domain/makeReadDocument.ts` | exists? allowed? | `authzClient.check` |
+| Use case | `core/domain/makeDocuments.ts` (`read`) | exists? allowed? | `authzClient.check` |
 | **Boundary** | `adapters/authz/makeAuthzServiceClient.ts` | **`fetch` POST /check** | the authz service |
 | Authz HTTP in | `authz-service/adapters/http/makeAuthzHttpHandler.ts` | route `/check` | `authz.check` |
-| Authz core | `core/domain/composeAuthzDomain.ts` | delegate to evaluator | `evaluator.evaluate` |
+| Authz core | `core/domain/makeAuthzService.ts` (`check`) | delegate to evaluator | `evaluator.evaluate` |
 | Evaluator | `adapters/graph/makeGraphEvaluator.ts` | traverse the tuple graph | repository reads |
 
 ---
 
 ## The one idea to take away
 
-`makeReadDocument` calls `authzClient.check(...)` and does not care what is on
-the other side. In production that is an HTTP call to a separate authz service;
+`makeDocuments`'s `read` calls `authzClient.check(...)` and does not care what is
+on the other side. In production that is an HTTP call to a separate authz service;
 in tests it is an in-process function call (`makeInProcessAuthzClient`). Same
 domain code, two completely different transports — chosen by the composition
 root, not the domain.
@@ -275,5 +275,5 @@ Good answers:
 2. The composition in the test swaps `makeAuthzServiceClient` for
    `makeInProcessAuthzClient`, which runs the real `makeGraphEvaluator` in the
    same process against a shared repository — no socket, same logic.
-3. `core/domain/makeUpdateDocument.ts` threw `ForbiddenError`; 
+3. `core/domain/makeDocuments.ts` (`update`) threw `ForbiddenError`; 
    `adapters/http/makeDocumentsHttpHandler.ts` (`toErrorResponse`) mapped it to 403.

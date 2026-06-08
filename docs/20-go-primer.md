@@ -37,7 +37,7 @@ The Go pattern for "this might not exist" is a pointer (`*T`) or a named sentine
 
 ```go
 // Returns nil when not found — the caller must check before using the result.
-func (r *InMemoryDocumentRepository) FindByID(_ context.Context, id string) (*CollaborativeDocument, error) {
+func (r *InMemoryRepository) FindByID(_ context.Context, id string) (*CollaborativeDocument, error) {
     doc, ok := r.docs[id]
     if !ok {
         return nil, nil  // nil pointer means "not found"
@@ -62,7 +62,7 @@ Go uses named types. A named type has the same underlying representation as its
 base type but is a distinct type at compile time:
 
 ```go
-// go/internal/shared/rebac.go
+// go/internal/rebac/rebac.go
 type Object   string  // "type:id" — e.g. "document:roadmapDocument"
 type Relation string  // "can_edit", "viewer", etc.
 type Subject  string  // Object or a subject-set like "team:platformTeam#member"
@@ -75,7 +75,7 @@ the hood. You cannot pass a `Relation` where an `Object` is expected:
 func Tuple(obj Object, rel Relation, subject Subject) TupleKey { ... }
 
 // Compile error — cannot use Relation as Object:
-// shared.Tuple(shared.RelationDocumentCanEdit, shared.Document("x"), ...)
+// rebac.Tuple(rebac.RelationDocumentCanEdit, rebac.Document("x"), ...)
 ```
 
 ### Structs instead of object types
@@ -93,7 +93,7 @@ type TupleKey = Readonly<{
 Go:
 
 ```go
-// go/internal/shared/rebac.go
+// go/internal/rebac/rebac.go
 type TupleKey struct {
     Object   Object
     Relation Relation
@@ -112,13 +112,13 @@ by default. Field names in Go are capitalized (exported), which would produce
 control the output:
 
 ```go
-// go/internal/documents/ports.go
+// go/internal/documents/documents.go
 type CollaborativeDocument struct {
     ID        string        `json:"id"`
     Title     string        `json:"title"`
     Body      string        `json:"body"`
-    Workspace shared.Object `json:"workspace"`
-    UpdatedBy shared.Object `json:"updatedBy"`
+    Workspace rebac.Object `json:"workspace"`
+    UpdatedBy rebac.Object `json:"updatedBy"`
 }
 ```
 
@@ -135,17 +135,17 @@ In Go, a type satisfies an interface if it has all the required methods. There i
 no `implements` keyword. The connection is established at the point of assignment:
 
 ```go
-// go/internal/authz/ports.go — the interface, owned by the domain
+// go/internal/authz/authz.go — the interface, owned by the domain
 type Evaluator interface {
-    Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error)
+    Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
 }
 
-// go/internal/authz/adapters/graph/evaluator.go — the implementation, no "implements" keyword
+// go/internal/authz/evaluator.go — the implementation, no "implements" keyword
 type GraphEvaluator struct {
     store authz.TupleRepository
 }
 
-func (g *GraphEvaluator) Evaluate(_ context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
+func (g *GraphEvaluator) Evaluate(_ context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
     // ...
 }
 ```
@@ -169,19 +169,19 @@ The Go community convention: keep interfaces to one or two methods. The smaller
 the interface, the easier it is to satisfy with a mock in tests.
 
 ```go
-// go/internal/authz/ports.go
+// go/internal/authz/authz.go
 // TupleRepository is what GraphEvaluator depends on.
 // The interface lists only the methods the evaluator needs.
 type TupleRepository interface {
-    Has(ctx context.Context, object shared.Object, relation shared.Relation, user shared.Subject) (bool, error)
-    FindByObjectRelation(ctx context.Context, object shared.Object, relation shared.Relation) ([]shared.TupleKey, error)
-    FindAll(ctx context.Context, filter ...TupleFilter) ([]shared.TupleKey, error)
-    Write(ctx context.Context, tuple shared.TupleKey) error
-    Delete(ctx context.Context, tuple shared.TupleKey) error
+    Has(ctx context.Context, object rebac.Object, relation rebac.Relation, user rebac.Subject) (bool, error)
+    FindByObjectRelation(ctx context.Context, object rebac.Object, relation rebac.Relation) ([]rebac.TupleKey, error)
+    FindAll(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error)
+    Write(ctx context.Context, tuple rebac.TupleKey) error
+    Delete(ctx context.Context, tuple rebac.TupleKey) error
 }
 ```
 
-`InMemoryTupleStore` (in `authz/adapters/db/store.go`) satisfies the full
+`InMemoryStore` (in `authz/store.go`) satisfies the full
 `TupleRepository` interface. `GraphEvaluator` only calls the read methods, but
 accepting the full interface keeps the dependency graph simple.
 
@@ -191,7 +191,7 @@ A common Go pattern is to add an assertion at package level so the compiler
 catches missing methods immediately, before any code runs:
 
 ```go
-// go/internal/authz/adapters/graph/evaluator.go
+// go/internal/authz/evaluator.go
 var _ authz.Evaluator = (*GraphEvaluator)(nil)
 ```
 
@@ -232,7 +232,7 @@ async function requireDocument(id: string): Promise<CollaborativeDocument> {
 ```
 
 ```go
-// go/internal/documents/domain.go — returns error
+// go/internal/documents/service.go — returns error
 func (s *documentService) requireDocument(ctx context.Context, id string) (*CollaborativeDocument, error) {
     doc, err := s.repo.FindByID(ctx, id)
     if err != nil {
@@ -317,7 +317,7 @@ if (error instanceof ForbiddenError) {
 Go uses `errors.As`:
 
 ```go
-// go/internal/documents/adapters/http/handler.go
+// go/internal/api/handler.go
 func (h *handler) writeError(w http.ResponseWriter, err error) {
     var notFound *documents.DocumentNotFoundError
     if errors.As(err, &notFound) {
@@ -388,13 +388,13 @@ are the most common. A method's receiver can be a value or a pointer:
 func (p Point) DistanceFromOrigin() float64 { ... }
 
 // Pointer receiver — sees the address; can mutate fields and shares state.
-func (s *InMemoryTupleStore) Write(ctx context.Context, key shared.TupleKey) error { ... }
-func (s *InMemoryTupleStore) FindAll(ctx context.Context, filter ...authz.TupleFilter) ([]shared.TupleKey, error) { ... } // also a pointer — needs the mutex
+func (s *InMemoryStore) Write(ctx context.Context, key rebac.TupleKey) error { ... }
+func (s *InMemoryStore) FindAll(ctx context.Context, filter ...authz.TupleFilter) ([]rebac.TupleKey, error) { ... } // also a pointer — needs the mutex
 ```
 
 The rule in this repo: use pointer receivers when the method mutates state,
 holds a mutex/RWMutex, or is large enough that copying is wasteful. The
-`InMemoryTupleStore` methods all use pointer receivers because `FindAll()`,
+`InMemoryStore` methods all use pointer receivers because `FindAll()`,
 `Has()`, and friends acquire `s.mu.RLock()` — and a `sync.RWMutex` must not be
 copied. Value receivers are reserved for small, immutable value types.
 
@@ -408,10 +408,10 @@ Go has no `new` keyword for custom initialization. The convention is a `New*`
 function that returns a pointer to an initialized struct:
 
 ```go
-// go/internal/authz/adapters/db/store.go — package db, so callers write db.New(...)
-func New(seed ...shared.TupleKey) *InMemoryTupleStore {
-    s := &InMemoryTupleStore{
-        tuples: make(map[string]shared.TupleKey, len(seed)),
+// go/internal/authz/store.go — package authz, so callers write authz.NewInMemoryStore(...)
+func NewInMemoryStore(seed ...rebac.TupleKey) *InMemoryStore {
+    s := &InMemoryStore{
+        tuples: make(map[string]rebac.TupleKey, len(seed)),
     }
     for _, k := range seed {
         s.Write(k)
@@ -436,8 +436,8 @@ authzdb.New(fixtures.SeedRelationshipTuples()...)  // spread a slice
 regardless of how it returns — normal return, early return, or panic:
 
 ```go
-// go/internal/authz/adapters/db/store.go
-func (s *InMemoryTupleStore) Has(_ context.Context, object Object, relation Relation, user Subject) (bool, error) {
+// go/internal/authz/store.go
+func (s *InMemoryStore) Has(_ context.Context, object Object, relation Relation, user Subject) (bool, error) {
     s.mu.RLock()          // acquire a read lock
     defer s.mu.RUnlock()  // release it when this function exits — guaranteed
     _, ok := s.tuples[...]
@@ -461,19 +461,19 @@ reading and writing a map concurrently causes a data race (undefined behaviour).
 ensuring that writes are exclusive:
 
 ```go
-// go/internal/authz/adapters/db/store.go
-type InMemoryTupleStore struct {
+// go/internal/authz/store.go
+type InMemoryStore struct {
     mu     sync.RWMutex
     tuples map[string]TupleKey
 }
 
-func (s *InMemoryTupleStore) Has(...) (bool, error) {
+func (s *InMemoryStore) Has(...) (bool, error) {
     s.mu.RLock()            // any number of readers can hold RLock simultaneously
     defer s.mu.RUnlock()
     ...
 }
 
-func (s *InMemoryTupleStore) Write(_ context.Context, key TupleKey) error {
+func (s *InMemoryStore) Write(_ context.Context, key TupleKey) error {
     s.mu.Lock()             // exclusive — blocks all readers and other writers
     defer s.mu.Unlock()
     ...
@@ -485,7 +485,7 @@ TypeScript does not need this because the JavaScript event loop is single-thread
 ### Return the interface, not the concrete type
 
 ```go
-// go/internal/documents/domain.go
+// go/internal/documents/service.go
 func New(repo DocumentRepository, authzClient AuthzClient) Service {
     return &documentService{repo: repo, authzClient: authzClient}
 }
@@ -507,13 +507,13 @@ package.
 ```
 go/
 ├── go.mod                  — module root, declares "module rebac-primer"
-├── cmd/server/             — package main (the composition root + entry point)
+├── cmd/server/             — package main (wires everything + entry point)
 └── internal/
-    ├── shared/             — package shared (rebac.go: Object, Relation, TupleKey, …)
-    ├── authz/              — package authz (authz.go, ports.go, domain.go)
-    │   └── adapters/       — db (tuple store), graph (evaluator), http
-    ├── documents/          — package documents (documents.go, ports.go, create/read/update.go)
-    │   └── adapters/       — db (repo), authn (verifier), http
+    ├── rebac/              — package rebac (rebac.go: Object, Relation, TupleKey, …)
+    ├── authz/              — package authz (Service + interfaces + store + evaluator + model)
+    ├── openfga/            — package openfga (OpenFGA-backed authz.Service)
+    ├── documents/          — package documents (Service + interfaces + create/read/update + store + token)
+    ├── api/                — package api (HTTP server for the documents service)
     └── fixtures/           — package fixtures (fixtures.go)
 ```
 
@@ -536,7 +536,7 @@ first argument so callers can cancel them or attach a deadline:
 
 ```go
 // go/internal/documents/read.go
-func (s *documentService) Read(ctx context.Context, id string, actor shared.Object) (*CollaborativeDocument, error) {
+func (s *documentService) Read(ctx context.Context, id string, actor rebac.Object) (*CollaborativeDocument, error) {
     doc, err := s.requireDocument(ctx, id)  // passes ctx to the repo
     // ...
 }
@@ -544,7 +544,7 @@ func (s *documentService) Read(ctx context.Context, id string, actor shared.Obje
 
 The in-memory implementations ignore `ctx` (they mark it `_`), but the signatures
 are ready for a real database without a refactor. If you later swap
-`InMemoryDocumentRepository` for a Postgres implementation, `ctx` will carry the
+`InMemoryRepository` for a Postgres implementation, `ctx` will carry the
 request deadline automatically.
 
 TypeScript equivalent: `AbortController` / `AbortSignal`, but most code ignores
@@ -569,7 +569,7 @@ Since Go 1.22, the standard `net/http` `ServeMux` supports method-prefixed path
 patterns and path variables directly:
 
 ```go
-// go/internal/documents/adapters/http/server.go
+// go/internal/api/server.go
 mux := http.NewServeMux()
 mux.HandleFunc("GET /health", h.handleHealth)
 mux.HandleFunc("POST /documents", h.handleCreateDocument)
@@ -580,7 +580,7 @@ mux.HandleFunc("PATCH /documents/{id}", h.handleUpdateDocument)
 Extract path variables with:
 
 ```go
-// go/internal/documents/adapters/http/handler.go
+// go/internal/api/handler.go
 id := r.PathValue("id")
 ```
 
@@ -598,14 +598,14 @@ Test functions follow the Arrange → Act → Assert pattern with explicit comme
 marking each section:
 
 ```go
-// go/internal/authz/adapters/graph/evaluator_test.go
+// go/internal/authz/evaluator_test.go
 func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
     // Arrange: alice is a member of platformTeam, which is an editor of
     // productWorkspace. roadmapDocument lives in productWorkspace.
     ev := newEvaluator()
-    req := shared.CheckRequest{
+    req := rebac.CheckRequest{
         User:     fixtures.Alice,
-        Relation: shared.RelationDocumentCanEdit,
+        Relation: rebac.RelationDocumentCanEdit,
         Object:   fixtures.RoadmapDocument,
     }
 
@@ -680,7 +680,7 @@ go test -v ./...
 
 ## Try this
 
-Open `go/internal/authz/adapters/graph/evaluator_test.go`.
+Open `go/internal/authz/evaluator_test.go`.
 
 1. Read `TestGraphEvaluator_TeamMemberCanEditDocument`. Notice the trace is
    printed when the test fails — the same `Trace []string` that the TypeScript
@@ -692,7 +692,7 @@ Open `go/internal/authz/adapters/graph/evaluator_test.go`.
    structure with `// Arrange`, `// Act`, `// Assert` comments.
 
 3. Run it: `make go/test`. Read the trace output and match each line to the
-   expansion rules in `go/internal/authz/adapters/graph/evaluator.go`.
+   expansion rules in `go/internal/authz/evaluator.go`.
 
 ---
 

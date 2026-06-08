@@ -15,7 +15,7 @@ import makeDemoTokenVerifier from "./adapters/authn/makeDemoTokenVerifier.ts";
 import makeInMemoryDocumentRepository from "./adapters/db/makeInMemoryDocumentRepository.ts";
 import makeDocumentsHttpHandler from "./adapters/http/makeDocumentsHttpHandler.ts";
 import makeDocumentsHttpServer from "./adapters/http/makeDocumentsHttpServer.ts";
-import composeDocuments from "./core/domain/composeDocuments.ts";
+import makeDocuments from "./core/domain/makeDocuments.ts";
 import readPort from "../shared/readPort.ts";
 import type { CreateDocumentInput } from "./core/index.ts";
 
@@ -35,7 +35,7 @@ const composeDocumentsService = ({
     const authzClient   = makeAuthzServiceClient({ baseUrl: authzUrl });
     const authenticator = makeDemoTokenVerifier({ tokens });
     const repository    = makeInMemoryDocumentRepository();
-    const documents     = composeDocuments({ repository, authzClient });
+    const documents     = makeDocuments({ repository, authzClient });
     const handler = makeDocumentsHttpHandler({ authenticator, documents });
     const server  = makeDocumentsHttpServer({ handler });
 

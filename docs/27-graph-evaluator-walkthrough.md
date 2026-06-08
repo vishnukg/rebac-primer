@@ -5,9 +5,9 @@ answers a permission check.  No prior graph theory knowledge required.
 
 The relevant source files are:
 
-- `go/internal/authz/adapters/graph/evaluator.go` — the traversal algorithm
-- `go/internal/authz/adapters/graph/permissionmodel.go` — the rule tables
-- `go/internal/authz/adapters/db/store.go` — the in-memory tuple store
+- `go/internal/authz/evaluator.go` — the traversal algorithm
+- `go/internal/authz/model.go` — the rule tables
+- `go/internal/authz/store.go` — the in-memory tuple store
 
 ---
 
@@ -270,9 +270,9 @@ winning path.
 You can print the trace yourself from a test:
 
 ```go
-result, _ := evaluator.Evaluate(ctx, shared.CheckRequest{
+result, _ := evaluator.Evaluate(ctx, rebac.CheckRequest{
     User:     fixtures.Alice,
-    Relation: shared.RelationDocumentCanEdit,
+    Relation: rebac.RelationDocumentCanEdit,
     Object:   fixtures.RoadmapDocument,
 })
 for _, line := range result.Trace {
@@ -370,7 +370,7 @@ immediately instead of recursing again.
 
 ## The permission model rules
 
-`permissionmodel.go` holds three tables — one per object type.  Each table maps
+`model.go` holds three tables — one per object type.  Each table maps
 a relation to the *stronger* relations that imply it.
 
 ```
@@ -408,7 +408,7 @@ Check "viewer" on workspace:productWorkspace for alice:
 | Step 2: subject-set | `hasTuple()` — the `for` loop |
 | Subject-set recursion | `subjectSetContains()` |
 | Step 3: rule expansion | `expandByRules()` |
-| The rule tables | `permissionmodel.go` |
+| The rule tables | `model.go` |
 | Step 4: workspace inherit | `expandDocument()` — the second `if` block |
 | Cycle detection | `hasRelation()` — the `visitKey` block at the top |
 | Depth + cancellation guard | `hasRelation()` — the `depth`/`ctx.Err()` checks at the top |
@@ -420,38 +420,38 @@ Check "viewer" on workspace:productWorkspace for alice:
 
 Add a `can_share` permission: only document owners can share.
 
-**1. Add the relation constant** in `go/internal/shared/rebac.go`:
+**1. Add the relation constant** in `go/internal/rebac/rebac.go`:
 
 ```go
 RelationDocumentCanShare Relation = "can_share"
 ```
 
-**2. Add the rule** in `go/internal/authz/adapters/graph/permissionmodel.go`:
+**2. Add the rule** in `go/internal/authz/model.go`:
 
 ```go
 var documentRules = impliedBy{
     // ... existing rules ...
-    shared.RelationDocumentCanShare: {shared.RelationDocumentOwner},
+    rebac.RelationDocumentCanShare: {rebac.RelationDocumentOwner},
 }
 ```
 
-**3. Add a test** in `go/internal/authz/adapters/graph/evaluator_test.go`:
+**3. Add a test** in `go/internal/authz/evaluator_test.go`:
 
 ```go
 func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
     // Make alice a direct owner of the document
-    extra := shared.Tuple(
+    extra := rebac.Tuple(
         fixtures.RoadmapDocument,
-        shared.RelationDocumentOwner,
-        shared.Subject(fixtures.Alice),
+        rebac.RelationDocumentOwner,
+        rebac.Subject(fixtures.Alice),
     )
     ev := newEvaluator(extra)
     ctx := context.Background()
 
     // alice (owner) can share
-    got, _ := ev.Evaluate(ctx, shared.CheckRequest{
+    got, _ := ev.Evaluate(ctx, rebac.CheckRequest{
         User:     fixtures.Alice,
-        Relation: shared.RelationDocumentCanShare,
+        Relation: rebac.RelationDocumentCanShare,
         Object:   fixtures.RoadmapDocument,
     })
     if !got.Allowed {
@@ -459,9 +459,9 @@ func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
     }
 
     // bob (viewer) cannot share
-    got, _ = ev.Evaluate(ctx, shared.CheckRequest{
+    got, _ = ev.Evaluate(ctx, rebac.CheckRequest{
         User:     fixtures.Bob,
-        Relation: shared.RelationDocumentCanShare,
+        Relation: rebac.RelationDocumentCanShare,
         Object:   fixtures.RoadmapDocument,
     })
     if got.Allowed {

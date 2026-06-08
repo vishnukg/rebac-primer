@@ -16,7 +16,7 @@ Here is exactly where each question is answered in this codebase:
 |---|---|
 | **Authentication** — "who are you?" | `documents-service/core/ports/authenticator.ts` (port) |
 | Bearer token extraction + verification | `documents-service/adapters/authn/makeDemoTokenVerifier.ts` |
-| **Authorization** — "what can you do?" | `authz-service/core/domain/composeAuthzDomain.ts` |
+| **Authorization** — "what can you do?" | `authz-service/core/domain/makeAuthzService.ts` |
 | Relationship tuple store | `authz-service/adapters/db/makeInMemoryTupleRepository.ts` |
 | Graph traversal (ReBAC evaluation) | `authz-service/adapters/graph/makeGraphEvaluator.ts` |
 | Permission model (who implies what) | `authz-service/adapters/graph/permissionModel.ts` |
@@ -157,11 +157,7 @@ src/
 │   ├── core/
 │   │   ├── domain/
 │   │   │   ├── types.ts         ← AuthzService interface + errors
-│   │   │   ├── composeAuthzDomain.ts ← assembles check/writeTuples/deleteTuples/listTuples
-│   │   │   ├── makeCheck.ts
-│   │   │   ├── makeWriteTuples.ts
-│   │   │   ├── makeDeleteTuples.ts
-│   │   │   └── makeListTuples.ts
+│   │   │   └── makeAuthzService.ts ← the domain: check/writeTuples/deleteTuples/listTuples inline
 │   │   └── ports/
 │   │       └── tupleRepository.ts ← what the domain needs from storage
 │   └── adapters/
@@ -180,10 +176,7 @@ src/
 │   ├── core/
 │   │   ├── domain/
 │   │   │   ├── types.ts         ← Documents interface + errors
-│   │   │   ├── composeDocuments.ts ← assembles create/read/update
-│   │   │   ├── makeCreateDocument.ts
-│   │   │   ├── makeReadDocument.ts
-│   │   │   └── makeUpdateDocument.ts
+│   │   │   └── makeDocuments.ts ← the domain: create/read/update inline
 │   │   └── ports/
 │   │       ├── authenticator.ts     ← "who are you?" (authn port)
 │   │       ├── authzClient.ts       ← "what can you do?" (authz port)
@@ -304,7 +297,7 @@ Here is every step that happens when Alice sends `POST /documents`:
         actor:     "user:alice",          ← subject from step 3
     })
         │
-5.  makeCreateDocument runs:
+5.  documents.create runs:
 
     a. AUTHZ CHECK: authzClient.check({
            user:     "user:alice",
@@ -454,7 +447,7 @@ a handful of tuples this is fast enough. A real store would use a secondary
 index keyed on `(object, relation)` for O(log n) or O(1) lookup.
 
 **No transaction between `repository.save` and `authzClient.writeTuples`.**
-In `makeCreateDocument`, the document is saved first, then tuples are written.
+In `makeDocuments`'s `create`, the document is saved first, then tuples are written.
 If the `writeTuples` call fails (network error, authz service down), the document
 exists in the repo but has no ownership record in the graph — future permission
 checks for that document will fail. In production you would handle this with:

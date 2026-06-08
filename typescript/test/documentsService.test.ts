@@ -12,7 +12,7 @@ import makeInMemoryDocumentRepository from
     "../src/documents-service/adapters/db/makeInMemoryDocumentRepository.ts";
 import makeDemoTokenVerifier from
     "../src/documents-service/adapters/authn/makeDemoTokenVerifier.ts";
-import composeDocuments from "../src/documents-service/core/domain/composeDocuments.ts";
+import makeDocuments from "../src/documents-service/core/domain/makeDocuments.ts";
 import type { DocumentsHttpHandler } from
     "../src/documents-service/adapters/http/makeDocumentsHttpHandler.ts";
 import {
@@ -27,7 +27,7 @@ const composeHandler = (): DocumentsHttpHandler => {
     const authzClient   = composeInProcessAuthzClient(seedPolicyTuples());
     const authenticator = makeDemoTokenVerifier({ tokens: demoTokens });
     const repository    = makeInMemoryDocumentRepository();
-    const documents     = composeDocuments({ repository, authzClient });
+    const documents     = makeDocuments({ repository, authzClient });
     return makeDocumentsHttpHandler({ authenticator, documents });
 };
 

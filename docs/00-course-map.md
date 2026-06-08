@@ -64,8 +64,8 @@ Go tracks the same foundation.
 | 01 | OAuth/OIDC authentication fundamentals | conceptual |
 | 02 | Authorization fundamentals: RBAC, ABAC, ReBAC, agentic systems | conceptual |
 | 03 | Graph theory needed for ReBAC | conceptual |
-| 04 | ReBAC concepts, relationship graphs, agentic tool calls | `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`, `go/internal/authz/adapters/graph/evaluator.go` |
-| 05 | OpenFGA model DSL | `typescript/src/authz-service/adapters/graph/permissionModel.ts`, `go/internal/authz/adapters/graph/permissionmodel.go` |
+| 04 | ReBAC concepts, relationship graphs, agentic tool calls | `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`, `go/internal/authz/evaluator.go` |
+| 05 | OpenFGA model DSL | `typescript/src/authz-service/adapters/graph/permissionModel.ts`, `go/internal/authz/model.go` |
 | 06 | Architecture: ports & adapters, dependency direction, intentional caveats (both languages) | `go/internal/authz/ports.go`, `go/internal/documents/ports.go`, `typescript/src/documents-service/core/ports` |
 
 ## TypeScript track
@@ -97,16 +97,16 @@ Read these after the shared ReBAC track if Go is your implementation language.
 
 | Doc | Topic | Code to inspect |
 |-----|-------|-----------------|
-| 20 | Go language primer | `go/internal/shared/rebac.go`, `go/internal/documents/documents.go` |
-| 21 | Go ReBAC implementation walkthrough | `go/internal/authz/adapters/graph/evaluator.go`, `go/internal/documents/adapters/http/handler.go` |
+| 20 | Go language primer | `go/internal/rebac/rebac.go`, `go/internal/documents/documents.go` |
+| 21 | Go ReBAC implementation walkthrough | `go/internal/authz/evaluator.go`, `go/internal/api/handler.go` |
 | 22 | Go concurrency: goroutines, channels, WaitGroups | `go/examples/concurrency/parallel.go` |
 | 23 | Go generics: type parameters, constraints, Result[T] | `go/examples/generics/result.go` |
 | 24 | Go interfaces and embedding: decorator pattern | `go/examples/middleware/middleware.go` |
-| 25 | Go testing: AAA, table-driven, benchmarks, fuzz | `go/internal/authz/adapters/graph/evaluator_test.go` |
-| 26 | From-scratch ReBAC vs OpenFGA: concept mapping + the shipped, flag-driven OpenFGA adapter | `go/internal/authz/adapters/openfga/openfga.go`, `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts`, `deployments/openfga/model.fga` |
-| 27 | Graph evaluator deep dive: step-by-step walkthrough for non-graph-theory readers | `go/internal/authz/adapters/graph/evaluator.go` |
-| 28 | Authz call flow: tracing a request through every layer (in-process) | `go/cmd/server/main.go`, `go/internal/documents/read.go`, `go/internal/authz/domain.go` |
-| 34 | OpenFGA adapter walkthrough: a check through the OpenFGA backend (both languages) | `go/internal/authz/adapters/openfga/openfga.go`, `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts` |
+| 25 | Go testing: AAA, table-driven, benchmarks, fuzz | `go/internal/authz/evaluator_test.go` |
+| 26 | From-scratch ReBAC vs OpenFGA: concept mapping + the shipped, flag-driven OpenFGA adapter | `go/internal/openfga/openfga.go`, `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts`, `deployments/openfga/model.fga` |
+| 27 | Graph evaluator deep dive: step-by-step walkthrough for non-graph-theory readers | `go/internal/authz/evaluator.go` |
+| 28 | Authz call flow: tracing a request through every layer (in-process) | `go/cmd/server/main.go`, `go/internal/documents/read.go`, `go/internal/authz/service.go` |
+| 34 | OpenFGA adapter walkthrough: a check through the OpenFGA backend (both languages) | `go/internal/openfga/openfga.go`, `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts` |
 
 ## Shared track: Docker and local services
 
@@ -181,7 +181,7 @@ concepts directly through the implementation code.
 ```
 
 Start with `make go/test` to confirm the setup works, then open
-`go/internal/authz/adapters/graph/evaluator.go` alongside `docs/21-go-rebac-implementation.md`.
+`go/internal/authz/evaluator.go` alongside `docs/21-go-rebac-implementation.md`.
 Read `docs/27-graph-evaluator-walkthrough.md` for a step-by-step trace of the traversal
 algorithm if the evaluator code feels hard to follow.
 
@@ -217,7 +217,7 @@ Checkpoint: explain why Bob can read but cannot edit.
 ### Day 3: OpenFGA model and the graph evaluator
 
 1. Read `05-openfga-model.md`.
-2. Open `typescript/src/authz-service/adapters/graph/permissionModel.ts` and `go/internal/authz/adapters/graph/permissionmodel.go`.
+2. Open `typescript/src/authz-service/adapters/graph/permissionModel.ts` and `go/internal/authz/model.go`.
 3. Compare the model with the in-memory graph evaluators in both languages.
 4. (Go track) Read `docs/27-graph-evaluator-walkthrough.md` — it traces every step of the
    `alice / can_edit / roadmapDocument` check through the actual evaluator code.
@@ -237,7 +237,7 @@ Go:
 
 1. Read `20-go-primer.md`.
 2. Run `make go/test`.
-3. Open `go/internal/authz/adapters/graph/evaluator_test.go`.
+3. Open `go/internal/authz/evaluator_test.go`.
 4. Break one tuple in `go/internal/fixtures/fixtures.go` and predict which tests fail.
 
 Checkpoint: explain the same tuple in both languages.
@@ -271,7 +271,7 @@ TypeScript:
 
 Go:
 
-1. Open `go/internal/authz/adapters/graph/evaluator_test.go` — read each AAA section.
+1. Open `go/internal/authz/evaluator_test.go` — read each AAA section.
 2. Run `make go/test`.
 3. Change `SeedRelationshipTuples()` in `go/internal/fixtures/fixtures.go` and predict which tests fail.
 

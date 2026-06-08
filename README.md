@@ -19,12 +19,14 @@ typescript/                TypeScript implementation
   src/cli/                 Terminal client composition root and entry point
   test/                    Vitest tests
 
-go/                        Go implementation
-  internal/shared/         ReBAC primitives (Object, Relation, TupleKey, CheckRequest)
-  internal/authz/          AuthZ core (Service, ports) + adapters/ (db, graph, http)
-  internal/documents/      Documents core (Service, ports, use cases) + adapters/ (db, authn, http)
+go/                        Go implementation (flat packages, idiomatic layout)
+  internal/rebac/          ReBAC primitives (Object, Relation, TupleKey, CheckRequest)
+  internal/authz/          AuthZ service: Service + interfaces + store + evaluator + model
+  internal/openfga/        OpenFGA-backed authz.Service (alternative backend)
+  internal/documents/      Documents service: Service + interfaces + create/read/update + store + token
+  internal/api/            HTTP server for the documents service
   internal/fixtures/       Shared test data
-  cmd/server/              Composition root + entry point
+  cmd/server/              Wires everything + entry point
 
 docs/             Tutorial chapters (read these in order)
 deployments/      Docker Compose for both implementations + OpenFGA

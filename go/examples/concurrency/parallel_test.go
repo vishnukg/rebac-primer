@@ -6,18 +6,17 @@ import (
 	"testing"
 
 	"rebac-primer/examples/concurrency"
-	authzdb "rebac-primer/internal/authz/adapters/db"
-	"rebac-primer/internal/authz/adapters/graph"
+	"rebac-primer/internal/authz"
 	"rebac-primer/internal/fixtures"
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // newEvaluator builds a graph evaluator over the standard fixture tuples.
 // The concurrency helpers under test work with any authz.Evaluator; here we
 // drive them with the real graph evaluator.
-func newEvaluator(extra ...shared.TupleKey) *graph.GraphEvaluator {
+func newEvaluator(extra ...rebac.TupleKey) *authz.GraphEvaluator {
 	all := append(fixtures.SeedRelationshipTuples(), extra...)
-	return graph.NewGraphEvaluator(authzdb.New(all...))
+	return authz.NewGraphEvaluator(authz.NewInMemoryStore(all...))
 }
 
 // blockingEvaluator is a fake Checker whose Evaluate does no work until the
@@ -25,9 +24,9 @@ func newEvaluator(extra ...shared.TupleKey) *graph.GraphEvaluator {
 // AllPermissions' cancellation path deterministically.
 type blockingEvaluator struct{}
 
-func (blockingEvaluator) Evaluate(ctx context.Context, _ shared.CheckRequest) (shared.CheckResult, error) {
+func (blockingEvaluator) Evaluate(ctx context.Context, _ rebac.CheckRequest) (rebac.CheckResult, error) {
 	<-ctx.Done()
-	return shared.CheckResult{}, ctx.Err()
+	return rebac.CheckResult{}, ctx.Err()
 }
 
 func TestAllPermissions_CancelledContextReturnsError(t *testing.T) {
@@ -57,11 +56,11 @@ func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := map[shared.Relation]bool{
-		shared.RelationDocumentCanRead:    true,
-		shared.RelationDocumentCanComment: true,
-		shared.RelationDocumentCanEdit:    true,
-		shared.RelationDocumentCanDelete:  false,
+	want := map[rebac.Relation]bool{
+		rebac.RelationDocumentCanRead:    true,
+		rebac.RelationDocumentCanComment: true,
+		rebac.RelationDocumentCanEdit:    true,
+		rebac.RelationDocumentCanDelete:  false,
 	}
 	for rel, expected := range want {
 		if got := summary[rel]; got != expected {
@@ -77,16 +76,16 @@ func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !summary[shared.RelationDocumentCanRead] {
+	if !summary[rebac.RelationDocumentCanRead] {
 		t.Error("expected viewer can_read=true")
 	}
-	if !summary[shared.RelationDocumentCanComment] {
+	if !summary[rebac.RelationDocumentCanComment] {
 		t.Error("expected viewer can_comment=true")
 	}
-	if summary[shared.RelationDocumentCanEdit] {
+	if summary[rebac.RelationDocumentCanEdit] {
 		t.Error("expected viewer can_edit=false")
 	}
-	if summary[shared.RelationDocumentCanDelete] {
+	if summary[rebac.RelationDocumentCanDelete] {
 		t.Error("expected viewer can_delete=false")
 	}
 }
@@ -105,10 +104,10 @@ func TestAllPermissions_NonDocumentObjectReturnsEmptySummary(t *testing.T) {
 
 func TestBulkCheck_ReturnsResultsInInputOrder(t *testing.T) {
 	ev := newEvaluator()
-	reqs := []shared.CheckRequest{
-		{User: fixtures.Alice, Relation: shared.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
-		{User: fixtures.Bob, Relation: shared.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
-		{User: fixtures.Bob, Relation: shared.RelationDocumentCanRead, Object: fixtures.RoadmapDocument},
+	reqs := []rebac.CheckRequest{
+		{User: fixtures.Alice, Relation: rebac.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
+		{User: fixtures.Bob, Relation: rebac.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
+		{User: fixtures.Bob, Relation: rebac.RelationDocumentCanRead, Object: fixtures.RoadmapDocument},
 	}
 
 	results := concurrency.BulkCheck(context.Background(), ev, reqs)

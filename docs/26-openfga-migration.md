@@ -43,9 +43,9 @@ Every piece of our scratch implementation has a direct OpenFGA counterpart.
 | `shared.Subject` with `#` (`"team:platformTeam#member"`) | Subject set (userset) | Same `object#relation` format |
 | `shared.CheckRequest` | Check call parameters | Same three fields |
 | `authz.TupleRepository` | Tuple store | We own the interface; OpenFGA owns the store |
-| `authz/adapters/db.InMemoryTupleStore` | (our own, not in OpenFGA) | In-memory only; OpenFGA uses PostgreSQL or MySQL |
+| `authz.InMemoryStore` | (our own, not in OpenFGA) | In-memory only; OpenFGA uses PostgreSQL or MySQL |
 | `authz.Evaluator` | Check API | Our port; OpenFGA's HTTP/gRPC endpoint is the adapter |
-| `authz/adapters/graph.GraphEvaluator` | OpenFGA's check engine | Our traversal mirrors what OpenFGA does internally |
+| `authz.GraphEvaluator` | OpenFGA's check engine | Our traversal mirrors what OpenFGA does internally |
 | `graph/permissionmodel.go` (`teamRules`, `workspaceRules`, `documentRules`) | Authorization model DSL | We express rules as Go maps; OpenFGA uses a DSL stored in a database |
 | `authz.New(store, evaluator)` | (wiring only) | No OpenFGA equivalent; OpenFGA merges store and evaluator in one server |
 
@@ -120,7 +120,7 @@ is plugged in.
   graph.GraphEvaluator                 openfga.Authorizer
   (in-process, today)                 (SDK adapter, migration target)
               │                                 │
-  reads InMemoryTupleStore          calls OpenFGA server over HTTP/gRPC
+  reads InMemoryStore          calls OpenFGA server over HTTP/gRPC
 ```
 
 The documents service sees only `documents.AuthzClient`, which `authz.Service`
@@ -139,7 +139,7 @@ cmd/server/main.go   ← only place that knows about concrete types
 **This is already implemented.** The OpenFGA adapter and the flag-driven wiring
 ship in the repo, so the swap is a runtime flag, not a code change:
 
-- Go adapter: `go/internal/authz/adapters/openfga/openfga.go` (implements `authz.Service`)
+- Go adapter: `go/internal/openfga/openfga.go` (implements `authz.Service`)
 - TS adapter: `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts`
 - Model: `deployments/openfga/model.fga` · Seed: `deployments/openfga/seed.sh`
 
@@ -194,7 +194,7 @@ Note both IDs — you will need them in Step 4.
 
 ### Step 3 — the OpenFGA adapter
 
-The adapter ships at `go/internal/authz/adapters/openfga/openfga.go` (and the TS
+The adapter ships at `go/internal/openfga/openfga.go` (and the TS
 equivalent), and `github.com/openfga/go-sdk` is already in `go.mod`. It implements
 the full `authz.Service` driving port — `Check`, `WriteTuples`, `DeleteTuples`,
 `ListTuples` — **not** the inner `Evaluator` port. That choice is deliberate:
@@ -218,7 +218,7 @@ import (
     fgaclient "github.com/openfga/go-sdk/client"
 
     "rebac-primer/internal/authz"
-    "rebac-primer/internal/shared"
+    "rebac-primer/internal/rebac"
 )
 
 type Config struct {

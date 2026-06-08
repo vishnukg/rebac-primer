@@ -98,28 +98,30 @@ It only cares that the dependency satisfies `AuthzClient`.
 
 ## Dependency injection without a framework
 
-From `src/documents-service/core/domain/composeDocuments.ts`:
+From `src/documents-service/core/domain/makeDocuments.ts`:
 
 ```ts
-const composeDocuments = ({ repository, authzClient }: DocumentsCfg): Documents => ({
-    create: makeCreateDocument({ repository, authzClient }),
-    read:   makeReadDocument({ repository, authzClient }),
-    update: makeUpdateDocument({ repository, authzClient }),
-});
+const makeDocuments = ({ repository, authzClient }: MakeDocumentsCfg): Documents => {
+    const create: Documents["create"] = async input => { /* ... */ };
+    const read:   Documents["read"]   = async ({ id, actor }) => { /* ... */ };
+    const update: Documents["update"] = async ({ id, body, actor }) => { /* ... */ };
+    return { create, read, update };
+};
 ```
 
 This is dependency injection in plain TypeScript. No container is required. No
-decorators are required. It simply receives the dependencies the domain needs.
-(It is named `compose*`, not `make*`, because it builds its own collaborators —
-the `create`/`read`/`update` factories — and wires them into the `Documents`
-port; see [19-factory-function-pattern](./19-factory-function-pattern.md).)
+decorators are required. The domain is one factory that receives the
+dependencies it needs and defines its three operations inline as methods. (It is
+named `make*`, not `compose*`, because it builds no collaborators of its own — it
+just closes over `repository`/`authzClient`; see
+[19-factory-function-pattern](./19-factory-function-pattern.md).)
 
 That keeps tests simple:
 
 ```ts
 const repository  = makeInMemoryDocumentRepository();
 const authzClient = makeInProcessAuthzClient(seedPolicyTuples());
-const documents   = composeDocuments({ repository, authzClient });
+const documents   = makeDocuments({ repository, authzClient });
 ```
 
 ## Factories are enough for stateful adapters
@@ -191,7 +193,7 @@ adapters -> core <- composition roots
 
 Concrete examples:
 
-- `makeCreateDocument` depends on `DocumentRepository` and `AuthzClient`.
+- `makeDocuments` depends on `DocumentRepository` and `AuthzClient`.
 - `makeGraphEvaluator` is the in-process AuthZ implementation.
 - `makeAuthzServiceClient` is the HTTP AuthZ implementation.
 - `makeInMemoryDocumentRepository` implements `DocumentRepository`.
@@ -258,20 +260,20 @@ Requirements:
 
 1. the actor must have `can_delete` on the document
 2. the repository should expose a delete method
-3. `composeDocuments` should return the new operation
+3. `makeDocuments` should define and return the new operation
 4. tests should cover owner allowed and viewer denied
 
-Keep the shape consistent with `read` and `update`. The goal is making the new
-behavior feel like it belongs.
+Keep the shape consistent with `read` and `update` — add it as another method
+inside `makeDocuments`. The goal is making the new behavior feel like it belongs.
 
 ## Checkpoint
 
 Explain this design in one sentence:
 
 ```text
-makeUpdateDocument depends on AuthzClient.
+makeDocuments depends on AuthzClient.
 makeAuthzServiceClient implements AuthzClient.
-makeUpdateDocument does not import makeAuthzServiceClient.
+makeDocuments does not import makeAuthzServiceClient.
 ```
 
 Good answer: the domain depends on behavior (the port), not infrastructure (the

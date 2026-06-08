@@ -3,7 +3,7 @@
 // Wires together:
 //   TupleRepository  (in-memory, seeded with workspace/team policies)
 //   GraphEvaluator   (ReBAC traversal, reads from TupleRepository)
-//   AuthzDomain      (check + writeTuples + deleteTuples + listTuples)
+//   AuthzService     (check + writeTuples + deleteTuples + listTuples)
 //   AuthzHttpHandler (routes POST /check, POST /tuples, etc.)
 //   AuthzHttpServer  (Node HTTP server)
 //
@@ -17,7 +17,7 @@ import makeGraphEvaluator from "./adapters/graph/makeGraphEvaluator.ts";
 import makeOpenFgaAuthzService from "./adapters/openfga/makeOpenFgaAuthzService.ts";
 import makeAuthzHttpHandler from "./adapters/http/makeAuthzHttpHandler.ts";
 import makeAuthzHttpServer from "./adapters/http/makeAuthzHttpServer.ts";
-import composeAuthzDomain from "./core/domain/composeAuthzDomain.ts";
+import makeAuthzService from "./core/domain/makeAuthzService.ts";
 import readPort from "../shared/readPort.ts";
 import type { AuthzService } from "./core/index.ts";
 import type { TupleKey } from "../shared/rebac.ts";
@@ -51,7 +51,7 @@ const composeAuthzBackend = (seedTuples: TupleKey[]): AuthzService => {
     const repository = makeInMemoryTupleRepository({ seed: seedTuples });
     const evaluator  = makeGraphEvaluator({ repository });
     console.log("AuthZ backend: in-process graph evaluator");
-    return composeAuthzDomain({ repository, evaluator });
+    return makeAuthzService({ repository, evaluator });
 };
 
 const composeAuthzService = ({

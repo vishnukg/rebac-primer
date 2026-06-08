@@ -4,7 +4,7 @@ Go ships a testing package in the standard library. No framework required. This
 chapter covers the four patterns that appear in this repo, in order from most
 common to most specialised.
 
-Code references: `go/internal/authz/adapters/graph/evaluator_test.go`, `go/examples/concurrency/parallel_test.go`,
+Code references: `go/internal/authz/evaluator_test.go`, `go/examples/concurrency/parallel_test.go`,
 `go/examples/middleware/middleware_test.go`, `go/examples/generics/result_test.go`.
 
 ## The testing package basics
@@ -38,13 +38,13 @@ go test -v ./internal/authz/...
 Every test in this repo follows the AAA style. The comments are literal:
 
 ```go
-// go/internal/authz/adapters/graph/evaluator_test.go
+// go/internal/authz/evaluator_test.go
 func TestGraphEvaluator_CaseyIsDenied(t *testing.T) {
     // Arrange: Casey has no tuples in the graph.
     ev := newEvaluator()
-    req := shared.CheckRequest{
+    req := rebac.CheckRequest{
         User:     fixtures.Casey,
-        Relation: shared.RelationDocumentCanEdit,
+        Relation: rebac.RelationDocumentCanEdit,
         Object:   fixtures.RoadmapDocument,
     }
 
@@ -90,13 +90,13 @@ the fixture store and evaluator:
 ```go
 // seedStore builds a tuple store from the standard fixture tuples.
 // Optional extra tuples can be appended for specific test cases.
-func seedStore(extra ...shared.TupleKey) *authzdb.InMemoryTupleStore {
+func seedStore(extra ...rebac.TupleKey) *authzdb.InMemoryStore {
     all := append(fixtures.SeedRelationshipTuples(), extra...)
     return authzdb.New(all...)
 }
 
 // newEvaluator wraps seedStore + NewGraphEvaluator into one call.
-func newEvaluator(extra ...shared.TupleKey) *graph.GraphEvaluator {
+func newEvaluator(extra ...rebac.TupleKey) *graph.GraphEvaluator {
     return graph.NewGraphEvaluator(seedStore(extra...))
 }
 ```
@@ -110,30 +110,30 @@ When the same behaviour needs verifying against many inputs, a table-driven test
 is cleaner than N duplicate functions.
 
 ```go
-// go/internal/authz/adapters/graph/evaluator_test.go
+// go/internal/authz/evaluator_test.go
 func TestGraphEvaluator_PermissionMatrix(t *testing.T) {
     ev := newEvaluator()
 
     rows := []struct {
         name     string
-        user     shared.Object
-        relation shared.Relation
+        user     rebac.Object
+        relation rebac.Relation
         want     bool
     }{
         // alice — inherits editor via team → workspace → document
-        {"editor_can_read",    fixtures.Alice, shared.RelationDocumentCanRead,    true},
-        {"editor_can_edit",    fixtures.Alice, shared.RelationDocumentCanEdit,    true},
-        {"editor_cannot_delete", fixtures.Alice, shared.RelationDocumentCanDelete, false},
+        {"editor_can_read",    fixtures.Alice, rebac.RelationDocumentCanRead,    true},
+        {"editor_can_edit",    fixtures.Alice, rebac.RelationDocumentCanEdit,    true},
+        {"editor_cannot_delete", fixtures.Alice, rebac.RelationDocumentCanDelete, false},
         // bob — inherits viewer via workspace → document
-        {"viewer_can_read",    fixtures.Bob,   shared.RelationDocumentCanRead,    true},
-        {"viewer_cannot_edit", fixtures.Bob,   shared.RelationDocumentCanEdit,    false},
+        {"viewer_can_read",    fixtures.Bob,   rebac.RelationDocumentCanRead,    true},
+        {"viewer_cannot_edit", fixtures.Bob,   rebac.RelationDocumentCanEdit,    false},
         // casey — no tuples, no path
-        {"outside_cannot_read", fixtures.Casey, shared.RelationDocumentCanRead,   false},
+        {"outside_cannot_read", fixtures.Casey, rebac.RelationDocumentCanRead,   false},
     }
 
     for _, row := range rows {
         t.Run(row.name, func(t *testing.T) {
-            result, err := ev.Evaluate(context.Background(), shared.CheckRequest{
+            result, err := ev.Evaluate(context.Background(), rebac.CheckRequest{
                 User:     row.user,
                 Relation: row.relation,
                 Object:   fixtures.RoadmapDocument,
@@ -181,13 +181,13 @@ func BenchmarkName(b *testing.B) { ... }
 ```
 
 ```go
-// go/internal/authz/adapters/graph/evaluator_test.go
-// Run with: go test -bench=. -benchtime=5s ./internal/authz/adapters/graph/...
+// go/internal/authz/evaluator_test.go
+// Run with: go test -bench=. -benchtime=5s ./internal/authz/...
 func BenchmarkGraphEvaluator_Evaluate(b *testing.B) {
     ev := newEvaluator()
-    req := shared.CheckRequest{
+    req := rebac.CheckRequest{
         User:     fixtures.Alice,
-        Relation: shared.RelationDocumentCanEdit,
+        Relation: rebac.RelationDocumentCanEdit,
         Object:   fixtures.RoadmapDocument,
     }
     ctx := context.Background()
@@ -205,7 +205,7 @@ stable measurement. `b.ResetTimer()` excludes setup time from the measurement.
 Run benchmarks:
 
 ```bash
-go test -bench=. -benchtime=5s ./internal/authz/adapters/graph/...
+go test -bench=. -benchtime=5s ./internal/authz/...
 ```
 
 Sample output:
@@ -227,8 +227,8 @@ func FuzzName(f *testing.F) { ... }
 ```
 
 ```go
-// go/internal/authz/adapters/graph/evaluator_test.go
-// Run with: go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/authz/adapters/graph/...
+// go/internal/authz/evaluator_test.go
+// Run with: go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/authz/...
 func FuzzParseObject(f *testing.F) {
     // Seed corpus: the fuzzer mutates these inputs.
     f.Add("user:alice")
@@ -238,21 +238,21 @@ func FuzzParseObject(f *testing.F) {
     f.Add("user:")
 
     f.Fuzz(func(t *testing.T, s string) {
-        typ, id, err := shared.ParseObject(s)
+        typ, id, err := rebac.ParseObject(s)
         if err != nil {
             return // invalid input — fine
         }
         // If parsing succeeded, round-tripping must hold.
-        var obj shared.Object
+        var obj rebac.Object
         switch typ {
-        case shared.ObjectTypeUser:
-            obj = shared.User(id)
-        case shared.ObjectTypeTeam:
-            obj = shared.Team(id)
-        case shared.ObjectTypeWorkspace:
-            obj = shared.Workspace(id)
-        case shared.ObjectTypeDocument:
-            obj = shared.Document(id)
+        case rebac.ObjectTypeUser:
+            obj = rebac.User(id)
+        case rebac.ObjectTypeTeam:
+            obj = rebac.Team(id)
+        case rebac.ObjectTypeWorkspace:
+            obj = rebac.Workspace(id)
+        case rebac.ObjectTypeDocument:
+            obj = rebac.Document(id)
         default:
             t.Fatalf("ParseObject returned unrecognised type %q", typ)
         }
@@ -269,7 +269,7 @@ the parsed parts must reproduce the original string.
 Run fuzzing for 30 seconds:
 
 ```bash
-go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/authz/adapters/graph/...
+go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/authz/...
 ```
 
 The fuzzer saves any input that triggers a new code path into
@@ -326,7 +326,7 @@ means every assertion reads as plain Go — no magic matcher syntax to learn.
 **Run the permission matrix with a filter:**
 
 ```bash
-go test -run TestGraphEvaluator_PermissionMatrix/outside ./internal/authz/adapters/graph/...
+go test -run TestGraphEvaluator_PermissionMatrix/outside ./internal/authz/...
 ```
 
 Only the rows matching `outside` run. Add a new row for a direct document owner
@@ -335,7 +335,7 @@ Only the rows matching `outside` run. Add a new row for a direct document owner
 **Run the benchmark, then break it:**
 
 ```bash
-go test -bench=BenchmarkGraphEvaluator_Evaluate -benchtime=3s ./internal/authz/adapters/graph/...
+go test -bench=BenchmarkGraphEvaluator_Evaluate -benchtime=3s ./internal/authz/...
 ```
 
 Note the `ns/op`. Then modify `resolution.hasRelation` (the recursive method in `evaluator.go`) to add a `time.Sleep(1*time.Microsecond)` at the top and run the benchmark again. The number should jump.
@@ -343,7 +343,7 @@ Note the `ns/op`. Then modify `resolution.hasRelation` (the recursive method in 
 **Run the fuzz test:**
 
 ```bash
-go test -fuzz=FuzzParseObject -fuzztime=10s ./internal/authz/adapters/graph/...
+go test -fuzz=FuzzParseObject -fuzztime=10s ./internal/authz/...
 ```
 
 Look at what the fuzzer finds in `testdata/fuzz/FuzzParseObject/`. Add a

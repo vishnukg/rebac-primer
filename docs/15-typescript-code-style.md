@@ -73,7 +73,7 @@ This repo uses simple factories where they improve maintainability:
 Good:
 
 ```ts
-const documents = composeDocuments({ repository, authzClient });
+const documents = makeDocuments({ repository, authzClient });
 ```
 
 Also good:

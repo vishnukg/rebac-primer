@@ -43,10 +43,10 @@ closure. The returned operation is called **once per request** at runtime.
 
 ```ts
 // Startup — called once in compose.ts
-const create = makeCreateDocument({ repository, authzClient });
+const documents = makeDocuments({ repository, authzClient });
 
 // Runtime — called once per HTTP POST /documents
-await create({ id, title, body, workspace, actor });
+await documents.create({ id, title, body, workspace, actor });
 ```
 
 This separates two very different concerns:
@@ -61,7 +61,7 @@ This separates two very different concerns:
 A class mixes construction and operation in the same `this`:
 
 ```ts
-class CreateDocumentService {
+class DocumentsService {
     constructor(
         private repository: DocumentRepository,
         private authzClient: AuthzClient,
@@ -70,17 +70,19 @@ class CreateDocumentService {
     async create(input: CreateDocumentInput) {
         // repository and authzClient accessed via this
     }
+    // read, update — same shape, same `this`
 }
 ```
 
 A factory separates them cleanly:
 
 ```ts
-const makeCreateDocument = ({ repository, authzClient }: CreateDocumentCfg) => {
-    const create: CreateDocumentFn = async input => {
+const makeDocuments = ({ repository, authzClient }: MakeDocumentsCfg): Documents => {
+    const create: Documents["create"] = async input => {
         // repository and authzClient captured in closure — no this
     };
-    return create;
+    // read, update defined the same way, inline
+    return { create, read, update };
 };
 ```
 
@@ -99,7 +101,7 @@ framework, no class instantiation. The factory is just a function call.
 
 ```ts
 // In a test — wire it directly
-const documents = composeDocuments({
+const documents = makeDocuments({
     repository:  makeInMemoryDocumentRepository(),
     authzClient: makeInProcessAuthzClient(seedPolicyTuples()),
 });
@@ -111,9 +113,9 @@ await documents.create({ id, title, body, workspace, actor });
 
 ### Partial application
 
-Calling `makeCreateDocument({ repository, authzClient })` is **partial
-application**: you fix the dependency arguments now so the returned function
-only needs the runtime arguments later.
+Calling `makeDocuments({ repository, authzClient })` is **partial
+application**: you fix the dependency arguments now so the returned operations
+only need the runtime arguments later.
 
 Strict currying (`fn(a)(b)(c)`) is the mathematical version. Partial
 application via a config object is the practical version. This repo uses
@@ -126,7 +128,7 @@ In typed functional languages (Haskell, F#), the formal equivalent is the
 once. Your factory is the same idea without the monad machinery.
 
 ```text
-makeCreateDocument({ repository, authzClient })
+makeDocuments({ repository, authzClient })
   ≈ Reader.ask(env => useEnv(env))
 ```
 
@@ -149,10 +151,10 @@ This repo is that idea applied to TypeScript and ReBAC.
 
 ```ts
 // Good — names visible at the call site
-const create = makeCreateDocument({ repository, authzClient });
+const documents = makeDocuments({ repository, authzClient });
 
 // Bad — positional, caller must read the signature to know order
-const create = makeCreateDocument(repository, authzClient);
+const documents = makeDocuments(repository, authzClient);
 ```
 
 **`make*` functions return one port, with their operations defined inline.**
@@ -162,17 +164,47 @@ it does **not** build those operations from other factories; it defines them
 inline. The return type annotation names the port:
 
 ```ts
-const makeCheck            = ({ evaluator }: ...): AuthzService["check"]  => { ... }
-const makeGraphEvaluator   = ({ repository }: ...): Evaluator            => { ... }
-const makeAuthzHttpHandler = ({ authz }: ...): AuthzHttpHandler          => { ... }
-const makeCreateDocument   = ({ repository, authzClient }: ...): CreateDocumentFn => { ... }
+const makeGraphEvaluator   = ({ repository }: ...): Evaluator      => { ... }
+const makeAuthzHttpHandler = ({ authz }: ...): AuthzHttpHandler    => { ... }
 
-// A multi-method port can still be a make* — as long as its methods are inline:
+// A multi-method port is still a make* — as long as every method is inline.
+// Both domains are exactly this: one factory, one noun, operations as methods.
+const makeAuthzService = ({ repository, evaluator }: ...): AuthzService => {
+    // check / writeTuples / deleteTuples / listTuples defined inline — calls no factory
+    return { check, writeTuples, deleteTuples, listTuples };
+};
+const makeDocuments = ({ repository, authzClient }: ...): Documents => {
+    // create / read / update defined inline — calls no factory
+    return { create, read, update };
+};
 const makeInMemoryTupleRepository = ({ seed }: ...): TupleRepository => {
     // write / delete / findAll defined inline over a private Map — calls no factory
     return { write, delete: del, findAll };
 };
 ```
+
+#### The domain is one module — operations are its methods
+
+`makeAuthzService` defines all four operations (`check`, `writeTuples`,
+`deleteTuples`, `listTuples`) in **one** closure; `makeDocuments` defines its
+three (`create`, `read`, `update`) the same way — rather than a separate `make*`
+factory per operation that a `compose*` then re-bundles. That is deliberate:
+
+- **One factory, one noun.** The domain _is_ the `AuthzService` (or `Documents`).
+  Its operations are verbs that belong to it, so they live inside as methods — not
+  as four standalone nouns that have to be reassembled.
+- **One rule to apply.** "Build the noun; verbs are its methods." There is no
+  second decision about whether each operation gets its own file and factory.
+- **The seam is already there.** When an operation needs more — caching on
+  `check`, paging on `listTuples` — you add it _inside_ the factory; every call
+  site is untouched because they only ever called `authz.check(...)`.
+
+The trade-off is honest: you can no longer build a single operation in isolation
+(a hypothetical `makeCheck(...)`) — you build the whole service and call the one
+method. Tests do exactly that (`const { check } = makeAuthzService(...)`). The alternative — one
+`make*` per operation assembled by a `compose*` — is equally valid; this repo
+chose the single-module form for simplicity, matching `makeRestaurant` in the
+ModulePattern reference repo.
 
 **`compose*` functions build their own collaborators and wire them together.**
 A `compose*` calls `make*` factories (and may select a concrete adapter from the
@@ -180,16 +212,18 @@ environment), then assembles the results. *That* — building your own
 collaborators — is the deciding difference, not the return shape. A `compose*`
 may return either of two shapes:
 
-- **A single named port**, when its only job is to assemble one domain from
-  smaller factories. `composeDocuments` builds `create`/`read`/`update` and
-  returns them as `Documents`:
+- **A single named port**, when its only job is to select an adapter and/or
+  build one port from smaller factories. `composeAuthzBackend` picks the backend
+  from the environment and returns an `AuthzService` either way:
 
   ```ts
-  const composeDocuments = ({ repository, authzClient }: DocumentsCfg): Documents => {
-      const create = makeCreateDocument({ repository, authzClient });
-      const read   = makeReadDocument({ repository, authzClient });
-      const update = makeUpdateDocument({ repository, authzClient });
-      return { create, read, update }; // one named port — but BUILT from make* → compose*
+  const composeAuthzBackend = (seedTuples: TupleKey[]): AuthzService => {
+      if (process.env.AUTHZ_BACKEND === "openfga") {
+          return makeOpenFgaAuthzService({ apiUrl, storeId, modelId });
+      }
+      const repository = makeInMemoryTupleRepository({ seed: seedTuples });
+      const evaluator  = makeGraphEvaluator({ repository });
+      return makeAuthzService({ repository, evaluator }); // one named port — BUILT from make* → compose*
   };
   ```
 
@@ -203,7 +237,7 @@ may return either of two shapes:
       const authzClient   = makeAuthzServiceClient({ baseUrl: authzUrl });
       const authenticator = makeDemoTokenVerifier({ tokens });
       const repository    = makeInMemoryDocumentRepository();
-      const documents     = composeDocuments({ repository, authzClient });
+      const documents     = makeDocuments({ repository, authzClient });
       const handler = makeDocumentsHttpHandler({ authenticator, documents });
       const server  = makeDocumentsHttpServer({ handler });
       // seedDocuments are created inside listen() at startup, so the domain is
@@ -223,30 +257,29 @@ may return either of two shapes:
 > select a concrete adapter) and wire them together?_
 >
 > - **No** — it receives its deps ready-made and returns one port with its
->   operations defined inline → it is a **`make*`** (`makeCheck`,
->   `makeGraphEvaluator`, `makeCreateDocument`, `makeAuthzHttpServer`).
+>   operations defined inline → it is a **`make*`** (`makeAuthzService`,
+>   `makeDocuments`, `makeGraphEvaluator`, `makeAuthzHttpServer`).
 > - **Yes** — it assembles pieces built elsewhere → it is a **`compose*`**
->   (`composeAuthzDomain`, `composeDocuments`, `composeAuthzBackend`,
->   `composeAuthzService`).
+>   (`composeAuthzBackend`, `composeAuthzService`, `composeDocumentsService`,
+>   `composeCliApp`).
 
 The deciding factor is **building your own collaborators**, *not* the return
-type. `makeCheck` defines its one operation inline (a `make*`); `composeAuthzDomain`
-calls `makeCheck` / `makeWriteTuples` / `makeDeleteTuples` / `makeListTuples` and
-bundles them into the `AuthzService` port (a `compose*`) — both concern the same
-domain, but only one builds its parts. This is the same rule the ModulePattern
-reference repo uses to separate `makeRestaurant` (bundles ready-made operations)
-from `composeRestaurant` (builds them).
+type. `makeAuthzService` defines all four operations inline (a `make*`);
+`composeAuthzBackend` selects a backend and calls `makeInMemoryTupleRepository` /
+`makeGraphEvaluator` / `makeAuthzService` (or `makeOpenFgaAuthzService`), handing
+back an `AuthzService` (a `compose*`) — both produce the same port, but only one
+builds its parts. This is the same rule the ModulePattern reference repo uses to
+separate `makeRestaurant` (the domain, operations inline) from `composeServerApp`
+(builds the restaurant, router, and server, then wires them).
 
 #### This repo, function by function
 
 | Function | Kind | Why |
 | --- | --- | --- |
-| `makeCheck`, `makeWriteTuples`, `makeDeleteTuples`, `makeListTuples` | `make*` | one authz operation each, defined inline |
-| `makeCreateDocument`, `makeReadDocument`, `makeUpdateDocument` | `make*` | one documents operation each, defined inline |
+| `makeAuthzService` | `make*` | the authz domain — `check`/`writeTuples`/`deleteTuples`/`listTuples` defined inline |
+| `makeDocuments` | `make*` | the documents domain — `create`/`read`/`update` defined inline |
 | `makeGraphEvaluator`, `makeAuthzHttpHandler`/`Server`, `makeInMemory*`, … | `make*` | define their behaviour inline |
-| `composeAuthzDomain` | `compose*` | calls `makeCheck` / `makeWriteTuples` / `makeDeleteTuples` / `makeListTuples`, bundles into `AuthzService` |
-| `composeDocuments` | `compose*` | calls `makeCreateDocument` / `makeReadDocument` / `makeUpdateDocument`, bundles into `Documents` |
-| `composeAuthzBackend` | `compose*` | selects the backend, calls `makeInMemoryTupleRepository` / `makeGraphEvaluator` / `composeAuthzDomain` (or `makeOpenFgaAuthzService`) |
+| `composeAuthzBackend` | `compose*` | selects the backend, calls `makeInMemoryTupleRepository` / `makeGraphEvaluator` / `makeAuthzService` (or `makeOpenFgaAuthzService`) |
 | `composeAuthzService`, `composeDocumentsService`, `composeCliApp` | `compose*` | call the above + adapters; return only what the entry point drives (`{ listen }`, `{ listen }`, `{ run }`) |
 
 #### A third kind: plain functions
@@ -298,30 +331,31 @@ Explain this in one sentence:
 
 ```ts
 // compose.ts
-const create = makeCreateDocument({ repository, authzClient });
+const documents = makeDocuments({ repository, authzClient });
 
 // HTTP handler
-await create({ id, title, body, workspace, actor });
+await documents.create({ id, title, body, workspace, actor });
 ```
 
-Good answer: `makeCreateDocument` captures the infrastructure dependencies
-once at startup and returns the `create` function directly; `create` is then
-called once per request with only the runtime data it needs. The closure
-separates wiring from execution.
+Good answer: `makeDocuments` captures the infrastructure dependencies once at
+startup and returns the `Documents` port, whose `create`/`read`/`update` methods
+are defined inline in the closure; `documents.create` is then called once per
+request with only the runtime data it needs. The closure separates wiring from
+execution.
 
-Also explain why the file is named `compose.ts` and the function is named
-`composeAuthzService` rather than `makeAuthzService`:
+Also explain why the authz service has **both** a `makeAuthzService` and a
+`composeAuthzService`:
 
-Good answer: `make*` functions define one capability inline and return it —
-they call no other factory. `composeAuthzService` is a `compose*` because it
+Good answer: `makeAuthzService` is a `make*` — the **domain**. It receives its
+ports (`repository`, `evaluator`) ready-made, defines all four operations
+(`check`/`writeTuples`/`deleteTuples`/`listTuples`) inline, and calls no other
+factory. `composeAuthzService` is a `compose*` — the **composition root**. It
 **builds its collaborators by calling other factories** (`composeAuthzBackend`,
-`makeAuthzHttpHandler`, `makeAuthzHttpServer`) and wires them together. That —
-calling other factories — is what makes it a compose, not the shape of what it
-returns (a compose may return one named port, like `composeDocuments` →
-`Documents`, or a single capability, like `composeAuthzService` → `{ listen }`;
-it could return a bag of several peers, but only if the entry point drives them).
-The `compose.ts` file is the composition root — the one place in the codebase
-that knows which concrete adapter goes behind each port.
+which itself builds `makeAuthzService`; `makeAuthzHttpHandler`;
+`makeAuthzHttpServer`) and wires them together, returning only `{ listen }`.
+Calling other factories — not the shape of what it returns — is what makes it a
+compose. The `compose.ts` file is the composition root: the one place in the
+codebase that knows which concrete adapter goes behind each port.
 
 ## Further reading
 

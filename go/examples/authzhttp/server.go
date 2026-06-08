@@ -15,9 +15,6 @@
 //
 // No external router framework is used — Go 1.22+ ServeMux handles
 // method+path patterns like "POST /check" natively.
-//
-// Mirrors typescript/src/authz-service/adapters/http/makeAuthzHttpServer.ts
-// and typescript/src/authz-service/adapters/http/makeAuthzHttpHandler.ts.
 package authzhttp
 
 import (

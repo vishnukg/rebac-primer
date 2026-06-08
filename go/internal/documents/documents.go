@@ -1,68 +1,106 @@
-// Package documents is the documents service's core.
+// Package documents is the document service: it creates, reads, and updates
+// collaborative documents, gating every operation on an authorization check.
 //
-// It defines the [Service] driving port and the driven ports
-// ([DocumentRepository], [AuthzClient], [Authenticator]) that adapters must
-// satisfy.  The concrete implementation lives in [New] — everything else in
-// this package is an interface or a domain type.
-//
-// Hexagonal architecture in one diagram:
-//
-//	                 ┌──────────────────────────────────┐
-//	driving adapters │            documents             │  driven adapters
-//	(HTTP handler)   │                                  │  (db, authn, authz)
-//	     ───────────►│  Service                         │
-//	                 │    Create() ─────────────────────│──►  DocumentRepository
-//	                 │    Read()   ─────────────────────│──►  AuthzClient
-//	                 │    Update() ─────────────────────│──►  Authenticator (HTTP layer)
-//	                 └──────────────────────────────────┘
-//
-// Mirrors typescript/src/documents-service/core/domain/types.ts
-// and typescript/src/documents-service/core/ports/.
+// New builds a Service from the things it needs — a DocumentRepository for
+// persistence and an AuthzClient for permission checks. This package ships an
+// in-memory DocumentRepository (NewInMemoryRepository) and a demo Authenticator
+// (NewDemoTokenVerifier) for the HTTP layer; production swaps either for a real
+// implementation. Callers depend on the Service interface, never the concrete
+// type.
 package documents
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
-// ── Driving port ──────────────────────────────────────────────────────────────
-
-// Service is the driving port — what the HTTP handler and tests depend on.
-// The concrete implementation is returned by [New].
-//
-// Mirrors typescript/src/documents-service/core/domain/types.ts (Documents).
+// Service creates, reads, and updates documents. It is what the HTTP handler and
+// tests call into; New returns the concrete implementation.
 type Service interface {
 	Create(ctx context.Context, input CreateDocumentInput) (*CollaborativeDocument, error)
-	Read(ctx context.Context, id string, actor shared.Object) (*CollaborativeDocument, error)
+	Read(ctx context.Context, id string, actor rebac.Object) (*CollaborativeDocument, error)
 	Update(ctx context.Context, input UpdateDocumentInput) (*CollaborativeDocument, error)
 }
 
-// ── Input types ───────────────────────────────────────────────────────────────
+// CollaborativeDocument is a stored document. It is defined here, alongside the
+// Service, so the repository and the service share one type with no conversion
+// or alias. The JSON tags are the wire format the HTTP layer emits.
+type CollaborativeDocument struct {
+	ID        string       `json:"id"`
+	Title     string       `json:"title"`
+	Body      string       `json:"body"`
+	Workspace rebac.Object `json:"workspace"`
+	UpdatedBy rebac.Object `json:"updatedBy"`
+}
 
 // CreateDocumentInput carries the data needed to create a new document.
 type CreateDocumentInput struct {
 	ID        string
 	Title     string
 	Body      string
-	Workspace shared.Object
-	Actor     shared.Object
+	Workspace rebac.Object
+	Actor     rebac.Object
 }
 
 // UpdateDocumentInput carries the data needed to update an existing document.
 type UpdateDocumentInput struct {
 	ID    string
 	Body  string
-	Actor shared.Object
+	Actor rebac.Object
 }
 
-// ── Domain errors ─────────────────────────────────────────────────────────────
+// DocumentRepository stores documents. NewInMemoryRepository is the default
+// implementation.
+type DocumentRepository interface {
+	Save(ctx context.Context, doc CollaborativeDocument) error
+	FindByID(ctx context.Context, id string) (*CollaborativeDocument, error)
+}
 
-// DocumentNotFoundError is returned when a document ID does not match any
-// stored document.
+// AuthzClient is what the service needs from authorization: check a permission
+// and write the relationship tuples a new document implies.
 //
-// Mirrors typescript/src/documents-service/core/domain/types.ts (DocumentNotFoundError).
+// The in-process authz.Service satisfies this directly (its method set is a
+// superset), and so would an HTTP client to a standalone authz server — the
+// service never knows which.
+type AuthzClient interface {
+	Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
+	WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+}
+
+// AuthenticatedUser is the verified identity returned after a successful token check.
+type AuthenticatedUser struct {
+	Subject rebac.Object // e.g. "user:alice"
+	Scopes  []string     // OAuth scopes granted to this token
+}
+
+// Authenticator establishes caller identity from an Authorization header. The
+// HTTP handler calls it before every request; NewDemoTokenVerifier is the
+// development implementation.
+type Authenticator interface {
+	VerifyAccessToken(authorizationHeader string) (AuthenticatedUser, error)
+}
+
+// AuthenticationError is returned when a token is missing or invalid. The HTTP
+// layer maps it to 401 Unauthorized.
+type AuthenticationError struct {
+	Message string
+}
+
+func (e *AuthenticationError) Error() string { return e.Message }
+
+// IsAuthenticationError reports whether err is, or wraps, an AuthenticationError.
+// It uses errors.As so it still matches through a fmt.Errorf("...: %w", err)
+// wrapper — the same unwrapping the HTTP layer relies on for the other errors.
+func IsAuthenticationError(err error) bool {
+	var authErr *AuthenticationError
+	return errors.As(err, &authErr)
+}
+
+// DocumentNotFoundError is returned when an ID matches no stored document. The
+// HTTP layer maps it to 404 Not Found.
 type DocumentNotFoundError struct {
 	ID string
 }
@@ -71,9 +109,8 @@ func (e *DocumentNotFoundError) Error() string {
 	return fmt.Sprintf("document not found: %s", e.ID)
 }
 
-// ForbiddenError is returned when an actor lacks the required permission.
-//
-// Mirrors typescript/src/documents-service/core/domain/types.ts (ForbiddenError).
+// ForbiddenError is returned when an actor lacks the required permission. The
+// HTTP layer maps it to 403 Forbidden.
 type ForbiddenError struct {
 	Message string
 }

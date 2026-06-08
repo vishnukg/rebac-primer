@@ -15,25 +15,24 @@
 package fixtures
 
 import (
-	"rebac-primer/internal/documents/adapters/authn"
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/documents"
+	"rebac-primer/internal/rebac"
 )
 
 // Named objects — use these in tests instead of raw strings.
 var (
-	Alice = shared.User("alice")
-	Bob   = shared.User("bob")
-	Casey = shared.User("casey")
+	Alice = rebac.User("alice")
+	Bob   = rebac.User("bob")
+	Casey = rebac.User("casey")
 
-	PlatformTeam     = shared.Team("platformTeam")
-	ProductWorkspace = shared.Workspace("productWorkspace")
-	RoadmapDocument  = shared.Document("roadmapDocument")
+	PlatformTeam     = rebac.Team("platformTeam")
+	ProductWorkspace = rebac.Workspace("productWorkspace")
+	RoadmapDocument  = rebac.Document("roadmapDocument")
 )
 
 // DemoTokens maps demo bearer tokens to their claims.
-// Mirrors typescript/src/demo/fixtures.ts demoTokens.
-func DemoTokens() map[string]authn.TokenClaims {
-	return map[string]authn.TokenClaims{
+func DemoTokens() map[string]documents.TokenClaims {
+	return map[string]documents.TokenClaims{
 		"demo-token-alice": {Sub: "alice", Scopes: []string{"documents:read", "documents:write"}},
 		"demo-token-bob":   {Sub: "bob", Scopes: []string{"documents:read"}},
 		"demo-token-casey": {Sub: "casey", Scopes: []string{"documents:read"}},
@@ -41,15 +40,15 @@ func DemoTokens() map[string]authn.TokenClaims {
 }
 
 // SeedRelationshipTuples returns the four base tuples for the demo scenario.
-func SeedRelationshipTuples() []shared.TupleKey {
-	return []shared.TupleKey{
+func SeedRelationshipTuples() []rebac.TupleKey {
+	return []rebac.TupleKey{
 		// Alice is a member of platformTeam
-		shared.Tuple(PlatformTeam, shared.RelationTeamMember, shared.Subject(Alice)),
+		rebac.Tuple(PlatformTeam, rebac.RelationTeamMember, rebac.Subject(Alice)),
 		// platformTeam#member are editors of productWorkspace
-		shared.Tuple(ProductWorkspace, shared.RelationWorkspaceEditor, shared.SubjectSet(PlatformTeam, shared.RelationTeamMember)),
+		rebac.Tuple(ProductWorkspace, rebac.RelationWorkspaceEditor, rebac.SubjectSet(PlatformTeam, rebac.RelationTeamMember)),
 		// Bob is a viewer of productWorkspace
-		shared.Tuple(ProductWorkspace, shared.RelationWorkspaceViewer, shared.Subject(Bob)),
+		rebac.Tuple(ProductWorkspace, rebac.RelationWorkspaceViewer, rebac.Subject(Bob)),
 		// roadmapDocument lives in productWorkspace
-		shared.Tuple(RoadmapDocument, shared.RelationDocumentWorkspace, shared.Subject(ProductWorkspace)),
+		rebac.Tuple(RoadmapDocument, rebac.RelationDocumentWorkspace, rebac.Subject(ProductWorkspace)),
 	}
 }

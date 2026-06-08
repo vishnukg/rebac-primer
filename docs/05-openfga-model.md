@@ -35,7 +35,7 @@ application code can stay boring.
 The model is defined in both implementations — the DSL is identical:
 
 - TypeScript: `typescript/src/authz-service/adapters/graph/permissionModel.ts`
-- Go: `go/internal/authz/adapters/graph/permissionmodel.go`
+- Go: `go/internal/authz/model.go`
 
 Open either one.
 
@@ -371,9 +371,9 @@ define can_archive: archiver
 
 **Go** — mirror the same change:
 
-1. Add `RelationDocumentArchiver` and `RelationDocumentCanArchive` constants to `go/internal/shared/rebac.go`
-2. Add the expansion rule in `expandDocument` in `go/internal/authz/adapters/graph/evaluator.go`
-3. Add a test in `go/internal/authz/adapters/graph/evaluator_test.go` following the AAA pattern
+1. Add `RelationDocumentArchiver` and `RelationDocumentCanArchive` constants to `go/internal/rebac/rebac.go`
+2. Add the expansion rule in `expandDocument` in `go/internal/authz/evaluator.go`
+3. Add a test in `go/internal/authz/evaluator_test.go` following the AAA pattern
 
 This exercise forces the model, the TypeScript vocabulary, and the Go constants to
 stay in sync — which is the real cost of running dual implementations.

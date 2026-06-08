@@ -1,4 +1,4 @@
-// Unit tests for the AuthZ domain service (composeAuthzDomain) in isolation.
+// Unit tests for the AuthZ domain service (makeAuthzService) in isolation.
 // Mirrors the Go suite in internal/authz/authz_test.go.
 //
 // The domain is a thin orchestrator over two driven ports — TupleRepository and
@@ -17,7 +17,7 @@
 // Both kinds implement the same port interface; the difference is what the test
 // asserts on, not the type.
 import { describe, expect, it } from "vitest";
-import composeAuthzDomain from "../src/authz-service/core/domain/composeAuthzDomain.ts";
+import makeAuthzService from "../src/authz-service/core/domain/makeAuthzService.ts";
 import type { TupleFilter, TupleRepository } from "../src/authz-service/core/ports/tupleRepository.ts";
 import type { Evaluator } from "../src/authz-service/core/ports/evaluator.ts";
 import type { CheckRequest, CheckResult, TupleKey } from "../src/shared/rebac.ts";
@@ -92,10 +92,10 @@ const sampleRequest = (): CheckRequest => ({
 
 // ── check ───────────────────────────────────────────────────────────────────
 
-describe("composeAuthzDomain — check", () => {
+describe("makeAuthzService — check", () => {
     it("returns the evaluator's result (state)", async () => {
         // Arrange: a STUB evaluator pinned to an allowed result.
-        const domain = composeAuthzDomain({
+        const domain = makeAuthzService({
             repository: stubRepository(),
             evaluator: stubEvaluator({ allowed: true, trace: ["Result: allowed"] }),
         });
@@ -110,7 +110,7 @@ describe("composeAuthzDomain — check", () => {
     it("propagates an evaluator failure (state)", async () => {
         // Arrange: a STUB evaluator that rejects.
         const error = new Error("evaluator exploded");
-        const domain = composeAuthzDomain({
+        const domain = makeAuthzService({
             repository: stubRepository(),
             evaluator: failingEvaluator(error),
         });
@@ -122,7 +122,7 @@ describe("composeAuthzDomain — check", () => {
     it("delegates the exact request to the evaluator (behaviour)", async () => {
         // Arrange: a MOCK evaluator so we can verify the delegation, not the result.
         const { evaluator, calls } = makeMockEvaluator({ allowed: true, trace: [] });
-        const domain = composeAuthzDomain({ repository: stubRepository(), evaluator });
+        const domain = makeAuthzService({ repository: stubRepository(), evaluator });
         const request = sampleRequest();
 
         // Act
@@ -135,11 +135,11 @@ describe("composeAuthzDomain — check", () => {
 
 // ── writeTuples / deleteTuples ──────────────────────────────────────────────
 
-describe("composeAuthzDomain — writeTuples", () => {
+describe("makeAuthzService — writeTuples", () => {
     it("writes each tuple to the repository in order (behaviour)", async () => {
         // Arrange: a MOCK repository to capture the write interactions.
         const { repository, writes, deletes } = makeMockRepository();
-        const domain = composeAuthzDomain({ repository, evaluator: stubEvaluator({ allowed: false, trace: [] }) });
+        const domain = makeAuthzService({ repository, evaluator: stubEvaluator({ allowed: false, trace: [] }) });
         const tuples: TupleKey[] = [
             tuple(document("d1"), "owner", alice),
             tuple(document("d1"), "workspace", workspace("ws")),
@@ -156,7 +156,7 @@ describe("composeAuthzDomain — writeTuples", () => {
     it("does not touch the repository for an empty list (behaviour)", async () => {
         // Arrange
         const { repository, writes } = makeMockRepository();
-        const domain = composeAuthzDomain({ repository, evaluator: stubEvaluator({ allowed: false, trace: [] }) });
+        const domain = makeAuthzService({ repository, evaluator: stubEvaluator({ allowed: false, trace: [] }) });
 
         // Act
         await domain.writeTuples([]);
@@ -166,11 +166,11 @@ describe("composeAuthzDomain — writeTuples", () => {
     });
 });
 
-describe("composeAuthzDomain — deleteTuples", () => {
+describe("makeAuthzService — deleteTuples", () => {
     it("deletes each tuple from the repository (behaviour)", async () => {
         // Arrange: a MOCK repository to capture the delete interactions.
         const { repository, writes, deletes } = makeMockRepository();
-        const domain = composeAuthzDomain({ repository, evaluator: stubEvaluator({ allowed: false, trace: [] }) });
+        const domain = makeAuthzService({ repository, evaluator: stubEvaluator({ allowed: false, trace: [] }) });
         const t = tuple(document("d1"), "owner", alice);
 
         // Act
@@ -184,11 +184,11 @@ describe("composeAuthzDomain — deleteTuples", () => {
 
 // ── listTuples ──────────────────────────────────────────────────────────────
 
-describe("composeAuthzDomain — listTuples", () => {
+describe("makeAuthzService — listTuples", () => {
     it("returns the repository's tuples (state)", async () => {
         // Arrange: a STUB repository with canned contents.
         const stored: TupleKey[] = [tuple(document("d1"), "owner", alice)];
-        const domain = composeAuthzDomain({
+        const domain = makeAuthzService({
             repository: stubRepository(stored),
             evaluator: stubEvaluator({ allowed: false, trace: [] }),
         });
@@ -203,7 +203,7 @@ describe("composeAuthzDomain — listTuples", () => {
     it("passes the filter through to the repository (behaviour)", async () => {
         // Arrange: a MOCK repository so we can verify the filter is forwarded.
         const { repository, findFilters } = makeMockRepository();
-        const domain = composeAuthzDomain({ repository, evaluator: stubEvaluator({ allowed: false, trace: [] }) });
+        const domain = makeAuthzService({ repository, evaluator: stubEvaluator({ allowed: false, trace: [] }) });
         const filter: TupleFilter = { object: workspace("productWorkspace"), relation: "editor" };
 
         // Act

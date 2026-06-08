@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"rebac-primer/internal/authz"
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // This file unit-tests the authz [authz.Service] returned by [authz.New] in
@@ -31,11 +31,11 @@ import (
 // stubEvaluator is a STUB: it returns a fixed CheckResult/error and records
 // nothing.
 type stubEvaluator struct {
-	result shared.CheckResult
+	result rebac.CheckResult
 	err    error
 }
 
-func (s stubEvaluator) Evaluate(context.Context, shared.CheckRequest) (shared.CheckResult, error) {
+func (s stubEvaluator) Evaluate(context.Context, rebac.CheckRequest) (rebac.CheckResult, error) {
 	return s.result, s.err
 }
 
@@ -43,31 +43,31 @@ func (s stubEvaluator) Evaluate(context.Context, shared.CheckRequest) (shared.Ch
 // whose writes are no-ops. Tests that exercise the evaluator path pass this so
 // the Service has a collaborator without caring how it is used.
 type stubRepository struct {
-	all []shared.TupleKey
+	all []rebac.TupleKey
 }
 
-func (s stubRepository) Has(context.Context, shared.Object, shared.Relation, shared.Subject) (bool, error) {
+func (s stubRepository) Has(context.Context, rebac.Object, rebac.Relation, rebac.Subject) (bool, error) {
 	return false, nil
 }
-func (s stubRepository) FindByObjectRelation(context.Context, shared.Object, shared.Relation) ([]shared.TupleKey, error) {
+func (s stubRepository) FindByObjectRelation(context.Context, rebac.Object, rebac.Relation) ([]rebac.TupleKey, error) {
 	return nil, nil
 }
-func (s stubRepository) FindAll(context.Context, ...authz.TupleFilter) ([]shared.TupleKey, error) {
+func (s stubRepository) FindAll(context.Context, ...authz.TupleFilter) ([]rebac.TupleKey, error) {
 	return s.all, nil
 }
-func (s stubRepository) Write(context.Context, shared.TupleKey) error  { return nil }
-func (s stubRepository) Delete(context.Context, shared.TupleKey) error { return nil }
+func (s stubRepository) Write(context.Context, rebac.TupleKey) error  { return nil }
+func (s stubRepository) Delete(context.Context, rebac.TupleKey) error { return nil }
 
 // ── Mocks (behaviour verification) ──────────────────────────────────────────
 
 // mockEvaluator is a MOCK: it records every request it is asked to evaluate so a
 // test can assert the Service delegated the exact CheckRequest unchanged.
 type mockEvaluator struct {
-	calls  []shared.CheckRequest
-	result shared.CheckResult
+	calls  []rebac.CheckRequest
+	result rebac.CheckResult
 }
 
-func (m *mockEvaluator) Evaluate(_ context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
+func (m *mockEvaluator) Evaluate(_ context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
 	m.calls = append(m.calls, req)
 	return m.result, nil
 }
@@ -76,27 +76,27 @@ func (m *mockEvaluator) Evaluate(_ context.Context, req shared.CheckRequest) (sh
 // the filters passed to FindAll, so tests can verify the Service's interactions
 // with persistence.
 type mockRepository struct {
-	writes      []shared.TupleKey
-	deletes     []shared.TupleKey
+	writes      []rebac.TupleKey
+	deletes     []rebac.TupleKey
 	findFilters [][]authz.TupleFilter
-	findResult  []shared.TupleKey
+	findResult  []rebac.TupleKey
 }
 
-func (m *mockRepository) Has(context.Context, shared.Object, shared.Relation, shared.Subject) (bool, error) {
+func (m *mockRepository) Has(context.Context, rebac.Object, rebac.Relation, rebac.Subject) (bool, error) {
 	return false, nil
 }
-func (m *mockRepository) FindByObjectRelation(context.Context, shared.Object, shared.Relation) ([]shared.TupleKey, error) {
+func (m *mockRepository) FindByObjectRelation(context.Context, rebac.Object, rebac.Relation) ([]rebac.TupleKey, error) {
 	return nil, nil
 }
-func (m *mockRepository) FindAll(_ context.Context, filter ...authz.TupleFilter) ([]shared.TupleKey, error) {
+func (m *mockRepository) FindAll(_ context.Context, filter ...authz.TupleFilter) ([]rebac.TupleKey, error) {
 	m.findFilters = append(m.findFilters, filter)
 	return m.findResult, nil
 }
-func (m *mockRepository) Write(_ context.Context, t shared.TupleKey) error {
+func (m *mockRepository) Write(_ context.Context, t rebac.TupleKey) error {
 	m.writes = append(m.writes, t)
 	return nil
 }
-func (m *mockRepository) Delete(_ context.Context, t shared.TupleKey) error {
+func (m *mockRepository) Delete(_ context.Context, t rebac.TupleKey) error {
 	m.deletes = append(m.deletes, t)
 	return nil
 }
@@ -109,11 +109,11 @@ var (
 	_ authz.TupleRepository = (*mockRepository)(nil)
 )
 
-func sampleRequest() shared.CheckRequest {
-	return shared.CheckRequest{
-		User:     shared.User("alice"),
-		Relation: shared.RelationDocumentCanEdit,
-		Object:   shared.Document("roadmapDocument"),
+func sampleRequest() rebac.CheckRequest {
+	return rebac.CheckRequest{
+		User:     rebac.User("alice"),
+		Relation: rebac.RelationDocumentCanEdit,
+		Object:   rebac.Document("roadmapDocument"),
 	}
 }
 
@@ -121,7 +121,7 @@ func sampleRequest() shared.CheckRequest {
 
 func TestService_GivenEvaluatorAllows_WhenCheck_ThenReturnsEvaluatorResult(t *testing.T) {
 	// Arrange: a STUB evaluator pinned to an allowed result.
-	evaluator := stubEvaluator{result: shared.CheckResult{Allowed: true, Trace: []string{"Result: allowed"}}}
+	evaluator := stubEvaluator{result: rebac.CheckResult{Allowed: true, Trace: []string{"Result: allowed"}}}
 	svc := authz.New(stubRepository{}, evaluator)
 
 	// Act
@@ -152,7 +152,7 @@ func TestService_GivenEvaluatorFails_WhenCheck_ThenPropagatesError(t *testing.T)
 
 func TestService_GivenCheckRequest_WhenCheck_ThenDelegatesExactRequestToEvaluator(t *testing.T) {
 	// Arrange: a MOCK evaluator so we can verify the delegation, not the result.
-	evaluator := &mockEvaluator{result: shared.CheckResult{Allowed: true}}
+	evaluator := &mockEvaluator{result: rebac.CheckResult{Allowed: true}}
 	svc := authz.New(stubRepository{}, evaluator)
 	req := sampleRequest()
 
@@ -176,9 +176,9 @@ func TestService_GivenTuples_WhenWriteTuples_ThenWritesEachToRepositoryInOrder(t
 	// Arrange: a MOCK repository to capture the Write interactions.
 	repo := &mockRepository{}
 	svc := authz.New(repo, stubEvaluator{})
-	tuples := []shared.TupleKey{
-		shared.Tuple(shared.Document("d1"), shared.RelationDocumentOwner, shared.Subject(shared.User("alice"))),
-		shared.Tuple(shared.Document("d1"), shared.RelationDocumentWorkspace, shared.Subject(shared.Workspace("ws"))),
+	tuples := []rebac.TupleKey{
+		rebac.Tuple(rebac.Document("d1"), rebac.RelationDocumentOwner, rebac.Subject(rebac.User("alice"))),
+		rebac.Tuple(rebac.Document("d1"), rebac.RelationDocumentWorkspace, rebac.Subject(rebac.Workspace("ws"))),
 	}
 
 	// Act
@@ -220,8 +220,8 @@ func TestService_GivenTuples_WhenDeleteTuples_ThenDeletesEachFromRepository(t *t
 	// Arrange: a MOCK repository to capture the Delete interactions.
 	repo := &mockRepository{}
 	svc := authz.New(repo, stubEvaluator{})
-	tuples := []shared.TupleKey{
-		shared.Tuple(shared.Document("d1"), shared.RelationDocumentOwner, shared.Subject(shared.User("alice"))),
+	tuples := []rebac.TupleKey{
+		rebac.Tuple(rebac.Document("d1"), rebac.RelationDocumentOwner, rebac.Subject(rebac.User("alice"))),
 	}
 
 	// Act
@@ -242,8 +242,8 @@ func TestService_GivenTuples_WhenDeleteTuples_ThenDeletesEachFromRepository(t *t
 
 func TestService_GivenStoredTuples_WhenListTuples_ThenReturnsRepositoryTuples(t *testing.T) {
 	// Arrange: a STUB repository with canned contents — we assert on the result.
-	stored := []shared.TupleKey{
-		shared.Tuple(shared.Team("platformTeam"), shared.RelationTeamMember, shared.Subject(shared.User("alice"))),
+	stored := []rebac.TupleKey{
+		rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice"))),
 	}
 	svc := authz.New(stubRepository{all: stored}, stubEvaluator{})
 
@@ -263,7 +263,7 @@ func TestService_GivenFilter_WhenListTuples_ThenPassesFilterToRepository(t *test
 	// Arrange: a MOCK repository so we can verify the filter is forwarded.
 	repo := &mockRepository{}
 	svc := authz.New(repo, stubEvaluator{})
-	filter := authz.TupleFilter{Object: shared.Workspace("productWorkspace"), Relation: shared.RelationWorkspaceEditor}
+	filter := authz.TupleFilter{Object: rebac.Workspace("productWorkspace"), Relation: rebac.RelationWorkspaceEditor}
 
 	// Act
 	if _, err := svc.ListTuples(context.Background(), filter); err != nil {
@@ -284,11 +284,11 @@ func TestService_GivenFilter_WhenListTuples_ThenPassesFilterToRepository(t *test
 func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAndWritesNothing(t *testing.T) {
 	// Each case is a tuple that is malformed in exactly one field. The Service must
 	// reject the whole batch with a *TupleValidationError and never call Write.
-	cases := map[string]shared.TupleKey{
-		"object missing type": {Object: "roadmap", Relation: shared.RelationDocumentOwner, User: shared.Subject(shared.User("alice"))},
-		"unknown object type": {Object: "widget:1", Relation: shared.RelationDocumentOwner, User: shared.Subject(shared.User("alice"))},
-		"empty relation":      {Object: shared.Document("d1"), Relation: "", User: shared.Subject(shared.User("alice"))},
-		"user missing type":   {Object: shared.Document("d1"), Relation: shared.RelationDocumentOwner, User: "alice"},
+	cases := map[string]rebac.TupleKey{
+		"object missing type": {Object: "roadmap", Relation: rebac.RelationDocumentOwner, User: rebac.Subject(rebac.User("alice"))},
+		"unknown object type": {Object: "widget:1", Relation: rebac.RelationDocumentOwner, User: rebac.Subject(rebac.User("alice"))},
+		"empty relation":      {Object: rebac.Document("d1"), Relation: "", User: rebac.Subject(rebac.User("alice"))},
+		"user missing type":   {Object: rebac.Document("d1"), Relation: rebac.RelationDocumentOwner, User: "alice"},
 	}
 
 	for name, tk := range cases {
@@ -296,7 +296,7 @@ func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAnd
 			repo := &mockRepository{}
 			svc := authz.New(repo, stubEvaluator{})
 
-			err := svc.WriteTuples(context.Background(), []shared.TupleKey{tk})
+			err := svc.WriteTuples(context.Background(), []rebac.TupleKey{tk})
 
 			var verr *authz.TupleValidationError
 			if !errors.As(err, &verr) {
@@ -314,13 +314,13 @@ func TestService_GivenValidSubjectSetTuple_WhenWriteTuples_ThenSucceeds(t *testi
 	// must pass validation.
 	repo := &mockRepository{}
 	svc := authz.New(repo, stubEvaluator{})
-	tuple := shared.Tuple(
-		shared.Workspace("productWorkspace"),
-		shared.RelationWorkspaceEditor,
-		shared.SubjectSet(shared.Team("platformTeam"), shared.RelationTeamMember),
+	tuple := rebac.Tuple(
+		rebac.Workspace("productWorkspace"),
+		rebac.RelationWorkspaceEditor,
+		rebac.SubjectSet(rebac.Team("platformTeam"), rebac.RelationTeamMember),
 	)
 
-	if err := svc.WriteTuples(context.Background(), []shared.TupleKey{tuple}); err != nil {
+	if err := svc.WriteTuples(context.Background(), []rebac.TupleKey{tuple}); err != nil {
 		t.Fatalf("expected subject-set tuple to be valid, got %v", err)
 	}
 	if len(repo.writes) != 1 {

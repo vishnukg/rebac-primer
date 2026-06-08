@@ -7,7 +7,7 @@ shape, sharing one vocabulary module.
 src/shared/rebac.ts                ReBAC value helpers (objects, relations, tuples, checks)
 
 src/authz-service/                 AuthZ service (port 4100)
-  core/domain/                       AuthzService interface + makeAuthzDomain
+  core/domain/                       AuthzService interface + makeAuthzService
   core/ports/                        TupleRepository, Evaluator
   adapters/db/                       in-memory tuple store
   adapters/graph/                    graph evaluator + permission model

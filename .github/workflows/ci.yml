@@ -5,15 +5,12 @@ on:
     branches: [main]
   pull_request:
 
-# The Node project lives in typescript/ (the repo also has a Go implementation
-# under go/, which this workflow does not cover).
-defaults:
-  run:
-    working-directory: typescript
-
 jobs:
-  ci:
+  typescript:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: typescript
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,3 +23,20 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run audit # make*/compose* naming convention
+
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - run: go build ./...
+      - run: test -z "$(gofmt -l .)" || { echo 'gofmt: files need formatting:'; gofmt -l .; exit 1; }
+      - run: go vet ./...
+      - run: go tool staticcheck ./... # pinned via the tool directive in go.mod
+      - run: go test ./...

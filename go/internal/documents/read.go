@@ -3,7 +3,7 @@ package documents
 import (
 	"context"
 
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // Read returns a document if the actor has can_read access.
@@ -17,9 +17,7 @@ import (
 // learning — but high-security systems return 404 for both cases so the two are
 // indistinguishable (check authorization first, then map a denial to not-found).
 // See docs/40-production-readiness.md (Gap 13).
-//
-// Mirrors typescript/src/documents-service/core/domain/makeReadDocument.ts.
-func (s *documentService) Read(ctx context.Context, id string, actor shared.Object) (*CollaborativeDocument, error) {
+func (s *documentService) Read(ctx context.Context, id string, actor rebac.Object) (*CollaborativeDocument, error) {
 	doc, err := s.requireDocument(ctx, id)
 	if err != nil {
 		return nil, err
@@ -27,8 +25,8 @@ func (s *documentService) Read(ctx context.Context, id string, actor shared.Obje
 
 	if err := s.requireAllowed(ctx,
 		actor,
-		shared.RelationDocumentCanRead,
-		shared.Document(id),
+		rebac.RelationDocumentCanRead,
+		rebac.Document(id),
 		"read",
 	); err != nil {
 		return nil, err

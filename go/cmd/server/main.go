@@ -21,15 +21,11 @@ import (
 	"os"
 	"strconv"
 
+	"rebac-primer/internal/api"
 	"rebac-primer/internal/authz"
-	authzdb "rebac-primer/internal/authz/adapters/db"
-	"rebac-primer/internal/authz/adapters/graph"
-	authzopenfga "rebac-primer/internal/authz/adapters/openfga"
 	"rebac-primer/internal/documents"
-	docsauthn "rebac-primer/internal/documents/adapters/authn"
-	docsdb "rebac-primer/internal/documents/adapters/db"
-	docshttp "rebac-primer/internal/documents/adapters/http"
 	"rebac-primer/internal/fixtures"
+	"rebac-primer/internal/openfga"
 )
 
 func main() {
@@ -82,8 +78,8 @@ func buildHandler(ctx context.Context) (http.Handler, error) {
 	}
 
 	// ── Documents service ──────────────────────────────────────────────────────
-	docRepo := docsdb.New()
-	tokenVerifier := docsauthn.New(fixtures.DemoTokens())
+	docRepo := documents.NewInMemoryRepository()
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
 	docsSvc := documents.New(docRepo, authzSvc)
 
 	// Seed demo document so GET /documents/roadmapDocument works out of the box.
@@ -100,7 +96,7 @@ func buildHandler(ctx context.Context) (http.Handler, error) {
 	}
 
 	// ── HTTP layer ─────────────────────────────────────────────────────────────
-	return docshttp.NewServer(tokenVerifier, docsSvc), nil
+	return api.NewServer(tokenVerifier, docsSvc), nil
 }
 
 // buildAuthzService selects the authorization backend from the environment:
@@ -113,7 +109,7 @@ func buildHandler(ctx context.Context) (http.Handler, error) {
 // Both return an authz.Service, so nothing downstream changes between backends.
 func buildAuthzService() (authz.Service, error) {
 	if os.Getenv("AUTHZ_BACKEND") == "openfga" {
-		cfg := authzopenfga.Config{
+		cfg := openfga.Config{
 			APIURL:  envOr("OPENFGA_API_URL", "http://127.0.0.1:8080"),
 			StoreID: os.Getenv("OPENFGA_STORE_ID"),
 			ModelID: os.Getenv("OPENFGA_MODEL_ID"),
@@ -121,7 +117,7 @@ func buildAuthzService() (authz.Service, error) {
 		if cfg.StoreID == "" || cfg.ModelID == "" {
 			return nil, fmt.Errorf("AUTHZ_BACKEND=openfga requires OPENFGA_STORE_ID and OPENFGA_MODEL_ID (run deployments/openfga/seed.sh)")
 		}
-		svc, err := authzopenfga.New(cfg)
+		svc, err := openfga.New(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("openfga backend: %w", err)
 		}
@@ -129,8 +125,8 @@ func buildAuthzService() (authz.Service, error) {
 		return svc, nil
 	}
 
-	tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
-	authzSvc := authz.New(tupleStore, graph.NewGraphEvaluator(tupleStore))
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	log.Printf("authz backend: in-process graph evaluator")
 	return authzSvc, nil
 }

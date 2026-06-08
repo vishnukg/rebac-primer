@@ -20,7 +20,7 @@ requires, it satisfies the interface — automatically, silently, and for free:
 ```go
 // AuditEvaluator has an Evaluate method with the right signature.
 // It satisfies the Checker interface without any declaration.
-func (a *AuditEvaluator) Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error) { ... }
+func (a *AuditEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) { ... }
 ```
 
 This is implicit interface satisfaction, and it matters:
@@ -74,7 +74,7 @@ type AuditEvaluator struct {
     logger *log.Logger
 }
 
-func (a *AuditEvaluator) Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
+func (a *AuditEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
     start := time.Now()
     result, err := a.inner.Evaluate(ctx, req)
     // ... log outcome ...
@@ -120,13 +120,13 @@ that separates read and write capabilities:
 ```go
 // Conceptual split — illustrates interface composition
 type TupleReader interface {
-    Has(ctx context.Context, object shared.Object, relation shared.Relation, user shared.Subject) (bool, error)
-    FindByObjectRelation(ctx context.Context, object shared.Object, relation shared.Relation) ([]shared.TupleKey, error)
+    Has(ctx context.Context, object rebac.Object, relation rebac.Relation, user rebac.Subject) (bool, error)
+    FindByObjectRelation(ctx context.Context, object rebac.Object, relation rebac.Relation) ([]rebac.TupleKey, error)
 }
 
 type TupleWriter interface {
-    Write(ctx context.Context, tuple shared.TupleKey) error
-    Delete(ctx context.Context, tuple shared.TupleKey) error
+    Write(ctx context.Context, tuple rebac.TupleKey) error
+    Delete(ctx context.Context, tuple rebac.TupleKey) error
 }
 
 // TupleRepository composes both — satisfying either interface is enough for code
@@ -138,7 +138,7 @@ type TupleRepository interface {
 }
 ```
 
-In this repo `authz.TupleRepository` (`go/internal/authz/ports.go`) is the
+In this repo `authz.TupleRepository` (`go/internal/authz/authz.go`) is the
 single combined interface. Any code that only needs reads can accept a narrower
 interface — splitting is a refactor you can make without changing any caller that
 already passes a full `TupleRepository`.

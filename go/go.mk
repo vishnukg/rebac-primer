@@ -6,7 +6,7 @@
 #   GO_APP    docker compose invocation for the Go app profile
 # Every recipe runs from the repo root, so relative paths (deployments/...) work.
 
-.PHONY: go/build go/test go/vet go/check go/shell \
+.PHONY: go/build go/test go/vet go/lint go/check go/shell \
         go/server go/server-down go/server-openfga go/help
 
 go/build:
@@ -18,8 +18,13 @@ go/test:
 go/vet:
 	$(GO_TOOLS) go vet ./...
 
+# staticcheck is pinned as a module tool dependency (the `tool` directive in
+# go.mod), so `go tool staticcheck` builds it from the module — no global install.
+go/lint:
+	$(GO_TOOLS) go tool staticcheck ./...
+
 go/check:
-	$(GO_TOOLS) sh -c 'go vet ./... && go test ./...'
+	$(GO_TOOLS) sh -c 'go vet ./... && go tool staticcheck ./... && go test ./...'
 
 go/shell:
 	$(GO_TOOLS) sh
@@ -43,6 +48,7 @@ go/help:
 	@printf '%s\n' '  make go/build       Compile Go binaries'
 	@printf '%s\n' '  make go/test        Run Go tests'
 	@printf '%s\n' '  make go/vet         Run go vet'
-	@printf '%s\n' '  make go/check       Vet and test'
+	@printf '%s\n' '  make go/lint        Run staticcheck (go tool)'
+	@printf '%s\n' '  make go/check       Vet, staticcheck, and test'
 	@printf '%s\n' '  make go/shell       Open shell in the Go tools container'
 	@printf '%s\n' '  make go/server      Run the Go app on http://127.0.0.1:4001'

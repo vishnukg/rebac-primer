@@ -1,51 +1,78 @@
-// Package authz is the authz service's core.
+// Package authz is the in-process authorization service.
 //
-// It defines the [Service] driving port and the driven ports ([TupleRepository],
-// [Evaluator]) that adapters must satisfy.  The concrete implementation lives in
-// [New] — everything else in this package is an interface or a domain type.
+// It answers permission checks ("does user U have relation R on object O?") by
+// walking a graph of relationship tuples, and it stores those tuples. The public
+// surface is small:
 //
-// Hexagonal architecture in one diagram:
+//	Service          — what callers use: Check / WriteTuples / DeleteTuples / ListTuples.
+//	New              — builds a Service from a TupleRepository and an Evaluator.
+//	NewInMemoryStore — a TupleRepository backed by a map (the default store).
+//	NewGraphEvaluator — an Evaluator that walks the tuple graph (the default strategy).
 //
-//	                 ┌──────────────────────────────┐
-//	driving adapters │           authz              │  driven adapters
-//	(HTTP handler)   │                              │  (db, graph, openfga)
-//	     ───────────►│  Service                     │
-//	                 │    Check()                   │──►  Evaluator
-//	                 │    WriteTuples()             │
-//	                 │    DeleteTuples()            │──►  TupleRepository
-//	                 │    ListTuples()              │
-//	                 └──────────────────────────────┘
-//
-// Mirrors typescript/src/authz-service/core/domain/types.ts
-// and typescript/src/authz-service/core/ports/.
+// Callers depend on the Service interface, never the concrete type. The store and
+// the evaluation strategy are themselves interfaces, so either can be swapped: the
+// openfga package, for instance, implements Service directly against a remote
+// OpenFGA server.
 package authz
 
 import (
 	"context"
 	"fmt"
 
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
-// ── Driving port ──────────────────────────────────────────────────────────────
-
-// Service is the driving port — what HTTP handlers, tests, and other services
-// call into.  The concrete implementation is returned by [New].
-//
-// Mirrors typescript/src/authz-service/core/domain/types.ts (AuthzService).
+// Service answers authorization questions and manages the tuples behind them.
+// It is what HTTP handlers, tests, and other services call into; New returns the
+// default in-process implementation.
 type Service interface {
-	Check(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error)
-	WriteTuples(ctx context.Context, tuples []shared.TupleKey) error
-	DeleteTuples(ctx context.Context, tuples []shared.TupleKey) error
-	ListTuples(ctx context.Context, filter ...TupleFilter) ([]shared.TupleKey, error)
+	Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
+	WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+	DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+	ListTuples(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error)
 }
 
-// ── Domain errors ─────────────────────────────────────────────────────────────
+// TupleRepository stores relationship tuples. The evaluator reads from it; the
+// service's write operations mutate it.
+//
+// Every method takes a context.Context and returns an error. The in-memory store
+// never actually fails, but a real backend (Postgres, a network store) can time
+// out, drop its connection, or be cancelled mid-query — so the contract carries
+// ctx and error from the start, and swapping backends stays a wiring change
+// rather than an interface change.
+type TupleRepository interface {
+	// Has reports whether the exact (object, relation, user) tuple exists.
+	Has(ctx context.Context, object rebac.Object, relation rebac.Relation, user rebac.Subject) (bool, error)
+
+	// FindByObjectRelation returns all tuples matching (object, relation).
+	// Used during graph traversal.
+	FindByObjectRelation(ctx context.Context, object rebac.Object, relation rebac.Relation) ([]rebac.TupleKey, error)
+
+	// FindAll returns all stored tuples, optionally filtered.
+	FindAll(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error)
+
+	// Write adds a tuple (idempotent).
+	Write(ctx context.Context, tuple rebac.TupleKey) error
+
+	// Delete removes a tuple. No-op if it does not exist.
+	Delete(ctx context.Context, tuple rebac.TupleKey) error
+}
+
+// TupleFilter narrows FindAll results. Zero-value fields mean "match any".
+type TupleFilter struct {
+	Object   rebac.Object
+	Relation rebac.Relation
+}
+
+// Evaluator decides a single permission check. The service delegates Check to it,
+// which lets the evaluation strategy vary (the in-process graph walk here, or a
+// remote engine) without touching the service.
+type Evaluator interface {
+	Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
+}
 
 // TupleValidationError signals that a tuple contains semantically invalid data.
-// The HTTP adapter maps this to 422 Unprocessable Entity.
-//
-// Mirrors typescript/src/authz-service/core/domain/types.ts (TupleValidationError).
+// The HTTP layer maps this to 422 Unprocessable Entity.
 type TupleValidationError struct {
 	Message string
 }

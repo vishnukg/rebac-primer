@@ -41,13 +41,13 @@ domain and the authz engine. They talk through an interface, not a network:
  │  HTTP (documents)        documents domain            authz core         │
  │  ┌───────────────┐       ┌────────────────┐         ┌───────────────┐   │
  │  │ handler.go    │──────►│ read.go         │────────►│ authz.Service │   │
- │  │ (ServeMux)    │       │ domain.go       │ Check() │ (domain.go)   │   │
+ │  │ (ServeMux)    │       │ service.go       │ Check() │ (service.go)   │   │
  │  └──────┬────────┘       └────────────────┘   ▲     └──────┬────────┘   │
  │         │ authn                                │            │ Evaluate() │
  │         ▼                                 AuthzClient        ▼           │
  │  ┌───────────────┐                       (interface)  ┌───────────────┐ │
  │  │ authn/        │                                     │ graph/        │ │
- │  │ verifier.go   │                                     │ evaluator.go  │ │
+ │  │ token.go   │                                     │ evaluator.go  │ │
  │  └───────────────┘                                     └──────┬────────┘ │
  │                                                               │ reads     │
  │                                                        ┌──────▼────────┐ │
@@ -89,7 +89,7 @@ The last line is the whole trick: `authzSvc` is an `authz.Service`, which has
 `documents.AuthzClient` automatically — no adapter, no declaration. So the
 documents domain calls the authz engine **directly**.
 
-### 1. HTTP routing — `documents/adapters/http/server.go`
+### 1. HTTP routing — `api/server.go`
 
 `NewServer` registers the route on a Go 1.22 `ServeMux`:
 
@@ -99,7 +99,7 @@ mux.HandleFunc("GET /documents/{id}", h.handleGetDocument)
 
 The mux matches `GET /documents/roadmapDocument` and calls `handleGetDocument`.
 
-### 2. Authn + dispatch — `documents/adapters/http/handler.go`
+### 2. Authn + dispatch — `api/handler.go`
 
 ```go
 func (h *handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +114,7 @@ func (h *handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-### 3. Authn — `documents/adapters/authn/verifier.go`
+### 3. Authn — `documents/token.go`
 
 `VerifyAccessToken` strips `Bearer `, looks the token up in the demo map, and
 returns `AuthenticatedUser{Subject: "user:bob"}`. (In production this verifies a
@@ -128,8 +128,8 @@ func (s *documentService) Read(ctx, id, actor) (*CollaborativeDocument, error) {
     doc, err := s.requireDocument(ctx, id)        // exists? else DocumentNotFoundError (404)
     if err != nil { return nil, err }
 
-    if err := s.requireAllowed(ctx, actor, shared.RelationDocumentCanRead,
-        shared.Document(id), "read"); err != nil {   // ── step 5
+    if err := s.requireAllowed(ctx, actor, rebac.RelationDocumentCanRead,
+        rebac.Document(id), "read"); err != nil {   // ── step 5
         return nil, err
     }
     return doc, nil
@@ -139,11 +139,11 @@ func (s *documentService) Read(ctx, id, actor) (*CollaborativeDocument, error) {
 Note the order: **existence is checked before authorization**, so a missing
 document returns 404 (not found), not 403 (forbidden).
 
-### 5. The authorization boundary — `documents/domain.go`
+### 5. The authorization boundary — `documents/service.go`
 
 ```go
 func (s *documentService) requireAllowed(ctx, actor, relation, object, action) error {
-    result, err := s.authzClient.Check(ctx, shared.CheckRequest{
+    result, err := s.authzClient.Check(ctx, rebac.CheckRequest{
         User: actor, Relation: relation, Object: object,
     })
     if err != nil { return err }
@@ -157,10 +157,10 @@ func (s *documentService) requireAllowed(ctx, actor, relation, object, action) e
 `s.authzClient` is the interface. The call `s.authzClient.Check(...)` lands on
 `authz.Service.Check` **in the same process** — an ordinary method call.
 
-### 6. Authz core — `authz/domain.go`
+### 6. Authz core — `authz/service.go`
 
 ```go
-func (d *authzDomain) Check(ctx, req) (shared.CheckResult, error) {
+func (d *authzService) Check(ctx, req) (rebac.CheckResult, error) {
     return d.evaluator.Evaluate(ctx, req)   // delegates to the Evaluator port
 }
 ```
@@ -169,14 +169,14 @@ The authz core does no graph work itself; it delegates to whatever `Evaluator`
 was wired in (the graph evaluator today; an OpenFGA client tomorrow — see
 `docs/26-openfga-migration.md`).
 
-### 7. Graph traversal — `authz/adapters/graph/evaluator.go`
+### 7. Graph traversal — `authz/evaluator.go`
 
 `Evaluate` runs the recursive `hasRelation` search:
 `can_read → viewer → (workspace inheritance) → workspace:productWorkspace viewer
 → Bob is a direct viewer → allowed`. It returns:
 
 ```go
-shared.CheckResult{Allowed: true, Trace: [...]}
+rebac.CheckResult{Allowed: true, Trace: [...]}
 ```
 
 For the line-by-line recursion (and the trace lines it produces), read
@@ -187,10 +187,10 @@ For the line-by-line recursion (and the trace lines it produces), read
 
 ```text
 evaluator.Evaluate → {Allowed:true}      (graph/evaluator.go)
-  authzDomain.Check returns it           (authz/domain.go)
-    requireAllowed sees Allowed → nil err (documents/domain.go)
+  authzService.Check returns it           (authz/service.go)
+    requireAllowed sees Allowed → nil err (documents/service.go)
       Read returns the document           (documents/read.go)
-        handler writes 200 + JSON         (documents/adapters/http/handler.go)
+        handler writes 200 + JSON         (api/handler.go)
 ```
 
 ### 9. … and becomes an HTTP status
@@ -206,7 +206,7 @@ For `PATCH /documents/roadmapDocument` as Bob, step 4 is `Update` (in
 *viewer*, so the graph returns `Allowed: false`. Then:
 
 ```go
-// documents/domain.go
+// documents/service.go
 if !result.Allowed {
     return &ForbiddenError{Message: "user:bob cannot edit document:roadmapDocument"}
 }
@@ -216,7 +216,7 @@ That error travels back up to the HTTP handler, where `writeError` maps the
 domain error to a status code:
 
 ```go
-// documents/adapters/http/handler.go
+// api/handler.go
 var forbidden *documents.ForbiddenError
 if errors.As(err, &forbidden) {
     writeJSON(w, http.StatusForbidden, errorBody(err.Error()))   // 403
@@ -241,13 +241,13 @@ mapping in `writeError`:
 
 | Layer | File | Responsibility | Calls next |
 |---|---|---|---|
-| HTTP in | `documents/adapters/http/handler.go` | parse request, map errors→status | authn, then domain |
-| Authn | `documents/adapters/authn/verifier.go` | token → identity | (returns) |
+| HTTP in | `api/handler.go` | parse request, map errors→status | authn, then domain |
+| Authn | `documents/token.go` | token → identity | (returns) |
 | Use case | `documents/read.go` / `update.go` | orchestrate: exists? allowed? | `requireAllowed` |
-| Domain boundary | `documents/domain.go` | call authz, raise `ForbiddenError` | `authzClient.Check` |
-| Authz core | `authz/domain.go` | delegate to evaluator | `evaluator.Evaluate` |
-| Evaluator | `authz/adapters/graph/evaluator.go` | traverse the tuple graph | `store` reads |
-| Store | `authz/adapters/db/store.go` | hold tuples | (returns) |
+| Domain boundary | `documents/service.go` | call authz, raise `ForbiddenError` | `authzClient.Check` |
+| Authz core | `authz/service.go` | delegate to evaluator | `evaluator.Evaluate` |
+| Evaluator | `authz/evaluator.go` | traverse the tuple graph | `store` reads |
+| Store | `authz/store.go` | hold tuples | (returns) |
 
 ---
 
@@ -271,7 +271,7 @@ and a network call.
 1. Start the server: `make go/server` (listens on 4001).
 2. Read as Bob (allowed): `curl :4001/documents/roadmapDocument -H "Authorization: Bearer demo-token-bob"` → 200.
 3. Edit as Bob (denied): `curl -X PATCH :4001/documents/roadmapDocument -H "Authorization: Bearer demo-token-bob" -H "content-type: application/json" -d '{"body":"x"}'` → 403.
-4. Open `documents/domain.go` and add a `log.Printf` inside `requireAllowed` printing the `CheckRequest`. Re-run both curls and watch the relation change from `can_read` to `can_edit`.
+4. Open `documents/service.go` and add a `log.Printf` inside `requireAllowed` printing the `CheckRequest`. Re-run both curls and watch the relation change from `can_read` to `can_edit`.
 
 ## Checkpoint
 
@@ -282,8 +282,8 @@ and a network call.
    you swapped the order?
 
 Good answers:
-1. `documents/adapters/http/handler.go` (`writeError`) maps it to 403; the
-   decision was made in `documents/domain.go` (`requireAllowed` returning
+1. `api/handler.go` (`writeError`) maps it to 403; the
+   decision was made in `documents/service.go` (`requireAllowed` returning
    `ForbiddenError` after the authz check came back `Allowed: false`).
 2. `authz.Service` has `Check` and `WriteTuples` (among others), which is a
    superset of `AuthzClient`'s methods. Go interface satisfaction is structural,

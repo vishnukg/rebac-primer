@@ -80,7 +80,7 @@ its own domain to seed with — see Alternatives.
   `seedDocuments`), consumed by the entry points and re-used by tests — so the
   demo and the tests stay in sync.
 - Tests/integration that need the domain build it **directly** via the shared
-  domain composer (`composeDocuments`) or the relevant `make*` factories — they
+  domain factory (`makeDocuments`) or the relevant `make*` factories — they
   never reach into a service root. This is what made the exposed domain
   redundant in the first place.
 - Trade-off accepted: `listen()` now performs a startup domain op (seeding).
@@ -92,7 +92,7 @@ its own domain to seed with — see Alternatives.
 1. **Keep `{ listen, documents }` and seed in `index.ts`.** Rejected: re-exposes
    the domain and is asymmetric with authz. The same "return only what's driven"
    rule we apply everywhere else would flag it.
-2. **Let `index.ts` compose its own `documents` (via `composeDocuments`) to
+2. **Let `index.ts` build its own `documents` (via `makeDocuments`) to
    seed.** Rejected: that builds a *second* domain over a *different* in-memory
    repository, so the seed would never reach the store the server actually
    serves. The seed must use the same instance the server uses.

@@ -69,7 +69,6 @@ func Map[T, U any](r Result[T], f func(T) U) Result[U] {
 
 // Collect gathers a slice of Results into a single Result containing a slice.
 // The first failure short-circuits and is returned as the overall failure.
-// This is the Go equivalent of Promise.all in TypeScript.
 func Collect[T any](results []Result[T]) Result[[]T] {
 	out := make([]T, 0, len(results))
 	for _, r := range results {

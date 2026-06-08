@@ -323,7 +323,7 @@ In Go the same idea uses named types — a `string` that the compiler treats as 
 distinct type:
 
 ```go
-// go/internal/shared/rebac.go
+// go/internal/rebac/rebac.go
 type Object string  // "type:id" — e.g. "workspace:productWorkspace"
 ```
 
@@ -630,7 +630,7 @@ make go/test
 # or: go test -v ./internal/authz/...
 ```
 
-Open `go/internal/authz/adapters/graph/evaluator_test.go` and change the fixture similarly. Predict
+Open `go/internal/authz/evaluator_test.go` and change the fixture similarly. Predict
 the new result before running the test again.
 
 For both implementations: predict the new result before running anything.

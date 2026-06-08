@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"rebac-primer/internal/authz"
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // Checker is a type alias for [authz.Evaluator] — see the concurrency example
@@ -41,7 +41,7 @@ func NewAuditEvaluator(inner Checker, w io.Writer) *AuditEvaluator {
 // Evaluate delegates to the inner Checker and then logs the outcome.
 // AuditEvaluator satisfies the Checker interface, so it can be dropped in
 // anywhere a Checker is expected without changing call sites.
-func (a *AuditEvaluator) Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
+func (a *AuditEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
 	start := time.Now()
 	result, err := a.inner.Evaluate(ctx, req)
 	elapsed := time.Since(start)

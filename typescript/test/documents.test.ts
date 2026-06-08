@@ -3,14 +3,14 @@
 // that runs the real graph evaluator in-process instead of making HTTP calls.
 // See test/documentsService.test.ts for HTTP-level integration tests.
 import { describe, expect, it } from "vitest";
-import composeDocuments from "../src/documents-service/core/domain/composeDocuments.ts";
+import makeDocuments from "../src/documents-service/core/domain/makeDocuments.ts";
 import makeInMemoryDocumentRepository from
     "../src/documents-service/adapters/db/makeInMemoryDocumentRepository.ts";
 import { document } from "../src/shared/rebac.ts";
 import { alice, bob, productWorkspace, seedPolicyTuples, composeInProcessAuthzClient } from "./fixtures.ts";
 
 const composeService = () =>
-    composeDocuments({
+    makeDocuments({
         repository:  makeInMemoryDocumentRepository(),
         authzClient: composeInProcessAuthzClient(seedPolicyTuples()),
     });
@@ -45,7 +45,7 @@ describe("documents domain — create", () => {
     it("makes the creator the document owner (grants can_delete)", async () => {
         // Arrange: share the authz stub so we can inspect the tuples create writes.
         const authzClient = composeInProcessAuthzClient(seedPolicyTuples());
-        const documents = composeDocuments({
+        const documents = makeDocuments({
             repository: makeInMemoryDocumentRepository(),
             authzClient,
         });

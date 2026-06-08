@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"rebac-primer/internal/authz"
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // handler holds the authz service.
@@ -40,10 +40,10 @@ func (h *handler) handleCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.authz.Check(r.Context(), shared.CheckRequest{
-		User:     shared.Object(body.User),
-		Relation: shared.Relation(body.Relation),
-		Object:   shared.Object(body.Object),
+	result, err := h.authz.Check(r.Context(), rebac.CheckRequest{
+		User:     rebac.Object(body.User),
+		Relation: rebac.Relation(body.Relation),
+		Object:   rebac.Object(body.Object),
 	})
 	if err != nil {
 		h.writeError(w, err)
@@ -98,8 +98,8 @@ func (h *handler) handleListTuples(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	// Empty strings in TupleFilter are treated as "match any" by FindAll.
 	filter := authz.TupleFilter{
-		Object:   shared.Object(q.Get("object")),
-		Relation: shared.Relation(q.Get("relation")),
+		Object:   rebac.Object(q.Get("object")),
+		Relation: rebac.Relation(q.Get("relation")),
 	}
 
 	tuples, err := h.authz.ListTuples(r.Context(), filter)
@@ -128,7 +128,7 @@ func (h *handler) writeError(w http.ResponseWriter, err error) {
 }
 
 // parseTupleBody reads a JSON body of shape { "tuples": [{object,relation,user}] }.
-func parseTupleBody(r *http.Request) ([]shared.TupleKey, error) {
+func parseTupleBody(r *http.Request) ([]rebac.TupleKey, error) {
 	var body struct {
 		Tuples []struct {
 			Object   string `json:"object"`
@@ -140,15 +140,15 @@ func parseTupleBody(r *http.Request) ([]shared.TupleKey, error) {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
 
-	out := make([]shared.TupleKey, 0, len(body.Tuples))
+	out := make([]rebac.TupleKey, 0, len(body.Tuples))
 	for i, t := range body.Tuples {
 		if t.Object == "" || t.Relation == "" || t.User == "" {
 			return nil, fmt.Errorf("tuples[%d]: object, relation, and user are required", i)
 		}
-		out = append(out, shared.TupleKey{
-			Object:   shared.Object(t.Object),
-			Relation: shared.Relation(t.Relation),
-			User:     shared.Subject(t.User),
+		out = append(out, rebac.TupleKey{
+			Object:   rebac.Object(t.Object),
+			Relation: rebac.Relation(t.Relation),
+			User:     rebac.Subject(t.User),
 		})
 	}
 	return out, nil

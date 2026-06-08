@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import type { AddressInfo } from "node:net";
 import makeInMemoryTupleRepository from "../src/authz-service/adapters/db/makeInMemoryTupleRepository.ts";
 import makeGraphEvaluator from "../src/authz-service/adapters/graph/makeGraphEvaluator.ts";
-import composeAuthzDomain from "../src/authz-service/core/domain/composeAuthzDomain.ts";
+import makeAuthzService from "../src/authz-service/core/domain/makeAuthzService.ts";
 import makeAuthzHttpHandler from "../src/authz-service/adapters/http/makeAuthzHttpHandler.ts";
 import makeAuthzHttpServer from "../src/authz-service/adapters/http/makeAuthzHttpServer.ts";
 import { alice, productWorkspace, seedPolicyTuples } from "../src/demo/fixtures.ts";
@@ -17,7 +17,7 @@ import { alice, productWorkspace, seedPolicyTuples } from "../src/demo/fixtures.
 const startTestServer = async (): Promise<{ baseUrl: string } & AsyncDisposable> => {
     const repository = makeInMemoryTupleRepository({ seed: seedPolicyTuples() });
     const evaluator  = makeGraphEvaluator({ repository });
-    const domain     = composeAuthzDomain({ repository, evaluator });
+    const domain     = makeAuthzService({ repository, evaluator });
     const handler    = makeAuthzHttpHandler({ authz: domain });
     const server     = makeAuthzHttpServer({ handler });
 

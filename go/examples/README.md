@@ -8,7 +8,7 @@ Keep this split in your head:
 
 | You want to learn… | Read… |
 |--------------------|-------|
-| How ReBAC actually works | `internal/` (start at `internal/authz/adapters/graph/evaluator.go`) |
+| How ReBAC actually works | `internal/` (start at `internal/authz/evaluator.go`) |
 | A Go language feature | `examples/` (this folder) |
 
 ## What's here

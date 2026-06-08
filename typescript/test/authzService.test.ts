@@ -2,7 +2,7 @@
 // Exercises POST /check, POST /tuples, DELETE /tuples, GET /tuples end-to-end
 // through the handler — no HTTP server started, but full domain + adapter stack.
 import { describe, expect, it } from "vitest";
-import composeAuthzDomain from "../src/authz-service/core/domain/composeAuthzDomain.ts";
+import makeAuthzService from "../src/authz-service/core/domain/makeAuthzService.ts";
 import makeInMemoryTupleRepository from "../src/authz-service/adapters/db/makeInMemoryTupleRepository.ts";
 import makeGraphEvaluator from "../src/authz-service/adapters/graph/makeGraphEvaluator.ts";
 import makeAuthzHttpHandler from "../src/authz-service/adapters/http/makeAuthzHttpHandler.ts";
@@ -18,7 +18,7 @@ const q            = new URLSearchParams();
 const composeHandler = (extra: ReturnType<typeof seedPolicyTuples> = []): AuthzHttpHandler => {
     const repository      = makeInMemoryTupleRepository({ seed: [...seedPolicyTuples(), ...extra] });
     const evaluator       = makeGraphEvaluator({ repository });
-    const domain          = composeAuthzDomain({ repository, evaluator });
+    const domain          = makeAuthzService({ repository, evaluator });
     return makeAuthzHttpHandler({ authz: domain });
 };
 

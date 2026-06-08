@@ -141,7 +141,7 @@ relationships:
 const makeDocumentService = () => {
   const repository  = makeInMemoryDocumentRepository();
   const authzClient = makeInProcessAuthzClient(seedPolicyTuples());
-  return composeDocuments({ repository, authzClient });
+  return makeDocuments({ repository, authzClient });
 };
 ```
 

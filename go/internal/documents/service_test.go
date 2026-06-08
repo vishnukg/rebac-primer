@@ -6,12 +6,9 @@ import (
 	"testing"
 
 	"rebac-primer/internal/authz"
-	authzdb "rebac-primer/internal/authz/adapters/db"
-	"rebac-primer/internal/authz/adapters/graph"
 	"rebac-primer/internal/documents"
-	docsdb "rebac-primer/internal/documents/adapters/db"
 	"rebac-primer/internal/fixtures"
-	"rebac-primer/internal/shared"
+	"rebac-primer/internal/rebac"
 )
 
 // newSeededService wires together a documents.Service backed by the standard
@@ -20,12 +17,12 @@ func newSeededService(t *testing.T) documents.Service {
 	t.Helper()
 
 	// Authz service wired in-process (no HTTP hop in tests)
-	store := authzdb.New(fixtures.SeedRelationshipTuples()...)
-	evaluator := graph.NewGraphEvaluator(store)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	evaluator := authz.NewGraphEvaluator(store)
 	authzSvc := authz.New(store, evaluator)
 
 	// Documents service
-	repo := docsdb.New()
+	repo := documents.NewInMemoryRepository()
 	svc := documents.New(repo, authzSvc)
 
 	_, err := svc.Create(context.Background(), documents.CreateDocumentInput{
@@ -87,9 +84,9 @@ func TestDocumentService_Create_SucceedsForEditor(t *testing.T) {
 func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	// Arrange: wire authz + documents over a shared tuple store so we can inspect
 	// the tuples Create writes.
-	store := authzdb.New(fixtures.SeedRelationshipTuples()...)
-	authzSvc := authz.New(store, graph.NewGraphEvaluator(store))
-	svc := documents.New(docsdb.New(), authzSvc)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, authz.NewGraphEvaluator(store))
+	svc := documents.New(documents.NewInMemoryRepository(), authzSvc)
 
 	// Act: alice (a workspace editor) creates a document.
 	if _, err := svc.Create(context.Background(), documents.CreateDocumentInput{
@@ -102,8 +99,8 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	// Assert: alice can_delete d1. can_delete requires document owner, and a
 	// workspace editor only inherits document editor (can_edit) — never owner. So
 	// this passes only because Create wrote a direct (d1, owner, alice) tuple.
-	ownerCheck, err := authzSvc.Check(context.Background(), shared.CheckRequest{
-		User: fixtures.Alice, Relation: shared.RelationDocumentCanDelete, Object: shared.Document("d1"),
+	ownerCheck, err := authzSvc.Check(context.Background(), rebac.CheckRequest{
+		User: fixtures.Alice, Relation: rebac.RelationDocumentCanDelete, Object: rebac.Document("d1"),
 	})
 	if err != nil {
 		t.Fatalf("check alice: %v", err)
@@ -113,8 +110,8 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	}
 
 	// And bob (a workspace viewer) is not an owner — cannot delete.
-	viewerCheck, err := authzSvc.Check(context.Background(), shared.CheckRequest{
-		User: fixtures.Bob, Relation: shared.RelationDocumentCanDelete, Object: shared.Document("d1"),
+	viewerCheck, err := authzSvc.Check(context.Background(), rebac.CheckRequest{
+		User: fixtures.Bob, Relation: rebac.RelationDocumentCanDelete, Object: rebac.Document("d1"),
 	})
 	if err != nil {
 		t.Fatalf("check bob: %v", err)
