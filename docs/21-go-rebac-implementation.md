@@ -624,20 +624,20 @@ concrete type. Everything else depends only on interfaces.
 ```go
 func buildHandler(ctx context.Context) (http.Handler, error) {
     // ── Authz service ─────────────────────────────────────────────────────────
-    tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
-    evaluator  := graph.NewGraphEvaluator(tupleStore)
+    tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+    evaluator  := authz.NewGraphEvaluator(tupleStore)
     authzSvc   := authz.New(tupleStore, evaluator)
 
     // ── Documents service ─────────────────────────────────────────────────────
-    docRepo       := docsdb.New()
-    tokenVerifier := docsauthn.New(fixtures.DemoTokens())
+    docRepo       := documents.NewInMemoryRepository()
+    tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
     docsSvc       := documents.New(docRepo, authzSvc)   // authzSvc satisfies AuthzClient
 
     // seed
     _, err := docsSvc.Create(ctx, documents.CreateDocumentInput{ ... })
 
     // ── HTTP layer ────────────────────────────────────────────────────────────
-    return docshttp.NewServer(tokenVerifier, docsSvc), nil
+    return api.NewServer(tokenVerifier, docsSvc), nil
 }
 ```
 
@@ -645,7 +645,7 @@ To swap `GraphEvaluator` for a real OpenFGA server, change only these lines:
 
 ```go
 // Replace this:
-evaluator := graph.NewGraphEvaluator(tupleStore)
+evaluator := authz.NewGraphEvaluator(tupleStore)
 authzSvc  := authz.New(tupleStore, evaluator)
 
 // With this (after restoring the openfga adapter — see docs/26-openfga-migration.md):
@@ -667,7 +667,7 @@ Nothing else changes. The documents domain and HTTP layer never find out.
 ```go
 func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
     // Arrange
-    ev := graph.NewGraphEvaluator(seedStore())
+    ev := authz.NewGraphEvaluator(seedStore())
     req := rebac.CheckRequest{
         User:     fixtures.Alice,
         Relation: rebac.RelationDocumentCanEdit,

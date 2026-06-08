@@ -66,7 +66,7 @@ Go tracks the same foundation.
 | 03 | Graph theory needed for ReBAC | conceptual |
 | 04 | ReBAC concepts, relationship graphs, agentic tool calls | `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`, `go/internal/authz/evaluator.go` |
 | 05 | OpenFGA model DSL | `typescript/src/authz-service/adapters/graph/permissionModel.ts`, `go/internal/authz/model.go` |
-| 06 | Architecture: ports & adapters, dependency direction, intentional caveats (both languages) | `go/internal/authz/ports.go`, `go/internal/documents/ports.go`, `typescript/src/documents-service/core/ports` |
+| 06 | Architecture: ports & adapters, dependency direction, intentional caveats (both languages) | `go/internal/authz/authz.go`, `go/internal/documents/documents.go`, `typescript/src/documents-service/core/ports` |
 
 ## TypeScript track
 

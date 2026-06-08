@@ -38,29 +38,29 @@ Every piece of our scratch implementation has a direct OpenFGA counterpart.
 
 | Our code | OpenFGA concept | Notes |
 |---|---|---|
-| `shared.TupleKey` | Relationship tuple | Same structure: `(object, relation, user)` |
-| `shared.Object` (`"user:alice"`) | Object ID | Same `type:id` format |
-| `shared.Subject` with `#` (`"team:platformTeam#member"`) | Subject set (userset) | Same `object#relation` format |
-| `shared.CheckRequest` | Check call parameters | Same three fields |
+| `rebac.TupleKey` | Relationship tuple | Same structure: `(object, relation, user)` |
+| `rebac.Object` (`"user:alice"`) | Object ID | Same `type:id` format |
+| `rebac.Subject` with `#` (`"team:platformTeam#member"`) | Subject set (userset) | Same `object#relation` format |
+| `rebac.CheckRequest` | Check call parameters | Same three fields |
 | `authz.TupleRepository` | Tuple store | We own the interface; OpenFGA owns the store |
 | `authz.InMemoryStore` | (our own, not in OpenFGA) | In-memory only; OpenFGA uses PostgreSQL or MySQL |
 | `authz.Evaluator` | Check API | Our port; OpenFGA's HTTP/gRPC endpoint is the adapter |
 | `authz.GraphEvaluator` | OpenFGA's check engine | Our traversal mirrors what OpenFGA does internally |
-| `graph/permissionmodel.go` (`teamRules`, `workspaceRules`, `documentRules`) | Authorization model DSL | We express rules as Go maps; OpenFGA uses a DSL stored in a database |
+| `authz/model.go` (`teamRules`, `workspaceRules`, `documentRules`) | Authorization model DSL | We express rules as Go maps; OpenFGA uses a DSL stored in a database |
 | `authz.New(store, evaluator)` | (wiring only) | No OpenFGA equivalent; OpenFGA merges store and evaluator in one server |
 
 ### The permission model side by side
 
-Our Go table for documents (`permissionmodel.go`):
+Our Go table for documents (`model.go`):
 
 ```go
 var documentRules = impliedBy{
-    shared.RelationDocumentCanRead:    {shared.RelationDocumentViewer},
-    shared.RelationDocumentCanComment: {shared.RelationDocumentViewer},
-    shared.RelationDocumentCanEdit:    {shared.RelationDocumentEditor},
-    shared.RelationDocumentCanDelete:  {shared.RelationDocumentOwner},
-    shared.RelationDocumentViewer:     {shared.RelationDocumentEditor},
-    shared.RelationDocumentEditor:     {shared.RelationDocumentOwner},
+    rebac.RelationDocumentCanRead:    {rebac.RelationDocumentViewer},
+    rebac.RelationDocumentCanComment: {rebac.RelationDocumentViewer},
+    rebac.RelationDocumentCanEdit:    {rebac.RelationDocumentEditor},
+    rebac.RelationDocumentCanDelete:  {rebac.RelationDocumentOwner},
+    rebac.RelationDocumentViewer:     {rebac.RelationDocumentEditor},
+    rebac.RelationDocumentEditor:     {rebac.RelationDocumentOwner},
 }
 ```
 
@@ -104,7 +104,7 @@ The key is that `authz.Evaluator` is an interface with one method:
 
 ```go
 type Evaluator interface {
-    Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error)
+    Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
 }
 ```
 
@@ -117,7 +117,7 @@ is plugged in.
                               │
               ┌───────────────┴─────────────────┐
               │                                 │
-  graph.GraphEvaluator                 openfga.Authorizer
+  authz.GraphEvaluator                 openfga.Service
   (in-process, today)                 (SDK adapter, migration target)
               │                                 │
   reads InMemoryStore          calls OpenFGA server over HTTP/gRPC
@@ -246,16 +246,16 @@ func New(cfg Config) (*Service, error) {
     return &Service{client: sdk}, nil
 }
 
-func (s *Service) Check(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
+func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
     resp, err := s.client.Check(ctx).Body(fgaclient.ClientCheckRequest{
         User:     string(req.User),
         Relation: string(req.Relation),
         Object:   string(req.Object),
     }).Execute()
     if err != nil {
-        return shared.CheckResult{}, fmt.Errorf("openfga: check: %w", err)
+        return rebac.CheckResult{}, fmt.Errorf("openfga: check: %w", err)
     }
-    return shared.CheckResult{Allowed: resp.GetAllowed(), Trace: []string{"OpenFGA evaluated remotely"}}, nil
+    return rebac.CheckResult{Allowed: resp.GetAllowed(), Trace: []string{"OpenFGA evaluated remotely"}}, nil
 }
 ```
 
@@ -263,7 +263,7 @@ func (s *Service) Check(ctx context.Context, req shared.CheckRequest) (shared.Ch
 tuples written at runtime are visible to subsequent checks:
 
 ```go
-func (s *Service) WriteTuples(ctx context.Context, tuples []shared.TupleKey) error {
+func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
     writes := make([]fgaclient.ClientTupleKey, 0, len(tuples))
     for _, t := range tuples {
         writes = append(writes, fgaclient.ClientTupleKey{
@@ -286,14 +286,14 @@ func (s *Service) WriteTuples(ctx context.Context, tuples []shared.TupleKey) err
 ```go
 func buildAuthzService() (authz.Service, error) {
     if os.Getenv("AUTHZ_BACKEND") == "openfga" {
-        return authzopenfga.New(authzopenfga.Config{
+        return openfga.New(openfga.Config{
             APIURL:  envOr("OPENFGA_API_URL", "http://127.0.0.1:8080"),
             StoreID: os.Getenv("OPENFGA_STORE_ID"),
             ModelID: os.Getenv("OPENFGA_MODEL_ID"),
         })
     }
-    tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
-    return authz.New(tupleStore, graph.NewGraphEvaluator(tupleStore)), nil
+    tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+    return authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore)), nil
 }
 ```
 

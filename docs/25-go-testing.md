@@ -90,14 +90,14 @@ the fixture store and evaluator:
 ```go
 // seedStore builds a tuple store from the standard fixture tuples.
 // Optional extra tuples can be appended for specific test cases.
-func seedStore(extra ...rebac.TupleKey) *authzdb.InMemoryStore {
+func seedStore(extra ...rebac.TupleKey) *authz.InMemoryStore {
     all := append(fixtures.SeedRelationshipTuples(), extra...)
-    return authzdb.New(all...)
+    return authz.NewInMemoryStore(all...)
 }
 
 // newEvaluator wraps seedStore + NewGraphEvaluator into one call.
-func newEvaluator(extra ...rebac.TupleKey) *graph.GraphEvaluator {
-    return graph.NewGraphEvaluator(seedStore(extra...))
+func newEvaluator(extra ...rebac.TupleKey) *authz.GraphEvaluator {
+    return authz.NewGraphEvaluator(seedStore(extra...))
 }
 ```
 

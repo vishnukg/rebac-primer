@@ -369,7 +369,7 @@ In Go:
 
 ```go
 // go/internal/fixtures/fixtures.go
-shared.Tuple(ProductWorkspace, shared.RelationWorkspaceEditor, shared.SubjectSet(PlatformTeam, shared.RelationTeamMember))
+rebac.Tuple(ProductWorkspace, rebac.RelationWorkspaceEditor, rebac.SubjectSet(PlatformTeam, rebac.RelationTeamMember))
 ```
 
 This means:

@@ -154,7 +154,7 @@ The compiler proves the connection here:
 
 ```go
 // go/cmd/server/main.go — the only place that names both the interface and the concrete type
-evaluator := graph.NewGraphEvaluator(tupleStore)   // concrete type
+evaluator := authz.NewGraphEvaluator(tupleStore)   // concrete type
 authzSvc  := authz.New(tupleStore, evaluator)      // evaluator satisfies authz.Evaluator
 // If GraphEvaluator were missing the Evaluate method, authz.New would not compile.
 ```
@@ -425,9 +425,9 @@ just without the `constructor` keyword. Notice the variadic `seed ...TupleKey`:
 you can call it with no arguments, one tuple, or a slice spread with `...`:
 
 ```go
-authzdb.New()                                      // empty store
-authzdb.New(t1, t2, t3)                            // three tuples
-authzdb.New(fixtures.SeedRelationshipTuples()...)  // spread a slice
+authz.NewInMemoryStore()                                      // empty store
+authz.NewInMemoryStore(t1, t2, t3)                            // three tuples
+authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)  // spread a slice
 ```
 
 ### `defer` — guaranteed cleanup

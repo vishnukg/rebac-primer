@@ -89,7 +89,7 @@ type. You can wrap `GraphEvaluator`, an OpenFGA evaluator, or another
 In `cmd/server/main.go` (the composition root), wiring one in is one line:
 
 ```go
-evaluator := middleware.NewAuditEvaluator(graph.NewGraphEvaluator(tupleStore), os.Stderr)
+evaluator := middleware.NewAuditEvaluator(authz.NewGraphEvaluator(tupleStore), os.Stderr)
 ```
 
 Nothing else changes. `documents.Service` depends on `authz.AuthzClient` and will
@@ -183,7 +183,7 @@ When you embed type `T`:
    promotes all the required methods.
 
 ```go
-ev := graph.NewGraphEvaluator(ro)  // ro satisfies TupleRepository — compiles
+ev := authz.NewGraphEvaluator(ro)  // ro satisfies TupleRepository — compiles
 ```
 
 `NewGraphEvaluator` accepts an `authz.TupleRepository`. `ReadOnlyStore` satisfies
@@ -195,7 +195,7 @@ An interface value in Go is secretly two words: a pointer to the type descriptor
 and a pointer to the data. When you assign a concrete value to an interface:
 
 ```go
-var e authz.Evaluator = graph.NewGraphEvaluator(store)
+var e authz.Evaluator = authz.NewGraphEvaluator(store)
 ```
 
 Go stores `(*GraphEvaluator)(pointer)` inside the interface. The compiler erases
@@ -209,9 +209,9 @@ interface shape, not the concrete class.
 The composition root (`cmd/server/main.go`) is where you decide the order:
 
 ```go
-tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
+tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
 ro         := middleware.NewReadOnlyStore(tupleStore)   // signal: this path reads only
-base       := graph.NewGraphEvaluator(ro)
+base       := authz.NewGraphEvaluator(ro)
 audited    := middleware.NewAuditEvaluator(base, os.Stderr)
 authzSvc   := authz.New(tupleStore, audited)
 docsSvc    := documents.New(docRepo, authzSvc)
@@ -239,8 +239,8 @@ Add the compile-time assertion (`var _ Checker = (*CachingEvaluator)(nil)`).
 Wire it between `AuditEvaluator` and `GraphEvaluator` in `buildHandler()`:
 
 ```go
-base    := graph.NewGraphEvaluator(tupleStore)
-cached  := graph.NewCachingEvaluator(base)
+base    := authz.NewGraphEvaluator(tupleStore)
+cached  := middleware.NewCachingEvaluator(base)
 audited := middleware.NewAuditEvaluator(cached, os.Stderr)
 ```
 

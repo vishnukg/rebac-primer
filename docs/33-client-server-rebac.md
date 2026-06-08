@@ -174,7 +174,7 @@ const { allowed } = await authzClient.check({
 Go:
 
 ```go
-err := s.requireAllowed(ctx, input.Actor, shared.RelationDocumentCanEdit, shared.Document(input.ID), "edit")
+err := s.requireAllowed(ctx, input.Actor, rebac.RelationDocumentCanEdit, rebac.Document(input.ID), "edit")
 ```
 
 That is the important boundary.
@@ -220,13 +220,13 @@ composeCliApp (cli/compose.ts)
   -> makeTerminalClient
 
 go buildHandler() (cmd/server/main.go)
-  -> authzdb.New (in-memory tuple store, seeded)
-  -> graph.NewGraphEvaluator
+  -> authz.New (in-memory tuple store, seeded)
+  -> authz.NewGraphEvaluator
   -> authz.New (authz service)
-  -> docsdb.New (in-memory document repository)
-  -> docsauthn.New (demo token verifier)
+  -> documents.New (in-memory document repository)
+  -> documents.New (demo token verifier)
   -> documents.New (documents service)
-  -> docshttp.NewServer (HTTP handler)
+  -> api.NewServer (HTTP handler)
 ```
 
 That split matters because ReBAC code is easier to reason about when business

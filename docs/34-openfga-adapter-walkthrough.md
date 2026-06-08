@@ -21,7 +21,7 @@ authz.Service (Go) / AuthzService (TS):  Check · WriteTuples · DeleteTuples ·
 
 | | Graph backend (default) | OpenFGA backend (`AUTHZ_BACKEND=openfga`) |
 |---|---|---|
-| Who answers `Check` | `graph.GraphEvaluator` traverses tuples in memory | OpenFGA server's Check API |
+| Who answers `Check` | `authz.GraphEvaluator` traverses tuples in memory | OpenFGA server's Check API |
 | Where tuples live | in-memory `TupleRepository` | the OpenFGA store |
 | Where the model lives | Go maps / TS tables (`permissionmodel.*`) | DSL uploaded to the store (`model.fga`) |
 | `Check` result trace | full step-by-step trace | one synthetic line (OpenFGA returns only allow/deny) |

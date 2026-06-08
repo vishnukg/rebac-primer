@@ -74,12 +74,12 @@ Each step names the file and function, the call it makes, and what comes back.
 concrete types:
 
 ```go
-tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
-evaluator  := graph.NewGraphEvaluator(tupleStore)
+tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+evaluator  := authz.NewGraphEvaluator(tupleStore)
 authzSvc   := authz.New(tupleStore, evaluator)   // type: authz.Service
 
-docRepo       := docsdb.New()
-tokenVerifier := docsauthn.New(fixtures.DemoTokens())
+docRepo       := documents.NewInMemoryRepository()
+tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
 docsSvc       := documents.New(docRepo, authzSvc) // authzSvc passed as AuthzClient
 ```
 
@@ -186,7 +186,7 @@ For the line-by-line recursion (and the trace lines it produces), read
 ### 8. The answer propagates back
 
 ```text
-evaluator.Evaluate → {Allowed:true}      (graph/evaluator.go)
+evaluator.Evaluate → {Allowed:true}      (authz/evaluator.go)
   authzService.Check returns it           (authz/service.go)
     requireAllowed sees Allowed → nil err (documents/service.go)
       Read returns the document           (documents/read.go)
