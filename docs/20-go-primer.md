@@ -535,7 +535,7 @@ Go does not have `async`/`await`. All I/O runs synchronously in Go goroutines
 first argument so callers can cancel them or attach a deadline:
 
 ```go
-// go/internal/documents/read.go
+// go/internal/documents/service.go
 func (s *documentService) Read(ctx context.Context, id string, actor rebac.Object) (*CollaborativeDocument, error) {
     doc, err := s.requireDocument(ctx, id)  // passes ctx to the repo
     // ...

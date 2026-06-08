@@ -33,10 +33,7 @@ go/
 │   ├── openfga/openfga.go        OpenFGA-backed authz.Service (alternative backend)
 │   ├── documents/                the document service
 │   │   ├── documents.go          Service + CollaborativeDocument + interfaces + errors
-│   │   ├── service.go            documentService + New()
-│   │   ├── create.go             Create operation
-│   │   ├── read.go               Read operation
-│   │   ├── update.go             Update operation
+│   │   ├── service.go            documentService + New() + Create/Read/Update + helpers
 │   │   ├── store.go              InMemoryRepository — a DocumentRepository
 │   │   └── token.go              DemoTokenVerifier — an Authenticator
 │   ├── api/                      HTTP server for the documents service
@@ -521,21 +518,23 @@ Nothing else changes.
 
 ---
 
-## `documents/` — domain use cases
+## `documents/service.go` — the operations
 
-The Go domain splits the service across small files — one per use case — a common
-Go convention that keeps each operation easy to find and read. (The TypeScript
-side makes the opposite, equally idiomatic choice: it defines all three
-operations inline in a single `makeDocuments.ts`. The two implementations are
-arranged differently on purpose, each following its own language's conventions.)
+`Create`, `Read`, and `Update` are methods on the `documentService` struct, all
+in `service.go` alongside `New` and the shared helpers (`requireDocument`,
+`requireAllowed`). Go files are just organization — the package is the unit — and
+the idiomatic default is to keep a type with its methods in one cohesive file
+until it grows large. Three short methods plus two helpers (~150 lines) sit
+comfortably together, and it matches how the authz service keeps its four
+operations in one `service.go`. (The TypeScript side reaches the same shape from
+its own direction: one `makeDocuments.ts` factory with the operations inline.)
 
 | Go file       | What it does                     |
 |---------------|----------------------------------|
 | `documents.go`| `Service` interface, `CollaborativeDocument`, the dependency interfaces, errors |
-| `service.go`  | the `documentService` struct, `New`, shared helpers |
-| `create.go`   | `Create` operation               |
-| `read.go`     | `Read` operation                 |
-| `update.go`   | `Update` operation               |
+| `service.go`  | `documentService` + `New` + `Create`/`Read`/`Update` + shared helpers |
+| `store.go`    | `InMemoryRepository` — an in-memory `DocumentRepository` |
+| `token.go`    | `DemoTokenVerifier` — a demo `Authenticator` |
 
 ### Copying a struct for an immutable update
 
@@ -548,7 +547,7 @@ const updated = { ...existing, body: input.body, updatedBy: input.actor };
 Go dereferences the pointer to copy the struct, then modifies fields:
 
 ```go
-// go/internal/documents/update.go
+// go/internal/documents/service.go
 updated := *existing       // dereference: copies the full struct value
 updated.Body = input.Body
 updated.UpdatedBy = input.Actor

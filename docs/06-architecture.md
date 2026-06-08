@@ -144,7 +144,7 @@ authz service. Same port, two transports — see `docs/28` / `docs/29`.
 | AuthZ implementations | `internal/authz/{store,evaluator,model}.go` + `internal/openfga` | `authz-service/adapters/{db,graph,http}` |
 | Documents driving port | `documents.Service` (`internal/documents/documents.go`) | `Documents` (`documents-service/core/domain/types.ts`) |
 | Documents driven ports | `DocumentRepository`, `AuthzClient`, `Authenticator` (`internal/documents/documents.go`) | same names (`documents-service/core/ports/`) |
-| Documents use cases | `internal/documents/{create,read,update}.go` (one file each) | `documents-service/core/domain/makeDocuments.ts` (`create`/`read`/`update` methods, inline) |
+| Documents use cases | `internal/documents/service.go` (`Create`/`Read`/`Update` methods) | `documents-service/core/domain/makeDocuments.ts` (`create`/`read`/`update` methods, inline) |
 | Documents implementations | `internal/documents/{store,token}.go` + `internal/api` | `documents-service/adapters/{db,authn,authz,http,client}` |
 | Composition root | `cmd/server/main.go` | `*/compose.ts` (+ `index.ts` entrypoints) |
 

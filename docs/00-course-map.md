@@ -105,7 +105,7 @@ Read these after the shared ReBAC track if Go is your implementation language.
 | 25 | Go testing: AAA, table-driven, benchmarks, fuzz | `go/internal/authz/evaluator_test.go` |
 | 26 | From-scratch ReBAC vs OpenFGA: concept mapping + the shipped, flag-driven OpenFGA adapter | `go/internal/openfga/openfga.go`, `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts`, `deployments/openfga/model.fga` |
 | 27 | Graph evaluator deep dive: step-by-step walkthrough for non-graph-theory readers | `go/internal/authz/evaluator.go` |
-| 28 | Authz call flow: tracing a request through every layer (in-process) | `go/cmd/server/main.go`, `go/internal/documents/read.go`, `go/internal/authz/service.go` |
+| 28 | Authz call flow: tracing a request through every layer (in-process) | `go/cmd/server/main.go`, `go/internal/documents/service.go`, `go/internal/authz/service.go` |
 | 34 | OpenFGA adapter walkthrough: a check through the OpenFGA backend (both languages) | `go/internal/openfga/openfga.go`, `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts` |
 
 ## Shared track: Docker and local services
@@ -254,7 +254,7 @@ TypeScript:
 Go:
 
 1. Read `21-go-rebac-implementation.md`.
-2. Open `go/internal/documents/update.go` (and `domain.go` for the shared helpers).
+2. Open `go/internal/documents/service.go` (the operations and the shared helpers live there).
 3. Trace how `Update` becomes an authorization check.
 4. If the graph traversal is hard to follow, read `docs/27-graph-evaluator-walkthrough.md`
    and step through the `alice / can_edit / roadmapDocument` trace.

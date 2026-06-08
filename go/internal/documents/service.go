@@ -19,7 +19,118 @@ func New(repo DocumentRepository, authzClient AuthzClient) Service {
 	return &documentService{repo: repo, authzClient: authzClient}
 }
 
-// ── Shared helpers ────────────────────────────────────────────────────────────
+// ── Operations ────────────────────────────────────────────────────────────────
+
+// Create saves a new document if the actor has editor access to the workspace.
+//
+// After persisting the document it writes two relationship tuples to the authz
+// service so future checks can traverse the graph:
+//
+//	(document:id, workspace, workspace:X) — records where the document lives, so
+//	                                        workspace members inherit access.
+//	(document:id, owner,     user:actor)  — the creator directly owns the document
+//	                                        (e.g. can_delete, an owner-only action).
+//
+// This is the write-back pattern: the documents service owns document-level
+// tuples; the authz service owns workspace/team tuples.
+func (s *documentService) Create(ctx context.Context, input CreateDocumentInput) (*CollaborativeDocument, error) {
+	if err := s.requireAllowed(ctx,
+		input.Actor,
+		rebac.RelationWorkspaceEditor,
+		input.Workspace,
+		"create documents in",
+	); err != nil {
+		return nil, err
+	}
+
+	doc := CollaborativeDocument{
+		ID:        input.ID,
+		Title:     input.Title,
+		Body:      input.Body,
+		Workspace: input.Workspace,
+		UpdatedBy: input.Actor,
+	}
+	if err := s.repo.Save(ctx, doc); err != nil {
+		return nil, err
+	}
+
+	// Register the document relationships so the graph evaluator can resolve
+	// can_read / can_edit for workspace members and owner-only actions for the
+	// creator.
+	if err := s.authzClient.WriteTuples(ctx, []rebac.TupleKey{
+		rebac.Tuple(
+			rebac.Document(input.ID),
+			rebac.RelationDocumentWorkspace,
+			rebac.Subject(input.Workspace),
+		),
+		rebac.Tuple(
+			rebac.Document(input.ID),
+			rebac.RelationDocumentOwner,
+			rebac.Subject(input.Actor),
+		),
+	}); err != nil {
+		return nil, err
+	}
+
+	return &doc, nil
+}
+
+// Read returns a document if the actor has can_read access.
+//
+// Existence is checked before authorization so the error is accurate:
+// a non-existent document returns not-found, not forbidden.
+//
+// Security tradeoff: this ordering leaks existence. A denied actor gets 403 for a
+// document that exists but 404 for one that does not, so they can probe which ids
+// exist even without access. That is fine for this tutorial — clear errors aid
+// learning — but high-security systems return 404 for both cases so the two are
+// indistinguishable (check authorization first, then map a denial to not-found).
+// See docs/40-production-readiness.md (Gap 13).
+func (s *documentService) Read(ctx context.Context, id string, actor rebac.Object) (*CollaborativeDocument, error) {
+	doc, err := s.requireDocument(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireAllowed(ctx,
+		actor,
+		rebac.RelationDocumentCanRead,
+		rebac.Document(id),
+		"read",
+	); err != nil {
+		return nil, err
+	}
+
+	return doc, nil
+}
+
+// Update saves new body text if the actor has can_edit access.
+func (s *documentService) Update(ctx context.Context, input UpdateDocumentInput) (*CollaborativeDocument, error) {
+	existing, err := s.requireDocument(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireAllowed(ctx,
+		input.Actor,
+		rebac.RelationDocumentCanEdit,
+		rebac.Document(input.ID),
+		"edit",
+	); err != nil {
+		return nil, err
+	}
+
+	updated := *existing
+	updated.Body = input.Body
+	updated.UpdatedBy = input.Actor
+
+	if err := s.repo.Save(ctx, updated); err != nil {
+		return nil, err
+	}
+	return &updated, nil
+}
+
+// ── Shared helpers ──────────────────────────────────────────────────────────────
 
 // requireDocument fetches a document and wraps a missing one in [DocumentNotFoundError].
 func (s *documentService) requireDocument(ctx context.Context, id string) (*CollaborativeDocument, error) {

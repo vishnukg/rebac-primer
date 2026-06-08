@@ -40,8 +40,8 @@ domain and the authz engine. They talk through an interface, not a network:
  │                                                                         │
  │  HTTP (documents)        documents domain            authz core         │
  │  ┌───────────────┐       ┌────────────────┐         ┌───────────────┐   │
- │  │ handler.go    │──────►│ read.go         │────────►│ authz.Service │   │
- │  │ (ServeMux)    │       │ service.go       │ Check() │ (service.go)   │   │
+ │  │ handler.go    │──────►│ documentService │────────►│ authz.Service │   │
+ │  │ (ServeMux)    │       │ (service.go)    │ Check() │ (service.go)   │   │
  │  └──────┬────────┘       └────────────────┘   ▲     └──────┬────────┘   │
  │         │ authn                                │            │ Evaluate() │
  │         ▼                                 AuthzClient        ▼           │
@@ -121,7 +121,7 @@ returns `AuthenticatedUser{Subject: "user:bob"}`. (In production this verifies a
 JWT instead — the port is unchanged.) **This establishes *who* is asking. The
 *what-can-they-do* question is the authz check in step 5.**
 
-### 4. Use case — `documents/read.go`
+### 4. Use case — `documents/service.go`
 
 ```go
 func (s *documentService) Read(ctx, id, actor) (*CollaborativeDocument, error) {
@@ -189,7 +189,7 @@ For the line-by-line recursion (and the trace lines it produces), read
 evaluator.Evaluate → {Allowed:true}      (authz/evaluator.go)
   authzService.Check returns it           (authz/service.go)
     requireAllowed sees Allowed → nil err (documents/service.go)
-      Read returns the document           (documents/read.go)
+      Read returns the document           (documents/service.go)
         handler writes 200 + JSON         (api/handler.go)
 ```
 
@@ -201,8 +201,8 @@ evaluator.Evaluate → {Allowed:true}      (authz/evaluator.go)
 
 ## Where the 403 comes from (the same flow, denied)
 
-For `PATCH /documents/roadmapDocument` as Bob, step 4 is `Update` (in
-`update.go`) and step 5 checks `can_edit` instead of `can_read`. Bob is a
+For `PATCH /documents/roadmapDocument` as Bob, step 4 is `Update` (also in
+`service.go`) and step 5 checks `can_edit` instead of `can_read`. Bob is a
 *viewer*, so the graph returns `Allowed: false`. Then:
 
 ```go
@@ -243,7 +243,7 @@ mapping in `writeError`:
 |---|---|---|---|
 | HTTP in | `api/handler.go` | parse request, map errors→status | authn, then domain |
 | Authn | `documents/token.go` | token → identity | (returns) |
-| Use case | `documents/read.go` / `update.go` | orchestrate: exists? allowed? | `requireAllowed` |
+| Use case | `documents/service.go` (`Read`/`Update`) | orchestrate: exists? allowed? | `requireAllowed` |
 | Domain boundary | `documents/service.go` | call authz, raise `ForbiddenError` | `authzClient.Check` |
 | Authz core | `authz/service.go` | delegate to evaluator | `evaluator.Evaluate` |
 | Evaluator | `authz/evaluator.go` | traverse the tuple graph | `store` reads |

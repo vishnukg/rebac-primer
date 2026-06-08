@@ -626,7 +626,7 @@ For OpenFGA specifically:
 ### Resource existence disclosure
 
 There is a subtler leak in how a denied request is reported. The tutorial's read
-path (`go/internal/documents/read.go`, `makeDocuments.ts`'s `read`) checks existence
+path (`go/internal/documents/service.go`, `makeDocuments.ts`'s `read`) checks existence
 *before* authorization, so the caller can tell two cases apart:
 
 ```text
