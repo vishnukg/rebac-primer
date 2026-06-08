@@ -44,6 +44,16 @@ var _ authz.Service = (*Service)(nil)
 
 // New builds an OpenFGA-backed authz service.
 func New(cfg Config) (*Service, error) {
+	if cfg.APIURL == "" {
+		return nil, fmt.Errorf("openfga: APIURL is required")
+	}
+	if cfg.StoreID == "" {
+		return nil, fmt.Errorf("openfga: StoreID is required")
+	}
+	if cfg.ModelID == "" {
+		return nil, fmt.Errorf("openfga: ModelID is required")
+	}
+
 	client, err := openfga.NewSdkClient(&openfga.ClientConfiguration{
 		ApiUrl:               cfg.APIURL,
 		StoreId:              cfg.StoreID,
@@ -81,6 +91,9 @@ func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) erro
 	}
 	writes := make([]openfga.ClientTupleKey, 0, len(tuples))
 	for _, t := range tuples {
+		if err := authz.ValidateTuple(t); err != nil {
+			return err
+		}
 		writes = append(writes, openfga.ClientTupleKey{
 			User:     string(t.User),
 			Relation: string(t.Relation),

@@ -22,7 +22,7 @@ func (h *handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 // handleWhoami returns the verified identity for the bearer token.
 func (h *handler) handleWhoami(w http.ResponseWriter, r *http.Request) {
-	user, err := h.authenticator.VerifyAccessToken(r.Header.Get("Authorization"))
+	user, err := h.authenticate(r)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -39,7 +39,7 @@ func (h *handler) handleWhoami(w http.ResponseWriter, r *http.Request) {
 // Request body (JSON): { "id": "...", "title": "...", "body": "...", "workspaceId": "..." }
 // Response: 201 with { "document": {...} }
 func (h *handler) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
-	user, err := h.authenticator.VerifyAccessToken(r.Header.Get("Authorization"))
+	user, err := h.authenticate(r)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -77,7 +77,7 @@ func (h *handler) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
 
 // handleGetDocument handles GET /documents/{id}.
 func (h *handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
-	user, err := h.authenticator.VerifyAccessToken(r.Header.Get("Authorization"))
+	user, err := h.authenticate(r)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -95,7 +95,7 @@ func (h *handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 
 // handleUpdateDocument handles PATCH /documents/{id}.
 func (h *handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
-	user, err := h.authenticator.VerifyAccessToken(r.Header.Get("Authorization"))
+	user, err := h.authenticate(r)
 	if err != nil {
 		h.writeError(w, err)
 		return
@@ -125,6 +125,11 @@ func (h *handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"document": doc})
+}
+
+// authenticate verifies the request's bearer token and returns the caller.
+func (h *handler) authenticate(r *http.Request) (documents.AuthenticatedUser, error) {
+	return h.authenticator.VerifyAccessToken(r.Header.Get("Authorization"))
 }
 
 // writeError maps a domain error to an HTTP status code.

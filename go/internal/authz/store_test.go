@@ -152,6 +152,25 @@ func TestStore_GivenFilter_WhenFindAll_ThenReturnsMatchingTuples(t *testing.T) {
 	}
 }
 
+func TestStore_GivenTuples_WhenFindAll_ThenReturnsDeterministicOrder(t *testing.T) {
+	// Arrange: write in reverse lexical order.
+	store := authz.NewInMemoryStore(bobViewer(), aliceMember())
+
+	// Act
+	got, _ := store.FindAll(context.Background())
+
+	// Assert: responses should not depend on Go's randomized map iteration order.
+	want := []rebac.TupleKey{aliceMember(), bobViewer()}
+	if len(got) != len(want) {
+		t.Fatalf("FindAll length = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("FindAll[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestStore_GivenConcurrentWrites_WhenFindAll_ThenAllTuplesStored(t *testing.T) {
 	// Arrange: distinct tuples written from many goroutines. With -race this
 	// exercises the store's mutex.

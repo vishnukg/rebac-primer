@@ -289,6 +289,11 @@ func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAnd
 		"unknown object type": {Object: "widget:1", Relation: rebac.RelationDocumentOwner, User: rebac.Subject(rebac.User("alice"))},
 		"empty relation":      {Object: rebac.Document("d1"), Relation: "", User: rebac.Subject(rebac.User("alice"))},
 		"user missing type":   {Object: rebac.Document("d1"), Relation: rebac.RelationDocumentOwner, User: "alice"},
+		"subject set missing object type": {
+			Object:   rebac.Document("d1"),
+			Relation: rebac.RelationDocumentOwner,
+			User:     "platformTeam#member",
+		},
 	}
 
 	for name, tk := range cases {

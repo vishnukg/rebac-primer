@@ -33,7 +33,7 @@ func (d *authzService) Check(ctx context.Context, req rebac.CheckRequest) (rebac
 // is the kind of bug that quietly grants or denies the wrong access.
 func (d *authzService) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
 	for _, t := range tuples {
-		if err := validateTuple(t); err != nil {
+		if err := ValidateTuple(t); err != nil {
 			return err
 		}
 	}

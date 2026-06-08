@@ -3,6 +3,7 @@ package authz
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"rebac-primer/internal/rebac"
@@ -71,6 +72,7 @@ func (s *InMemoryStore) FindByObjectRelation(_ context.Context, object rebac.Obj
 			out = append(out, k)
 		}
 	}
+	sortTuples(out)
 	return out, nil
 }
 
@@ -85,6 +87,7 @@ func (s *InMemoryStore) FindAll(_ context.Context, filter ...TupleFilter) ([]reb
 			out = append(out, k)
 		}
 	}
+	sortTuples(out)
 	return out, nil
 }
 
@@ -102,4 +105,10 @@ func matchesFilter(k rebac.TupleKey, f TupleFilter) bool {
 		return false
 	}
 	return true
+}
+
+func sortTuples(tuples []rebac.TupleKey) {
+	sort.Slice(tuples, func(i, j int) bool {
+		return keyFor(tuples[i]) < keyFor(tuples[j])
+	})
 }

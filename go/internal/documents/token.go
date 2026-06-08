@@ -1,7 +1,7 @@
 package documents
 
 import (
-	"fmt"
+	"strings"
 
 	"rebac-primer/internal/rebac"
 )
@@ -19,7 +19,14 @@ type DemoTokenVerifier struct {
 
 // NewDemoTokenVerifier creates a verifier from a token → claims map.
 func NewDemoTokenVerifier(tokens map[string]TokenClaims) *DemoTokenVerifier {
-	return &DemoTokenVerifier{tokens: tokens}
+	copied := make(map[string]TokenClaims, len(tokens))
+	for token, claims := range tokens {
+		copied[token] = TokenClaims{
+			Sub:    claims.Sub,
+			Scopes: append([]string(nil), claims.Scopes...),
+		}
+	}
+	return &DemoTokenVerifier{tokens: copied}
 }
 
 // Compile-time assertion: *DemoTokenVerifier must satisfy Authenticator.
@@ -38,21 +45,24 @@ func (v *DemoTokenVerifier) VerifyAccessToken(authorizationHeader string) (Authe
 	claims, ok := v.tokens[token]
 	if !ok {
 		return AuthenticatedUser{}, &AuthenticationError{
-			Message: fmt.Sprintf("invalid token: %s", token),
+			Message: "invalid token",
 		}
+	}
+	if strings.TrimSpace(claims.Sub) == "" {
+		return AuthenticatedUser{}, &AuthenticationError{Message: "invalid token claims"}
 	}
 
 	return AuthenticatedUser{
 		Subject: rebac.User(claims.Sub),
-		Scopes:  claims.Scopes,
+		Scopes:  append([]string(nil), claims.Scopes...),
 	}, nil
 }
 
-// extractBearer strips the "Bearer " prefix from an Authorization header value.
+// extractBearer parses an Authorization header of shape "Bearer <token>".
 func extractBearer(header string) (string, bool) {
-	const prefix = "Bearer "
-	if len(header) <= len(prefix) || header[:len(prefix)] != prefix {
+	fields := strings.Fields(header)
+	if len(fields) != 2 || !strings.EqualFold(fields[0], "Bearer") {
 		return "", false
 	}
-	return header[len(prefix):], true
+	return fields[1], true
 }

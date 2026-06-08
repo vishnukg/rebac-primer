@@ -6,7 +6,7 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// validateTuple checks that a tuple is well-formed before it is written.
+// ValidateTuple checks that a tuple is well-formed before it is written.
 //
 // It returns a [*TupleValidationError] (which the HTTP adapter maps to HTTP 422)
 // when any field is malformed:
@@ -20,7 +20,7 @@ import (
 // strings. A tuple like {Object: "roadmap"} (missing "document:") would be stored
 // happily but never match any check — a silent authorization bug. Rejecting it at
 // write time turns that latent bug into an immediate, explicit error.
-func validateTuple(t rebac.TupleKey) error {
+func ValidateTuple(t rebac.TupleKey) error {
 	if _, _, err := rebac.ParseObject(string(t.Object)); err != nil {
 		return &TupleValidationError{Message: fmt.Sprintf("object %q is not a valid type:id (%v)", t.Object, err)}
 	}
@@ -37,7 +37,11 @@ func validateTuple(t rebac.TupleKey) error {
 // ("team:platform#member"), matching the two shapes the User field can take.
 func validateSubject(s rebac.Subject) error {
 	if rebac.IsSubjectSet(s) {
-		_, _, err := rebac.ParseSubjectSet(s)
+		obj, _, err := rebac.ParseSubjectSet(s)
+		if err != nil {
+			return err
+		}
+		_, _, err = rebac.ParseObject(string(obj))
 		return err
 	}
 	_, _, err := rebac.ParseObject(string(s))

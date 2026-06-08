@@ -8,6 +8,7 @@
 //	New              — builds a Service from a TupleRepository and an Evaluator.
 //	NewInMemoryStore — a TupleRepository backed by a map (the default store).
 //	NewGraphEvaluator — an Evaluator that walks the tuple graph (the default strategy).
+//	ValidateTuple    — validates tuple shape before writes reach a backend.
 //
 // Callers depend on the Service interface, never the concrete type. The store and
 // the evaluation strategy are themselves interfaces, so either can be swapped: the

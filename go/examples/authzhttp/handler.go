@@ -1,7 +1,6 @@
 package authzhttp
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -136,7 +135,7 @@ func parseTupleBody(r *http.Request) ([]rebac.TupleKey, error) {
 			User     string `json:"user"`
 		} `json:"tuples"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := readJSON(r, &body); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
 

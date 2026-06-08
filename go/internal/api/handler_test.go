@@ -138,6 +138,35 @@ func TestHandler_CreateDocument_Returns401WhenTokenMissing(t *testing.T) {
 	}
 }
 
+func TestHandler_CreateDocument_Returns400ForUnknownJSONField(t *testing.T) {
+	handler := newTestHandler(t)
+	payload := []byte(`{"id":"testDoc","title":"Test","body":"Body","workspaceId":"productWorkspace","extra":true}`)
+	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer demo-token-alice")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d — body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandler_PatchDocument_Returns400ForMultipleJSONValues(t *testing.T) {
+	handler := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader([]byte(`{"body":"updated"} {}`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer demo-token-alice")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d — body: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandler_GetDocument_Returns200ForViewer(t *testing.T) {
 	handler := newTestHandler(t)
 	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument", nil)

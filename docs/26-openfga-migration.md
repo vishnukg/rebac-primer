@@ -25,10 +25,11 @@ The from-scratch implementation exists for three reasons:
    can run all tests with `go test ./...` without Docker, without a network, and
    without an OpenFGA server.
 
-3. **The port stays** — domain code (`documents/`, `authz/`) depends only on the
-   `authz.Evaluator` interface. The graph evaluator and the OpenFGA SDK adapter
-   both satisfy that interface. Swapping one for the other changes exactly one
-   line in `cmd/server/main.go`.
+3. **The service port stays** — domain code (`documents/`) depends on the
+   `authz.Service` behavior it needs: check permissions and write relationship
+   tuples. The in-process backend builds that service from a graph evaluator and
+   an in-memory store; the OpenFGA adapter implements the whole service directly.
+   Swapping backends is a composition-root choice in `cmd/server/main.go`.
 
 ---
 
@@ -44,10 +45,10 @@ Every piece of our scratch implementation has a direct OpenFGA counterpart.
 | `rebac.CheckRequest` | Check call parameters | Same three fields |
 | `authz.TupleRepository` | Tuple store | We own the interface; OpenFGA owns the store |
 | `authz.InMemoryStore` | (our own, not in OpenFGA) | In-memory only; OpenFGA uses PostgreSQL or MySQL |
-| `authz.Evaluator` | Check API | Our port; OpenFGA's HTTP/gRPC endpoint is the adapter |
+| `authz.Evaluator` | Check engine | In-process only; OpenFGA does this inside the server |
 | `authz.GraphEvaluator` | OpenFGA's check engine | Our traversal mirrors what OpenFGA does internally |
 | `authz/model.go` (`teamRules`, `workspaceRules`, `documentRules`) | Authorization model DSL | We express rules as Go maps; OpenFGA uses a DSL stored in a database |
-| `authz.New(store, evaluator)` | (wiring only) | No OpenFGA equivalent; OpenFGA merges store and evaluator in one server |
+| `authz.Service` | OpenFGA-backed authz service | The app-facing port: Check, WriteTuples, DeleteTuples, ListTuples |
 
 ### The permission model side by side
 
@@ -100,36 +101,38 @@ define editor: [user] or editor from workspace or owner
 
 ## Architectural fit
 
-The key is that `authz.Evaluator` is an interface with one method:
+The key is that the documents service talks to an authz **service**, not to a
+specific evaluator or tuple store:
 
 ```go
-type Evaluator interface {
-    Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
+type Service interface {
+    Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
+    WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+    DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+    ListTuples(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error)
 }
 ```
 
-Both our `GraphEvaluator` and an OpenFGA SDK adapter satisfy this interface.
-The authz domain, the documents domain, and the HTTP layer never know which one
-is plugged in.
+Both backends satisfy that same app-facing shape, but they get there differently:
 
 ```text
-                       authz.Evaluator (interface)
+                         authz.Service
                               │
-              ┌───────────────┴─────────────────┐
-              │                                 │
-  authz.GraphEvaluator                 openfga.Service
-  (in-process, today)                 (SDK adapter, migration target)
-              │                                 │
-  reads InMemoryStore          calls OpenFGA server over HTTP/gRPC
+              ┌───────────────┴──────────────────┐
+              │                                  │
+  authz.New(store, evaluator)            openfga.Service
+  (in-process service)                   (SDK adapter)
+              │                                  │
+  GraphEvaluator + InMemoryStore         OpenFGA Check/Write/Read APIs
 ```
 
 The documents service sees only `documents.AuthzClient`, which `authz.Service`
-satisfies. The authz service sees only `authz.Evaluator`. The dependency chain is:
+satisfies. The dependency chain is:
 
 ```text
 cmd/server/main.go   ← only place that knows about concrete types
-    └── authz.New(tupleStore, evaluator)   ← evaluator is swappable here
-            └── documents.New(repo, authzSvc)
+    └── choose graph authz.Service OR OpenFGA authz.Service
+            └── documents.New(repo, authzService)
 ```
 
 ---
@@ -157,6 +160,41 @@ make go/server-openfga  # or: make ts/server-openfga
 ```
 
 The sections below explain what each step does under the hood.
+
+## Bootstrapping: what exists when?
+
+OpenFGA has three separate things, and bootstrapping is just creating them in the
+right order:
+
+| Step | What exists after this step | Where it lives |
+|---|---|---|
+| `make openfga/up` | An empty OpenFGA server | Docker container, memory datastore |
+| `make openfga/seed` creates a store | A namespace called `rebac-primer` | OpenFGA store |
+| `make openfga/seed` writes `model.fga` | The policy schema: object types, relations, inheritance, computed permissions | OpenFGA authorization model |
+| `make openfga/seed` writes policy tuples | Demo workspace/team facts: Alice is in a team, that team edits the workspace, Bob views the workspace | OpenFGA tuple store |
+| `make openfga/seed` writes `.ids.env` | The API URL, store ID, and model ID the app must use | `deployments/openfga/.ids.env` |
+| `make go/server-openfga` starts the app | The app connects to that store/model and creates the demo document | Go process + OpenFGA tuple store |
+
+The last row matters: `seed.sh` does **not** write the document-level tuples.
+When the server starts, `cmd/server/main.go` calls `documentsService.Create(...)`
+to create `roadmapDocument`. That domain operation calls `authzService.WriteTuples`,
+so in OpenFGA mode the adapter writes:
+
+```text
+(document:roadmapDocument, workspace, workspace:productWorkspace)
+(document:roadmapDocument, owner,     user:alice)
+```
+
+So there are two kinds of tuples:
+
+```text
+bootstrap tuples  -> long-lived/demo policy facts, written by seed.sh
+runtime tuples    -> facts created by app behavior, written through WriteTuples
+```
+
+The local Docker setup uses OpenFGA's memory datastore, so all of this disappears
+when the OpenFGA container restarts. That is why `make openfga/seed` writes fresh
+IDs each time and why the server targets source `.ids.env`.
 
 ## How to migrate to OpenFGA
 
@@ -214,28 +252,27 @@ import (
     "context"
     "fmt"
 
-    openfga "github.com/openfga/go-sdk"
-    fgaclient "github.com/openfga/go-sdk/client"
+    openfga "github.com/openfga/go-sdk/client"
 
     "rebac-primer/internal/authz"
     "rebac-primer/internal/rebac"
 )
 
 type Config struct {
-    APIURL               string
-    StoreID              string
-    AuthorizationModelID string
+    APIURL  string
+    StoreID string
+    ModelID string
 }
 
 // Service satisfies authz.Service by delegating to an OpenFGA server.
 type Service struct {
-    client *fgaclient.OpenFgaClient
+    client *openfga.OpenFgaClient
 }
 
 var _ authz.Service = (*Service)(nil)
 
 func New(cfg Config) (*Service, error) {
-    sdk, err := fgaclient.NewSdkClient(&fgaclient.ClientConfiguration{
+    client, err := openfga.NewSdkClient(&openfga.ClientConfiguration{
         ApiUrl:               cfg.APIURL,
         StoreId:              cfg.StoreID,
         AuthorizationModelId: cfg.ModelID,
@@ -243,11 +280,11 @@ func New(cfg Config) (*Service, error) {
     if err != nil {
         return nil, fmt.Errorf("openfga: new client: %w", err)
     }
-    return &Service{client: sdk}, nil
+    return &Service{client: client}, nil
 }
 
 func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
-    resp, err := s.client.Check(ctx).Body(fgaclient.ClientCheckRequest{
+    resp, err := s.client.Check(ctx).Body(openfga.ClientCheckRequest{
         User:     string(req.User),
         Relation: string(req.Relation),
         Object:   string(req.Object),
@@ -264,13 +301,13 @@ tuples written at runtime are visible to subsequent checks:
 
 ```go
 func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
-    writes := make([]fgaclient.ClientTupleKey, 0, len(tuples))
+    writes := make([]openfga.ClientTupleKey, 0, len(tuples))
     for _, t := range tuples {
-        writes = append(writes, fgaclient.ClientTupleKey{
+        writes = append(writes, openfga.ClientTupleKey{
             User: string(t.User), Relation: string(t.Relation), Object: string(t.Object),
         })
     }
-    _, err := s.client.Write(ctx).Body(fgaclient.ClientWriteRequest{Writes: writes}).Execute()
+    _, err := s.client.Write(ctx).Body(openfga.ClientWriteRequest{Writes: writes}).Execute()
     if err != nil {
         return fmt.Errorf("openfga: write tuples: %w", err)
     }
@@ -326,9 +363,10 @@ seed whenever you restart OpenFGA.
 
 ## What you keep from the from-scratch version
 
-Nothing is thrown away. The `authz.Service` interface, the `authz.Evaluator` port,
-the documents domain, and the HTTP layer are all unchanged. The only thing that
-changes is the concrete type plugged into the `evaluator` slot in `main.go`.
+Nothing is thrown away. The `authz.Service` interface, the in-process
+`authz.Evaluator` implementation, the documents domain, and the HTTP layer all
+still exist. The only thing that changes is which concrete `authz.Service` is
+plugged into `documents.New(...)` in `main.go`.
 
 That is the payoff of the ports-and-adapters design: you can replace the
 persistence and evaluation strategy without touching the business logic.

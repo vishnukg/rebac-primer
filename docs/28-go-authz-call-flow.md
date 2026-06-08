@@ -116,10 +116,11 @@ func (h *handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 
 ### 3. Authn — `documents/token.go`
 
-`VerifyAccessToken` strips `Bearer `, looks the token up in the demo map, and
-returns `AuthenticatedUser{Subject: "user:bob"}`. (In production this verifies a
-JWT instead — the port is unchanged.) **This establishes *who* is asking. The
-*what-can-they-do* question is the authz check in step 5.**
+`VerifyAccessToken` parses the `Authorization: Bearer <token>` header, looks the
+token up in the demo map, and returns `AuthenticatedUser{Subject: "user:bob"}`.
+(In production this verifies a JWT instead — the port is unchanged.) **This
+establishes *who* is asking. The *what-can-they-do* question is the authz check
+in step 5.**
 
 ### 4. Use case — `documents/service.go`
 
