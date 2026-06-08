@@ -1,80 +1,23 @@
 services:
-  ts-tools:
+  tools:
     build:
-      context: ../typescript
-      dockerfile: Dockerfile
-      target: deps
-    working_dir: /workspace
-    volumes:
-      - ../typescript:/workspace
-      - ts_node_modules:/workspace/node_modules
-    environment:
-      REBAC_API_URL: "http://ts-documents:4000"
-    profiles:
-      - ts-tools
-
-  # The TypeScript app is two independent services (mirroring the code's two-service
-  # design), each in its own container. They share one image; compose overrides the
-  # entrypoint command per service.
-  ts-authz:
-    build:
-      context: ../typescript
-      dockerfile: Dockerfile
-    command: ["node", "src/authz-service/index.ts"]
-    environment:
-      AUTHZ_PORT: "4100"
-      # Authorization backend. Default "graph" (in-process). The ts/server-openfga
-      # make target sets AUTHZ_BACKEND=openfga and the OPENFGA_* vars below.
-      AUTHZ_BACKEND: "${AUTHZ_BACKEND:-graph}"
-      OPENFGA_API_URL: "${OPENFGA_API_URL:-http://openfga:8080}"
-      OPENFGA_STORE_ID: "${OPENFGA_STORE_ID:-}"
-      OPENFGA_MODEL_ID: "${OPENFGA_MODEL_ID:-}"
-    ports:
-      - "4100:4100"
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 3s
-      timeout: 3s
-      retries: 10
-    profiles:
-      - ts-app
-
-  ts-documents:
-    build:
-      context: ../typescript
-      dockerfile: Dockerfile
-    command: ["node", "src/documents-service/index.ts"]
-    environment:
-      DOCUMENTS_PORT: "4000"
-      # Reach the authz service by its compose service name.
-      AUTHZ_URL: "http://ts-authz:4100"
-    ports:
-      - "4000:4000"
-    depends_on:
-      ts-authz:
-        condition: service_healthy
-    profiles:
-      - ts-app
-
-  go-tools:
-    build:
-      context: ../go
+      context: ..
       dockerfile: Dockerfile
       target: dev
     working_dir: /workspace
     volumes:
-      - ../go:/workspace
+      - ..:/workspace
       - go_cache:/root/go/pkg/mod
     profiles:
-      - go-tools
+      - tools
 
-  go-app:
+  app:
     build:
-      context: ../go
+      context: ..
       dockerfile: Dockerfile
     environment:
       PORT: "4001"
-      # Authorization backend. Default "graph" (in-process). The go/server-openfga
+      # Authorization backend. Default "graph" (in-process). The server-openfga
       # make target sets AUTHZ_BACKEND=openfga and the OPENFGA_* vars below.
       AUTHZ_BACKEND: "${AUTHZ_BACKEND:-graph}"
       OPENFGA_API_URL: "${OPENFGA_API_URL:-http://openfga:8080}"
@@ -83,7 +26,7 @@ services:
     ports:
       - "4001:4001"
     profiles:
-      - go-app
+      - app
 
   openfga:
     image: openfga/openfga:latest
@@ -97,5 +40,4 @@ services:
       - "3000:3000"
 
 volumes:
-  ts_node_modules:
   go_cache:

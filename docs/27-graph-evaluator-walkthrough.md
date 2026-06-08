@@ -5,9 +5,9 @@ answers a permission check.  No prior graph theory knowledge required.
 
 The relevant source files are:
 
-- `go/internal/authz/evaluator.go` — the traversal algorithm
-- `go/internal/authz/model.go` — the rule tables
-- `go/internal/authz/store.go` — the in-memory tuple store
+- `internal/authz/evaluator.go` — the traversal algorithm
+- `internal/authz/model.go` — the rule tables
+- `internal/authz/store.go` — the in-memory tuple store
 
 ---
 
@@ -420,13 +420,13 @@ Check "viewer" on workspace:productWorkspace for alice:
 
 Add a `can_share` permission: only document owners can share.
 
-**1. Add the relation constant** in `go/internal/rebac/rebac.go`:
+**1. Add the relation constant** in `internal/rebac/rebac.go`:
 
 ```go
 RelationDocumentCanShare Relation = "can_share"
 ```
 
-**2. Add the rule** in `go/internal/authz/model.go`:
+**2. Add the rule** in `internal/authz/model.go`:
 
 ```go
 var documentRules = impliedBy{
@@ -435,7 +435,7 @@ var documentRules = impliedBy{
 }
 ```
 
-**3. Add a test** in `go/internal/authz/evaluator_test.go`:
+**3. Add a test** in `internal/authz/evaluator_test.go`:
 
 ```go
 func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {

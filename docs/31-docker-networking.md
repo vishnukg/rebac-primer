@@ -1,157 +1,48 @@
-# Docker networking
+# Docker Networking
 
-Local development usually needs multiple processes:
+Docker Compose creates a private network for the services in
+`deployments/docker-compose.yml`.
 
-- the TypeScript app, Go app, or both
-- OpenFGA
-- maybe a database later
-- maybe a CLI on the host
+## Host Ports
 
-Docker networking is how those processes find each other.
-
-## Scene
-
-The app says `ECONNREFUSED`. OpenFGA is running. The port looks right. The
-problem is often not OpenFGA or the application language. It is where the
-request is coming from: your host or another container.
-
-## Host vs container networking
-
-Inside a container, `localhost` means the container itself.
-
-On your host machine, `localhost` means your laptop.
-
-That difference matters.
-
-If the app runs on your host and OpenFGA runs in Docker, the app can reach
-OpenFGA through the published port:
+The Go app publishes:
 
 ```text
-http://127.0.0.1:8080
+host 4001 -> container 4001
 ```
 
-If the app runs inside Docker Compose, it should reach OpenFGA by service name:
+OpenFGA publishes:
+
+```text
+host 8080 -> OpenFGA HTTP API
+host 8081 -> OpenFGA gRPC API
+host 3000 -> OpenFGA playground
+```
+
+## Service Names
+
+Inside Compose, services reach each other by service name. The Go app talks to
+OpenFGA at:
 
 ```text
 http://openfga:8080
 ```
 
-Compose creates DNS names for services.
-
-## Service names
-
-In `deployments/docker-compose.yml`:
-
-```yaml
-services:
-  openfga:
-    image: openfga/openfga:latest
-```
-
-Other Compose services can use:
+From your host machine, use:
 
 ```text
-openfga
+http://127.0.0.1:8080
 ```
 
-as a hostname.
+That is why `make server-openfga` sets `OPENFGA_API_URL=http://openfga:8080`
+for the container.
 
-That is why production-like config often differs from host-local config:
-
-```text
-host app -> http://127.0.0.1:8080
-compose app -> http://openfga:8080
-```
-
-## Published ports
-
-OpenFGA publishes:
-
-```yaml
-ports:
-  - "8080:8080"
-  - "8081:8081"
-  - "3000:3000"
-```
-
-The left side is your host. The right side is the container.
-
-Common OpenFGA ports:
-
-- `8080`: HTTP API (what the SDK calls)
-- `8081`: gRPC API
-- `3000`: Playground UI — only served when `OPENFGA_PLAYGROUND_ENABLED=true` is
-  set on the container. This repo's compose file publishes the port but does
-  not enable the playground, so nothing is listening on `localhost:3000` until
-  you add that env var.
-
-## Compose profiles
-
-The app services use profiles:
-
-```yaml
-ts-authz:        # both TypeScript services share the ts-app profile
-  profiles:
-    - ts-app
-ts-documents:
-  profiles:
-    - ts-app
-
-go-app:
-  profiles:
-    - go-app
-```
-
-That means plain Compose can start only OpenFGA:
+## Quick Checks
 
 ```bash
-docker compose -f deployments/docker-compose.yml up openfga
-```
-
-And these start the app containers:
-
-```bash
-docker compose -f deployments/docker-compose.yml --profile ts-app up
-docker compose -f deployments/docker-compose.yml --profile go-app up
-```
-
-Profiles keep local infrastructure flexible.
-
-## Debugging networking
-
-Useful checks:
-
-```bash
+make openfga/up
 docker compose -f deployments/docker-compose.yml ps
-```
-
-```bash
-curl http://127.0.0.1:4000/health
+curl http://127.0.0.1:8080/healthz
+make server
 curl http://127.0.0.1:4001/health
 ```
-
-```bash
-curl http://127.0.0.1:8080/healthz
-```
-
-If a container cannot reach another service, check:
-
-1. Are they in the same Compose project?
-2. Are you using service name from inside Docker?
-3. Are you using published host port from outside Docker?
-4. Is the service actually listening on that port?
-
-## Rule of thumb
-
-```text
-From your laptop: use 127.0.0.1 plus published port.
-From another Compose service: use service name plus container port.
-```
-
-## Checkpoint
-
-If the app runs inside Compose, should it call OpenFGA at `127.0.0.1:8080` or
-`openfga:8080`?
-
-Good answer: `openfga:8080`, because `127.0.0.1` inside a container points back
-to that same container.

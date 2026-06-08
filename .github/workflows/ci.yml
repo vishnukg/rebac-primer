@@ -6,35 +6,14 @@ on:
   pull_request:
 
 jobs:
-  typescript:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: typescript
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: typescript/package-lock.json
-      - run: npm ci
-      - run: npm run build
-      - run: npm run lint
-      - run: npm test
-      - run: npm run audit # make*/compose* naming convention
-
   go:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: go
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
       - run: go build ./...
       - name: gofmt
         run: |
@@ -46,3 +25,4 @@ jobs:
       - run: go vet ./...
       - run: go tool staticcheck ./... # pinned via the tool directive in go.mod
       - run: go test ./...
+      - run: go test -race ./...

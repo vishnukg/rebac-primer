@@ -7,46 +7,67 @@ COMPOSE_MENU ?= false
 export COMPOSE_MENU
 
 COMPOSE ?= docker compose -f deployments/docker-compose.yml
-
-# Containerized tool/app runners shared by the language-specific makefiles.
-# Defined here (before the includes) so go/go.mk and typescript/ts.mk can use them.
-TS_TOOLS := $(COMPOSE) --profile ts-tools run --rm ts-tools
-GO_TOOLS  := $(COMPOSE) --profile go-tools run --rm go-tools
-TS_APP    := $(COMPOSE) --profile ts-app
-GO_APP    := $(COMPOSE) --profile go-app
+GO_TOOLS := $(COMPOSE) --profile tools run --rm tools
+APP      := $(COMPOSE) --profile app
 
 .DEFAULT_GOAL := help
 
-# Language-specific targets live alongside each implementation (go/go.mk,
-# typescript/ts.mk). This root ties them together and owns the shared (OpenFGA /
-# cleanup) targets. They are namespaced with a slash — `make go/test`,
-# `make ts/server`, etc. The fragments are NOT standalone: they are included here
-# and every recipe runs from the repo root (so deployments/... paths resolve).
-include go/go.mk
-include typescript/ts.mk
-
-.PHONY: help openfga/up openfga/down openfga/seed compose/config clean
+.PHONY: help build test vet lint check shell server server-down server-openfga \
+        openfga/up openfga/down openfga/seed compose/config clean
 
 help:
-	@printf '%s\n' 'ReBAC Primer — TypeScript and Go implementations'
+	@printf '%s\n' 'ReBAC Primer — Go implementation'
 	@printf '%s\n' ''
 	@printf '%s\n' '3 Musketeers workflow: make -> docker compose -> containerized tools'
 	@printf '%s\n' ''
-	@$(MAKE) --no-print-directory ts/help
+	@printf '%s\n' 'Go:'
+	@printf '%s\n' '  make build          Compile Go packages'
+	@printf '%s\n' '  make test           Run Go tests'
+	@printf '%s\n' '  make vet            Run go vet'
+	@printf '%s\n' '  make lint           Run staticcheck (go tool)'
+	@printf '%s\n' '  make check          Vet, staticcheck, and test'
+	@printf '%s\n' '  make shell          Open shell in the Go tools container'
+	@printf '%s\n' '  make server         Run the Go app on http://127.0.0.1:4001'
 	@printf '%s\n' ''
-	@$(MAKE) --no-print-directory go/help
-	@printf '%s\n' ''
-	@printf '%s\n' 'Shared:'
+	@printf '%s\n' 'OpenFGA:'
 	@printf '%s\n' '  make openfga/up     Start local OpenFGA'
 	@printf '%s\n' '  make openfga/down   Stop local OpenFGA'
-	@printf '%s\n' '  make clean          Remove containers, volumes, and build output'
+	@printf '%s\n' '  make openfga/seed   Create store, write model, seed tuples'
+	@printf '%s\n' '  make server-openfga Run app with AUTHZ_BACKEND=openfga'
 	@printf '%s\n' ''
-	@printf '%s\n' 'Real OpenFGA backend (swap the from-scratch evaluator for OpenFGA):'
-	@printf '%s\n' '  make openfga/up && make openfga/seed   Start + seed model/tuples (needs fga + jq)'
-	@printf '%s\n' '  make go/server-openfga                 Go app, AUTHZ_BACKEND=openfga'
-	@printf '%s\n' '  make ts/server-openfga                 TS app, AUTHZ_BACKEND=openfga'
+	@printf '%s\n' 'Cleanup:'
+	@printf '%s\n' '  make clean          Remove containers, volumes, and build output'
 
-# ── Shared targets ──────────────────────────────────────────────────────────
+build:
+	$(GO_TOOLS) go build ./...
+
+test:
+	$(GO_TOOLS) go test ./...
+
+vet:
+	$(GO_TOOLS) go vet ./...
+
+# staticcheck is pinned as a module tool dependency (the `tool` directive in
+# go.mod), so `go tool staticcheck` builds it from the module — no global install.
+lint:
+	$(GO_TOOLS) go tool staticcheck ./...
+
+check:
+	$(GO_TOOLS) sh -c 'go vet ./... && go tool staticcheck ./... && go test ./...'
+
+shell:
+	$(GO_TOOLS) sh
+
+server:
+	$(APP) up --build app
+
+server-down:
+	$(APP) down
+
+server-openfga:
+	@test -f deployments/openfga/.ids.env || { echo "Run 'make openfga/up && make openfga/seed' first."; exit 1; }
+	set -a; . deployments/openfga/.ids.env; set +a; \
+	AUTHZ_BACKEND=openfga OPENFGA_API_URL=http://openfga:8080 $(APP) up --build app
 
 openfga/up:
 	$(COMPOSE) up -d openfga
@@ -60,8 +81,8 @@ openfga/seed:
 	deployments/openfga/seed.sh
 
 compose/config:
-	$(COMPOSE) --profile ts-app --profile ts-tools --profile go-app --profile go-tools config
+	$(COMPOSE) --profile app --profile tools config
 
 clean:
-	$(COMPOSE) --profile ts-app --profile ts-tools --profile go-app --profile go-tools down --volumes --remove-orphans
-	rm -rf typescript/dist typescript/coverage go/bin
+	$(COMPOSE) --profile app --profile tools down --volumes --remove-orphans
+	rm -rf bin

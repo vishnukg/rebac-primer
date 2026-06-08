@@ -16,7 +16,7 @@ import (
 // To run it:
 //
 //	make openfga-up && make openfga-seed   # start OpenFGA, write model + policy tuples
-//	make go-server-openfga                 # start once so the document tuple is written
+//	make server-openfga                 # start once so the document tuple is written
 //	OPENFGA_API_URL=http://127.0.0.1:8080 \
 //	OPENFGA_STORE_ID=<id> OPENFGA_MODEL_ID=<id> \
 //	  go test -run TestContract_OpenFGA ./internal/openfga

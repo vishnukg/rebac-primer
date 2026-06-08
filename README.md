@@ -1,117 +1,73 @@
-# ReBAC Primer: TypeScript and Go
+# ReBAC Primer: Go
 
-This repository teaches relationship-based access control (ReBAC) with OpenFGA
-through two parallel implementations of the same application — one in TypeScript,
-one in Go.
+This repository teaches relationship-based access control (ReBAC) with a Go
+implementation and an optional OpenFGA backend.
 
 The project domain is a collaborative document workspace. Workspaces contain
 documents, teams get workspace access, and users inherit permissions through a
-relationship graph. That domain is small enough to stay concrete but rich enough
-to demonstrate the core ideas in both languages.
+relationship graph. The domain is small enough to trace by hand but rich enough
+to show the important ReBAC ideas.
 
-## Repository map
+## Repository Map
 
-```
-typescript/                TypeScript implementation
-  src/shared/              ReBAC value helpers (objects, relations, tuples)
-  src/authz-service/       AuthZ service: core/ (domain + ports), adapters/ (db, graph, http)
-  src/documents-service/   Documents service: core/, adapters/ (authn, authz, db, http, client)
-  src/cli/                 Terminal client composition root and entry point
-  test/                    Vitest tests
+```text
+internal/rebac/          ReBAC primitives: Object, Relation, TupleKey, CheckRequest
+internal/authz/          AuthZ service, tuple store, graph evaluator, model rules
+internal/openfga/        OpenFGA-backed authz.Service
+internal/documents/      Documents service, repository, demo token verifier
+internal/api/            HTTP server for the documents service
+internal/fixtures/       Shared demo/test data
+cmd/server/              Composition root and entry point
 
-go/                        Go implementation (flat packages, idiomatic layout)
-  internal/rebac/          ReBAC primitives (Object, Relation, TupleKey, CheckRequest)
-  internal/authz/          AuthZ service: Service + interfaces + store + evaluator + model
-  internal/openfga/        OpenFGA-backed authz.Service (alternative backend)
-  internal/documents/      Documents service: Service + interfaces + create/read/update + store + token
-  internal/api/            HTTP server for the documents service
-  internal/fixtures/       Shared test data
-  cmd/server/              Wires everything + entry point
-
-docs/             Tutorial chapters (read these in order)
-deployments/      Docker Compose for both implementations + OpenFGA
+deployments/               Docker Compose + OpenFGA model/seed script
+docs/                      Tutorial chapters
 ```
 
-## Where to start
+## Start Here
 
-Read [docs/00-course-map.md](docs/00-course-map.md) for the full learning path.
+Read [START-HERE.md](START-HERE.md), then follow
+[docs/00-course-map.md](docs/00-course-map.md).
 
-### The minimal path (start here)
+Minimal path:
 
-If you just want to understand ReBAC and read it working, you only need ~8 docs:
-
-1. **Concepts** — docs 01 → 02 → 03 → 04 → 05 (authn, authz, graphs, ReBAC, the model)
-2. **One implementation** (pick a language):
-   - Go: 20 → 21 → 27 (primer → implementation → a step-by-step evaluator trace)
-   - TypeScript: 10 → 11 → 12 → 18
-3. **Run it**: `make go/test` then `make go/server` (or `make ts/test` / `make ts/server`)
-
-Everything below is **optional depth** — read it when you want it, not before.
-
-### The rest (optional depth)
-
-1. Shared concepts + architecture synthesis -> docs 01-06
-2. TypeScript implementation track -> docs 10-19 (+ doc 29, the authz call flow)
-3. Go implementation track -> docs 20-28
-4. OpenFGA backend (swap the in-process evaluator) -> docs 26, 34
-5. Shared Docker/local services -> docs 30-33
-6. Shared production concerns -> doc 40
-
-You can learn either language without reading the other language track. The
-authorization, OpenFGA model, Docker, and production-readiness chapters are the
-common spine for both implementations. The Go language deep-dives (22-25) and the
-OpenFGA/Docker/production chapters are advanced tracks, not prerequisites.
+1. `docs/01-oauth-authentication.md`
+2. `docs/02-authorization-fundamentals.md`
+3. `docs/03-graph-theory-for-rebac.md`
+4. `docs/04-rebac-concepts.md`
+5. `docs/05-openfga-model.md`
+6. `docs/21-go-rebac-implementation.md`
+7. `docs/27-graph-evaluator-walkthrough.md`
+8. `docs/28-go-authz-call-flow.md`
 
 ## Commands
 
 This repo uses the [3 Musketeers](https://3musketeers.io/) pattern:
 
-```
-make → docker compose → containerized tools
+```text
+make -> docker compose -> containerized tools
 ```
 
-**TypeScript** (server on port 4000):
+Go:
 
 ```bash
-make ts/deps
-make ts/build
-make ts/test
-make ts/coverage
-make ts/check
-make ts/server
-make ts/client
+make build
+make test
+make vet
+make check
+make server
 ```
 
-**Go** (server on port 4001):
+Local OpenFGA:
 
 ```bash
-make go/build
-make go/test
-make go/vet
-make go/check
-make go/server
-```
-
-**Shared**:
-
-```bash
-make openfga/up    # start local OpenFGA
-make openfga/down  # stop everything
-make clean         # remove containers, volumes, and build output
-```
-
-**Swap the from-scratch evaluator for a real OpenFGA backend** (flag-driven; needs
-the `fga` CLI + `jq`):
-
-```bash
-make openfga/up && make openfga/seed   # start OpenFGA, write model.fga + policy tuples
-make go/server-openfga                 # Go app with AUTHZ_BACKEND=openfga
-make ts/server-openfga                 # TS app with AUTHZ_BACKEND=openfga
+make openfga/up
+make openfga/seed
+make server-openfga
 ```
 
 Run `make` with no arguments to see all targets.
 
-## The authorization story
+## The Authorization Story
 
 ```text
 Alice can edit the roadmap document
@@ -121,11 +77,11 @@ Alice can edit the roadmap document
 
 Bob can read but not edit.
 
-Casey has no path through the graph — access is denied.
+Casey has no path through the graph, so access is denied.
 ```
 
-| Person or object | ReBAC ID | Role in the example |
-|------------------|----------|---------------------|
+| Person or object | ReBAC ID | Role |
+|---|---|---|
 | Alice | `user:alice` | platform team member; can edit |
 | Bob | `user:bob` | workspace viewer; can read only |
 | Casey | `user:casey` | outside collaborator; denied |
@@ -133,32 +89,6 @@ Casey has no path through the graph — access is denied.
 | Product Workspace | `workspace:productWorkspace` | contains the roadmap document |
 | Roadmap Document | `document:roadmapDocument` | protected document |
 
-Both implementations answer the same question with the same graph traversal
-algorithm. Reading them side by side is the lesson.
-
-## TypeScript ports and adapters
-
-The TypeScript project is organized around a small ports-and-adapters shape:
-
-```text
-adapters -> core <- composition roots
-```
-
-Each service has a `core/` (the domain language and ports: ReBAC objects,
-relations, tuples, `Evaluator`, `Authenticator`, `DocumentRepository`, and the
-document operations) and an `adapters/` (concrete details: demo token
-verification, the graph evaluator, in-memory persistence, HTTP, and
-terminal/HTTP clients).
-
-Domain code does not import concrete infrastructure. For example, document
-operations receive a repository and an authz client. Each service's `compose.ts`
-chooses the in-memory repository, demo OAuth2 token verifier, and graph
-evaluator, then wires them together.
-
-Good files to read first:
-
-1. `typescript/src/documents-service/compose.ts`
-2. `typescript/src/authz-service/core/ports/evaluator.ts`
-3. `typescript/src/documents-service/core/domain/makeDocuments.ts`
-4. `typescript/src/authz-service/adapters/graph/makeGraphEvaluator.ts`
-5. `typescript/src/documents-service/adapters/http/makeDocumentsHttpHandler.ts`
+The in-process graph evaluator is the learning implementation. The OpenFGA
+adapter is the production direction: it implements the same `authz.Service` port
+and stores/evaluates relationships in OpenFGA.

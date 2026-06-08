@@ -34,7 +34,7 @@ A stored fact (a **tuple**) is exactly one labeled edge.
 
 ### 3. Our whole graph is 4 edges
 
-These are the four fixture tuples (`go/internal/fixtures/fixtures.go`):
+These are the four fixture tuples (`internal/fixtures/fixtures.go`):
 
 ```
 user:alice ─[member]─►  team:platformTeam
@@ -240,7 +240,7 @@ answers; one is in your process, one is a real service.
 
 - [play.fga.dev](https://play.fga.dev) — paste a model + tuples, run checks in a
   browser, see the resolution visually. Try pasting `model.fga`.
-- Then `make openfga/up && make openfga/seed && make go/server-openfga`.
+- Then `make openfga/up && make openfga/seed && make server-openfga`.
 
 ---
 

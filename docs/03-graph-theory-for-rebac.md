@@ -451,19 +451,9 @@ A -> B -> C -> A
 Cycles can happen in relationship graphs. A traversal algorithm must avoid
 walking forever.
 
-Both implementations keep a `visited` set that records every `(object, relation)`
-pair already evaluated in this request. If the same pair is seen again, the branch
-stops immediately.
-
-TypeScript (`makeGraphEvaluator.ts`):
-
-```ts
-const visitKey: VisitKey = `${object}#${relation}`;
-if (visited.has(visitKey)) {
-  return false;
-}
-visited.add(visitKey);
-```
+The Go evaluator keeps a `visited` set that records every `(object, relation)`
+pair already evaluated in this request. If the same pair is seen again, the
+branch stops immediately.
 
 Go (`evaluator.go`):
 

@@ -10,11 +10,7 @@ import "fmt"
 // Go generics use type parameters declared in square brackets: [T any] means
 // "T can be any type." The constraint 'any' is an alias for interface{}.
 //
-// Compare with TypeScript's generic syntax:
-//
-//	type Result<T> = { ok: true; value: T } | { ok: false; error: string }
-//
-// Go achieves the same idea with a struct and a bool field.
+// Go represents this value-or-error shape with a struct and a bool field.
 type Result[T any] struct {
 	value T
 	err   error
