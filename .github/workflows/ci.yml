@@ -36,7 +36,13 @@ jobs:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
       - run: go build ./...
-      - run: test -z "$(gofmt -l .)" || { echo 'gofmt: files need formatting:'; gofmt -l .; exit 1; }
+      - name: gofmt
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "These files need gofmt:"
+            gofmt -l .
+            exit 1
+          fi
       - run: go vet ./...
       - run: go tool staticcheck ./... # pinned via the tool directive in go.mod
       - run: go test ./...
