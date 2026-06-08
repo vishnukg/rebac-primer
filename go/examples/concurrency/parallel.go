@@ -1,4 +1,7 @@
-package graph
+// Package concurrency is a Go-language teaching example, NOT part of the
+// production ReBAC path. It demonstrates goroutines, channels, and WaitGroups by
+// fanning out permission checks. See docs/22-go-concurrency.md.
+package concurrency
 
 import (
 	"context"
@@ -11,9 +14,8 @@ import (
 
 // Checker is a minimal interface for permission evaluation.
 // It is a type alias for [authz.Evaluator] — the two are interchangeable.
-// Defining it here lets graph-internal helpers (AuditEvaluator, AllPermissions)
-// accept any evaluator adapter without importing the authz package by a long
-// path in every call site.
+// Defining it here lets these helpers accept any evaluator adapter without
+// repeating the long authz package path at every call site.
 type Checker = authz.Evaluator
 
 // PermissionSummary maps a Relation to whether it is allowed for a given user

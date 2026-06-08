@@ -20,7 +20,7 @@ directories.
 go/
 ├── cmd/server/main.go               Entry point + composition root
 │                                    (the only file that imports all concrete types)
-└── internal/
+├── internal/
     ├── shared/
     │   └── rebac.go                 Object / Relation / TupleKey / CheckRequest types
     │                                mirrors typescript/src/shared/rebac.ts
@@ -32,14 +32,8 @@ go/
     │       ├── db/store.go          InMemoryTupleStore
     │       ├── graph/
     │       │   ├── evaluator.go     GraphEvaluator (graph traversal)
-    │       │   ├── permissionmodel.go  Implied-by rules (the permission hierarchy)
-    │       │   ├── parallel.go      AllPermissions / BulkCheck (concurrency demo)
-    │       │   ├── middleware.go    AuditEvaluator, ReadOnlyStore (decorator demo)
-    │       │   └── result.go        Result[T] generic (generics demo)
-    │       └── http/
-    │           ├── server.go        routes: /health, /check, /tuples
-    │           ├── handler.go       request handlers
-    │           └── json.go          writeJSON / readJSON helpers
+    │       │   └── permissionmodel.go  Implied-by rules (the permission hierarchy)
+    │       └── openfga/openfga.go   OpenFGA-backed authz.Service (alt backend)
     ├── documents/
     │   ├── documents.go             Service interface (driving port)
     │   ├── ports.go                 CollaborativeDocument + DocumentRepository +
@@ -56,6 +50,11 @@ go/
     │           ├── handler.go       Route handlers + error dispatch
     │           └── json.go          writeJSON / readJSON helpers
     └── fixtures/fixtures.go         Shared test data (users, tuples, tokens)
+└── examples/                        Go-LANGUAGE lessons, NOT the ReBAC engine.
+    ├── generics/result.go             These import internal/ but are never
+    ├── concurrency/parallel.go        imported BY it — delete the folder and
+    ├── middleware/middleware.go       the system still runs. See
+    └── authzhttp/                     go/examples/README.md.
 ```
 
 The dependency arrows always flow inward — nothing in `internal/` ever imports
@@ -151,13 +150,16 @@ imports a concrete type.
 ```go
 // go/internal/authz/ports.go
 
-// TupleRepository is the persistence port.
+// TupleRepository is the persistence port. Every method takes a context and
+// returns an error so a real backend (Postgres, a network store) can time out,
+// fail, or be cancelled mid-check. The in-memory store never errors, but the
+// port is shaped for one that can.
 type TupleRepository interface {
-    Has(object shared.Object, relation shared.Relation, user shared.Subject) bool
-    FindByObjectRelation(object shared.Object, relation shared.Relation) []shared.TupleKey
-    FindAll(filter ...TupleFilter) []shared.TupleKey
-    Write(tuple shared.TupleKey)
-    Delete(tuple shared.TupleKey)
+    Has(ctx context.Context, object shared.Object, relation shared.Relation, user shared.Subject) (bool, error)
+    FindByObjectRelation(ctx context.Context, object shared.Object, relation shared.Relation) ([]shared.TupleKey, error)
+    FindAll(ctx context.Context, filter ...TupleFilter) ([]shared.TupleKey, error)
+    Write(ctx context.Context, tuple shared.TupleKey) error
+    Delete(ctx context.Context, tuple shared.TupleKey) error
 }
 
 // Evaluator is the graph-traversal port.
@@ -228,17 +230,20 @@ type InMemoryTupleStore struct {
     tuples map[string]shared.TupleKey
 }
 
-func (s *InMemoryTupleStore) Has(object shared.Object, relation shared.Relation, user shared.Subject) bool {
+// The ctx is unused (a map never blocks) and the error is always nil, but both
+// are part of the port so a real backend can honour them.
+func (s *InMemoryTupleStore) Has(_ context.Context, object shared.Object, relation shared.Relation, user shared.Subject) (bool, error) {
     s.mu.RLock()           // multiple concurrent readers allowed
     defer s.mu.RUnlock()   // released when this function returns, even on panic
     _, ok := s.tuples[keyFor(shared.TupleKey{...})]
-    return ok
+    return ok, nil
 }
 
-func (s *InMemoryTupleStore) Write(key shared.TupleKey) {
+func (s *InMemoryTupleStore) Write(_ context.Context, key shared.TupleKey) error {
     s.mu.Lock()            // exclusive — blocks all readers and writers
     defer s.mu.Unlock()
     s.tuples[keyFor(key)] = key
+    return nil
 }
 ```
 
@@ -274,27 +279,41 @@ the `alice / can_edit / roadmapDocument` case with diagrams.
 The algorithm is identical to the TypeScript version. Go idioms make it look
 different.
 
-### Pointer to slice for the trace
+### Per-request state: the `resolution` struct
 
-TypeScript passes `trace: string[]` and appends to it. JavaScript arrays are
-reference types — callee and caller share the same backing array.
-
-Go slices are value types. Passing a slice copies its header (pointer, length,
-capacity). To let recursive calls append to the *same* underlying array, the
-implementation passes a **pointer to the slice**:
+A single check accumulates state as it recurses: the running `trace`, the
+`visited` set (cycle guard), and the request's `context`. Rather than thread all
+of those through every recursive call, the evaluator bundles them in a small
+**per-request struct** and hangs the recursive helpers off it:
 
 ```go
-func (g *GraphEvaluator) hasRelation(
+type resolution struct {
+    ev      *GraphEvaluator
+    ctx     context.Context
+    trace   []string
+    visited map[string]bool
+}
+
+func (r *resolution) hasRelation(
     user     shared.Object,
     object   shared.Object,
     relation shared.Relation,
-    trace    *[]string,          // pointer — appends visible to all callers
-    visited  map[string]bool,    // map — already a reference type, no pointer needed
-) bool {
-    *trace = append(*trace, fmt.Sprintf("Already evaluated %s; stop", visitKey))
+    depth    int,                 // bounded by ev.maxDepth — guards against
+                                  // pathological/deep graphs
+) (bool, error) {
+    r.trace = append(r.trace, ...)   // shared via the struct field; no slice pointer
     // ...
 }
 ```
+
+`Evaluate` builds a fresh `resolution` per call, so concurrent checks never share
+state and the `GraphEvaluator` itself stays immutable and safe to share. The
+helpers return `(bool, error)` so a store failure or a cancelled `ctx` propagates
+out instead of being silently swallowed as "denied".
+
+(The TypeScript version threads a `trace: string[]` argument instead. Go slices
+are values — passing one and appending would not be visible to the caller — so
+the struct field sidesteps that problem rather than reaching for a `*[]string`.)
 
 ### Visited set as `map[string]bool`
 
@@ -330,15 +349,18 @@ compile. It is a zero-cost guard that makes the compiler your test.
 
 ---
 
-## `authz/adapters/graph/` — Go-specific extras
+## `examples/` — Go-specific extras (NOT the ReBAC engine)
 
-These files have no TypeScript equivalent. They demonstrate Go-specific patterns
-using the authz types.
+These files have no TypeScript equivalent and are **not** part of the running
+authorization path. They live under `go/examples/` and demonstrate Go-specific
+patterns using the authz types. They import `internal/` but nothing in
+`internal/` imports them — delete the folder and the system still works. See
+`go/examples/README.md`.
 
-### `result.go` — generic value-or-error container
+### `examples/generics/result.go` — generic value-or-error container
 
 ```go
-// go/internal/authz/adapters/graph/result.go
+// go/examples/generics/result.go
 type Result[T any] struct {
     value T
     err   error
@@ -371,7 +393,7 @@ func Map[T, U any](r Result[T], f func(T) U) Result[U] {
 }
 ```
 
-### `parallel.go` — concurrent permission checks
+### `examples/concurrency/parallel.go` — concurrent permission checks
 
 `AllPermissions` checks all four computed permissions concurrently using
 goroutines and a buffered channel:
@@ -405,7 +427,7 @@ func AllPermissions(ctx context.Context, auth Checker, user, object shared.Objec
 `BulkCheck` uses a `sync.WaitGroup` to preserve the input ordering despite
 goroutines finishing in an arbitrary sequence.
 
-### `middleware.go` — decorator pattern
+### `examples/middleware/middleware.go` — decorator pattern
 
 `AuditEvaluator` wraps any `Checker` (= `authz.Evaluator`) and logs every call:
 
@@ -581,7 +603,10 @@ func (h *handler) writeError(w http.ResponseWriter, err error) {
         writeJSON(w, http.StatusForbidden, errorBody(err.Error()))
         return
     }
-    writeJSON(w, http.StatusBadRequest, errorBody(err.Error()))
+    // Unknown error = unexpected internal failure: log it server-side and return
+    // a generic 500, rather than leaking internals or mislabelling it a 400.
+    log.Printf("documents: unhandled internal error: %v", err)
+    writeJSON(w, http.StatusInternalServerError, errorBody("internal server error"))
 }
 ```
 

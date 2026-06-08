@@ -4,8 +4,8 @@ Go ships a testing package in the standard library. No framework required. This
 chapter covers the four patterns that appear in this repo, in order from most
 common to most specialised.
 
-Code references: `go/internal/authz/adapters/graph/evaluator_test.go`, `go/internal/authz/adapters/graph/parallel_test.go`,
-`go/internal/authz/adapters/graph/middleware_test.go`, `go/internal/authz/adapters/graph/result_test.go`.
+Code references: `go/internal/authz/adapters/graph/evaluator_test.go`, `go/examples/concurrency/parallel_test.go`,
+`go/examples/middleware/middleware_test.go`, `go/examples/generics/result_test.go`.
 
 ## The testing package basics
 
@@ -338,7 +338,7 @@ Only the rows matching `outside` run. Add a new row for a direct document owner
 go test -bench=BenchmarkGraphEvaluator_Evaluate -benchtime=3s ./internal/authz/adapters/graph/...
 ```
 
-Note the `ns/op`. Then modify `GraphEvaluator.hasRelation` to add a `time.Sleep(1*time.Microsecond)` at the top and run the benchmark again. The number should jump.
+Note the `ns/op`. Then modify `resolution.hasRelation` (the recursive method in `evaluator.go`) to add a `time.Sleep(1*time.Microsecond)` at the top and run the benchmark again. The number should jump.
 
 **Run the fuzz test:**
 

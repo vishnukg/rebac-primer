@@ -46,13 +46,17 @@ type stubRepository struct {
 	all []shared.TupleKey
 }
 
-func (s stubRepository) Has(shared.Object, shared.Relation, shared.Subject) bool { return false }
-func (s stubRepository) FindByObjectRelation(shared.Object, shared.Relation) []shared.TupleKey {
-	return nil
+func (s stubRepository) Has(context.Context, shared.Object, shared.Relation, shared.Subject) (bool, error) {
+	return false, nil
 }
-func (s stubRepository) FindAll(...authz.TupleFilter) []shared.TupleKey { return s.all }
-func (s stubRepository) Write(shared.TupleKey)                          {}
-func (s stubRepository) Delete(shared.TupleKey)                         {}
+func (s stubRepository) FindByObjectRelation(context.Context, shared.Object, shared.Relation) ([]shared.TupleKey, error) {
+	return nil, nil
+}
+func (s stubRepository) FindAll(context.Context, ...authz.TupleFilter) ([]shared.TupleKey, error) {
+	return s.all, nil
+}
+func (s stubRepository) Write(context.Context, shared.TupleKey) error  { return nil }
+func (s stubRepository) Delete(context.Context, shared.TupleKey) error { return nil }
 
 // ── Mocks (behaviour verification) ──────────────────────────────────────────
 
@@ -78,16 +82,24 @@ type mockRepository struct {
 	findResult  []shared.TupleKey
 }
 
-func (m *mockRepository) Has(shared.Object, shared.Relation, shared.Subject) bool { return false }
-func (m *mockRepository) FindByObjectRelation(shared.Object, shared.Relation) []shared.TupleKey {
+func (m *mockRepository) Has(context.Context, shared.Object, shared.Relation, shared.Subject) (bool, error) {
+	return false, nil
+}
+func (m *mockRepository) FindByObjectRelation(context.Context, shared.Object, shared.Relation) ([]shared.TupleKey, error) {
+	return nil, nil
+}
+func (m *mockRepository) FindAll(_ context.Context, filter ...authz.TupleFilter) ([]shared.TupleKey, error) {
+	m.findFilters = append(m.findFilters, filter)
+	return m.findResult, nil
+}
+func (m *mockRepository) Write(_ context.Context, t shared.TupleKey) error {
+	m.writes = append(m.writes, t)
 	return nil
 }
-func (m *mockRepository) FindAll(filter ...authz.TupleFilter) []shared.TupleKey {
-	m.findFilters = append(m.findFilters, filter)
-	return m.findResult
+func (m *mockRepository) Delete(_ context.Context, t shared.TupleKey) error {
+	m.deletes = append(m.deletes, t)
+	return nil
 }
-func (m *mockRepository) Write(t shared.TupleKey)  { m.writes = append(m.writes, t) }
-func (m *mockRepository) Delete(t shared.TupleKey) { m.deletes = append(m.deletes, t) }
 
 // Compile-time checks that the doubles satisfy the ports they stand in for.
 var (
@@ -264,5 +276,54 @@ func TestService_GivenFilter_WhenListTuples_ThenPassesFilterToRepository(t *test
 	}
 	if len(repo.findFilters[0]) != 1 || repo.findFilters[0][0] != filter {
 		t.Errorf("FindAll filter = %+v, want [%+v]", repo.findFilters[0], filter)
+	}
+}
+
+// ── Tuple validation ────────────────────────────────────────────────────────
+
+func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAndWritesNothing(t *testing.T) {
+	// Each case is a tuple that is malformed in exactly one field. The Service must
+	// reject the whole batch with a *TupleValidationError and never call Write.
+	cases := map[string]shared.TupleKey{
+		"object missing type": {Object: "roadmap", Relation: shared.RelationDocumentOwner, User: shared.Subject(shared.User("alice"))},
+		"unknown object type": {Object: "widget:1", Relation: shared.RelationDocumentOwner, User: shared.Subject(shared.User("alice"))},
+		"empty relation":      {Object: shared.Document("d1"), Relation: "", User: shared.Subject(shared.User("alice"))},
+		"user missing type":   {Object: shared.Document("d1"), Relation: shared.RelationDocumentOwner, User: "alice"},
+	}
+
+	for name, tk := range cases {
+		t.Run(name, func(t *testing.T) {
+			repo := &mockRepository{}
+			svc := authz.New(repo, stubEvaluator{})
+
+			err := svc.WriteTuples(context.Background(), []shared.TupleKey{tk})
+
+			var verr *authz.TupleValidationError
+			if !errors.As(err, &verr) {
+				t.Fatalf("expected *TupleValidationError, got %v", err)
+			}
+			if len(repo.writes) != 0 {
+				t.Errorf("expected no writes when a tuple is invalid, got %d", len(repo.writes))
+			}
+		})
+	}
+}
+
+func TestService_GivenValidSubjectSetTuple_WhenWriteTuples_ThenSucceeds(t *testing.T) {
+	// A subject-set user ("team:platformTeam#member") is a valid User value and
+	// must pass validation.
+	repo := &mockRepository{}
+	svc := authz.New(repo, stubEvaluator{})
+	tuple := shared.Tuple(
+		shared.Workspace("productWorkspace"),
+		shared.RelationWorkspaceEditor,
+		shared.SubjectSet(shared.Team("platformTeam"), shared.RelationTeamMember),
+	)
+
+	if err := svc.WriteTuples(context.Background(), []shared.TupleKey{tuple}); err != nil {
+		t.Fatalf("expected subject-set tuple to be valid, got %v", err)
+	}
+	if len(repo.writes) != 1 {
+		t.Errorf("expected 1 write, got %d", len(repo.writes))
 	}
 }

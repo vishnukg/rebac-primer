@@ -1,4 +1,6 @@
-// Package http provides the HTTP adapter for the authz service.
+// Package authzhttp is a teaching example showing the authz service exposed over
+// HTTP — the client/server seam for ReBAC. It is NOT wired into cmd/server (which
+// calls the authz service in-process); see docs/33-client-server-rebac.md.
 //
 // Routes:
 //
@@ -16,7 +18,7 @@
 //
 // Mirrors typescript/src/authz-service/adapters/http/makeAuthzHttpServer.ts
 // and typescript/src/authz-service/adapters/http/makeAuthzHttpHandler.ts.
-package http
+package authzhttp
 
 import (
 	"net/http"

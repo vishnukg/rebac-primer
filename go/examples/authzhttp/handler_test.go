@@ -1,4 +1,4 @@
-package http_test
+package authzhttp_test
 
 import (
 	"bytes"
@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"rebac-primer/examples/authzhttp"
 	"rebac-primer/internal/authz"
 	authzdb "rebac-primer/internal/authz/adapters/db"
 	"rebac-primer/internal/authz/adapters/graph"
-	authzhttp "rebac-primer/internal/authz/adapters/http"
 	"rebac-primer/internal/fixtures"
 	"rebac-primer/internal/shared"
 )
@@ -212,6 +212,30 @@ func TestAuthzHandler_DeleteTuples_RevokesPermission(t *testing.T) {
 
 	if checkPermission(t, handler, fixtures.Bob, shared.RelationDocumentCanRead, fixtures.RoadmapDocument) {
 		t.Error("expected bob can_read=false after deleting workspace tuple")
+	}
+}
+
+func TestAuthzHandler_WriteTuples_InvalidTupleReturns422(t *testing.T) {
+	handler := newTestHandler()
+
+	// "roadmap" is non-empty (so it passes the handler's required-field check) but
+	// is not a valid "type:id" object, so domain validation rejects it. That maps
+	// to 422 Unprocessable Entity — the request was understood but is invalid.
+	payload, _ := json.Marshal(map[string]any{
+		"tuples": []map[string]string{{
+			"object":   "roadmap",
+			"relation": string(shared.RelationDocumentOwner),
+			"user":     string(fixtures.Alice),
+		}},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/tuples", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422, got %d — body: %s", rec.Code, rec.Body.String())
 	}
 }
 

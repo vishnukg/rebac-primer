@@ -76,19 +76,40 @@ import (
 	"rebac-primer/internal/shared"
 )
 
-// GraphEvaluator traverses the in-memory tuple graph to answer Check requests.
+// defaultMaxDepth bounds how deep the recursive traversal may go in a single
+// check. Cycle detection (the visited set) already stops loops; this is a second
+// guard against a pathological or hostile graph that is deep but acyclic — it
+// keeps one check from blowing the stack or hanging the request. OpenFGA enforces
+// a comparable resolution-depth limit for the same reason.
+const defaultMaxDepth = 100
+
+// GraphEvaluator traverses the tuple graph to answer Check requests.
 // Construct with [NewGraphEvaluator]; do not use the zero value directly.
 type GraphEvaluator struct {
-	store authz.TupleRepository
+	store    authz.TupleRepository
+	maxDepth int
 }
 
 // NewGraphEvaluator creates a GraphEvaluator backed by the given TupleRepository.
 func NewGraphEvaluator(store authz.TupleRepository) *GraphEvaluator {
-	return &GraphEvaluator{store: store}
+	return &GraphEvaluator{store: store, maxDepth: defaultMaxDepth}
 }
 
 // Compile-time assertion: *GraphEvaluator must implement [authz.Evaluator].
 var _ authz.Evaluator = (*GraphEvaluator)(nil)
+
+// resolution holds the mutable state for one Check call: the request's context,
+// the running trace, and the visited set. Bundling it in a struct keeps the
+// recursive helpers' signatures small (they take only the node being visited plus
+// the depth) instead of threading ctx, trace, and visited through every call.
+// A fresh resolution is created per Evaluate, so concurrent checks never share
+// state — the GraphEvaluator itself stays immutable and safe to share.
+type resolution struct {
+	ev      *GraphEvaluator
+	ctx     context.Context
+	trace   []string
+	visited map[string]bool
+}
 
 // Evaluate is the entry point for a permission check.
 //
@@ -103,25 +124,33 @@ var _ authz.Evaluator = (*GraphEvaluator)(nil)
 // It returns a CheckResult with Allowed=true/false and a Trace: a human-readable
 // log of every step the traversal took, useful for debugging.  The trace is
 // what you see when you run the tests with -v.
-func (g *GraphEvaluator) Evaluate(_ context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
-	// Start the trace with the question being asked.
-	trace := []string{
-		fmt.Sprintf("Check whether %s has %s on %s", req.User, req.Relation, req.Object),
+func (g *GraphEvaluator) Evaluate(ctx context.Context, req shared.CheckRequest) (shared.CheckResult, error) {
+	r := &resolution{
+		ev:  g,
+		ctx: ctx,
+		// Start the trace with the question being asked.
+		trace: []string{
+			fmt.Sprintf("Check whether %s has %s on %s", req.User, req.Relation, req.Object),
+		},
+		// visited prevents infinite loops on cyclic graphs.
+		// Key format: "object#relation", e.g. "workspace:productWorkspace#editor".
+		visited: make(map[string]bool),
 	}
 
-	// visited prevents infinite loops on cyclic graphs.
-	// Key format: "object#relation", e.g. "workspace:productWorkspace#editor".
-	visited := make(map[string]bool)
-
-	allowed := g.hasRelation(req.User, req.Object, req.Relation, &trace, visited)
+	allowed, err := r.hasRelation(req.User, req.Object, req.Relation, 0)
+	if err != nil {
+		// Return the partial trace alongside the error so callers can still see how
+		// far the traversal got before it was cancelled or hit a store failure.
+		return shared.CheckResult{Trace: r.trace}, err
+	}
 
 	if allowed {
-		trace = append(trace, "Result: allowed")
+		r.trace = append(r.trace, "Result: allowed")
 	} else {
-		trace = append(trace, "Result: denied")
+		r.trace = append(r.trace, "Result: denied")
 	}
 
-	return shared.CheckResult{Allowed: allowed, Trace: trace}, nil
+	return shared.CheckResult{Allowed: allowed, Trace: r.trace}, nil
 }
 
 // ── Core traversal ────────────────────────────────────────────────────────────
@@ -159,31 +188,49 @@ func (g *GraphEvaluator) Evaluate(_ context.Context, req shared.CheckRequest) (s
 //	      → true ✓
 //	    → true ✓
 //	  → true ✓ (can_edit satisfied by editor path)
-func (g *GraphEvaluator) hasRelation(
+func (r *resolution) hasRelation(
 	user shared.Object,
 	object shared.Object,
 	relation shared.Relation,
-	trace *[]string,
-	visited map[string]bool,
-) bool {
+	depth int,
+) (bool, error) {
+	// ── Cancellation guard ──────────────────────────────────────────────────────
+	// If the caller's context was cancelled or timed out, abandon the walk now
+	// rather than doing more work whose answer nobody is waiting for.
+	if err := r.ctx.Err(); err != nil {
+		return false, err
+	}
+
+	// ── Depth guard ─────────────────────────────────────────────────────────────
+	// A second safety net beyond the cycle check below: bound total recursion depth
+	// so a deep (but acyclic) or hostile graph cannot exhaust the stack or hang the
+	// request. Exceeding it is an error, not a silent "denied".
+	if depth > r.ev.maxDepth {
+		return false, fmt.Errorf("graph: max resolution depth %d exceeded at %s#%s", r.ev.maxDepth, object, relation)
+	}
+
 	// ── Cycle guard ───────────────────────────────────────────────────────────
 	// If we have already visited this (object, relation) pair in this request,
 	// stop.  Without this, a cyclic graph would recurse forever.
 	// The key intentionally omits the user — if we could not reach user from
 	// this (object, relation) before, we cannot reach them now via the same path.
 	visitKey := fmt.Sprintf("%s#%s", object, relation)
-	if visited[visitKey] {
-		*trace = append(*trace, fmt.Sprintf("Already evaluated %s; stop this branch", visitKey))
-		return false
+	if r.visited[visitKey] {
+		r.trace = append(r.trace, fmt.Sprintf("Already evaluated %s; stop this branch", visitKey))
+		return false, nil
 	}
-	visited[visitKey] = true
+	r.visited[visitKey] = true
 
 	// ── Steps 1 & 2: direct tuple + subject-set ───────────────────────────────
 	// Look in the tuple store.  This covers both:
 	//   1. a direct tuple  (object, relation, user:alice)
 	//   2. a subject-set   (object, relation, team:foo#member) where alice is a member
-	if g.hasTuple(user, object, relation, trace, visited) {
-		return true
+	found, err := r.hasTuple(user, object, relation, depth)
+	if err != nil {
+		return false, err
+	}
+	if found {
+		return true, nil
 	}
 
 	// ── Step 3 & 4: permission-model expansion ────────────────────────────────
@@ -193,22 +240,22 @@ func (g *GraphEvaluator) hasRelation(
 	typ, _, err := shared.ParseObject(string(object))
 	if err != nil {
 		// Unknown object type — cannot expand further.
-		return false
+		return false, nil
 	}
 
 	switch typ {
 	case shared.ObjectTypeTeam:
 		// e.g. "member" is satisfied by "admin"
-		return g.expandByRules(teamRules, user, object, relation, trace, visited)
+		return r.expandByRules(teamRules, user, object, relation, depth)
 	case shared.ObjectTypeWorkspace:
 		// e.g. "viewer" is satisfied by "editor", "editor" by "owner"
-		return g.expandByRules(workspaceRules, user, object, relation, trace, visited)
+		return r.expandByRules(workspaceRules, user, object, relation, depth)
 	case shared.ObjectTypeDocument:
 		// Documents have both rule expansion AND workspace inheritance.
-		return g.expandDocument(user, object, relation, trace, visited)
+		return r.expandDocument(user, object, relation, depth)
 	}
 
-	return false
+	return false, nil
 }
 
 // ── Tuple lookup (steps 1 & 2) ────────────────────────────────────────────────
@@ -228,32 +275,46 @@ func (g *GraphEvaluator) hasRelation(
 // The subject-set check is what allows "grant access to a whole team with one
 // tuple" — you write (workspace, editor, team#member) once and every team
 // member gets it automatically.
-func (g *GraphEvaluator) hasTuple(
+func (r *resolution) hasTuple(
 	user shared.Object,
 	object shared.Object,
 	relation shared.Relation,
-	trace *[]string,
-	visited map[string]bool,
-) bool {
+	depth int,
+) (bool, error) {
 	// Step 1: direct lookup.
 	// The store answers "does this exact (object, relation, user) triple exist?"
-	if g.store.Has(object, relation, shared.Subject(user)) {
-		*trace = append(*trace, fmt.Sprintf("Found direct tuple (%s, %s, %s)", object, relation, user))
-		return true
+	direct, err := r.ev.store.Has(r.ctx, object, relation, shared.Subject(user))
+	if err != nil {
+		return false, fmt.Errorf("store.Has(%s, %s, %s): %w", object, relation, user, err)
+	}
+	if direct {
+		r.trace = append(r.trace, fmt.Sprintf("Found direct tuple (%s, %s, %s)", object, relation, user))
+		return true, nil
 	}
 
 	// Step 2: subject-set lookup.
 	// Scan all tuples for (object, relation, *).  For each one whose "user" field
 	// is a subject set (contains '#'), recursively check whether our user is a
 	// member of that set.
-	for _, tk := range g.store.FindByObjectRelation(object, relation) {
-		if shared.IsSubjectSet(tk.User) && g.subjectSetContains(user, tk.User, trace, visited) {
-			*trace = append(*trace, fmt.Sprintf("Found subject-set tuple (%s, %s, %s)", object, relation, tk.User))
-			return true
+	candidates, err := r.ev.store.FindByObjectRelation(r.ctx, object, relation)
+	if err != nil {
+		return false, fmt.Errorf("store.FindByObjectRelation(%s, %s): %w", object, relation, err)
+	}
+	for _, tk := range candidates {
+		if !shared.IsSubjectSet(tk.User) {
+			continue
+		}
+		contains, err := r.subjectSetContains(user, tk.User, depth)
+		if err != nil {
+			return false, err
+		}
+		if contains {
+			r.trace = append(r.trace, fmt.Sprintf("Found subject-set tuple (%s, %s, %s)", object, relation, tk.User))
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 // subjectSetContains resolves a subject-set reference and checks membership.
@@ -269,20 +330,19 @@ func (g *GraphEvaluator) hasTuple(
 // …and recursively ask: "does user:alice have member on team:platformTeam?"
 // That is another hasRelation call — which might find a direct tuple, or expand
 // further.  This is where the graph traversal "goes up" through groups.
-func (g *GraphEvaluator) subjectSetContains(
+func (r *resolution) subjectSetContains(
 	user shared.Object,
 	subject shared.Subject,
-	trace *[]string,
-	visited map[string]bool,
-) bool {
+	depth int,
+) (bool, error) {
 	// Split "team:platformTeam#member" into (team:platformTeam, member).
 	ssObj, ssRel, err := shared.ParseSubjectSet(subject)
 	if err != nil {
-		return false
+		return false, nil
 	}
-	*trace = append(*trace, fmt.Sprintf("Resolve subject set %s: does it contain %s?", subject, user))
+	r.trace = append(r.trace, fmt.Sprintf("Resolve subject set %s: does it contain %s?", subject, user))
 	// Recurse: check membership in the group.
-	return g.hasRelation(user, ssObj, ssRel, trace, visited)
+	return r.hasRelation(user, ssObj, ssRel, depth+1)
 }
 
 // ── Permission-model expansion (step 3) ───────────────────────────────────────
@@ -301,23 +361,26 @@ func (g *GraphEvaluator) subjectSetContains(
 //
 // This is how role hierarchies work: you define the pyramid once in the rule
 // table, not in every tuple.
-func (g *GraphEvaluator) expandByRules(
+func (r *resolution) expandByRules(
 	rules impliedBy,
 	user shared.Object,
 	object shared.Object,
 	relation shared.Relation,
-	trace *[]string,
-	visited map[string]bool,
-) bool {
+	depth int,
+) (bool, error) {
 	// rules[relation] is the list of stronger relations that imply relation.
 	// If the key is missing, the slice is nil and the loop body never runs.
 	for _, implied := range rules[relation] {
-		*trace = append(*trace, fmt.Sprintf("%s %s includes %s", object, relation, implied))
-		if g.hasRelation(user, object, implied, trace, visited) {
-			return true
+		r.trace = append(r.trace, fmt.Sprintf("%s %s includes %s", object, relation, implied))
+		ok, err := r.hasRelation(user, object, implied, depth+1)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // ── Workspace inheritance for documents (step 4) ─────────────────────────────
@@ -339,16 +402,19 @@ func (g *GraphEvaluator) expandByRules(
 // workspace, then recursively check the same relation on that workspace.
 // Only owner, editor, and viewer are inheritable — computed permissions like
 // can_edit are resolved at the document level by expandByRules, not inherited.
-func (g *GraphEvaluator) expandDocument(
+func (r *resolution) expandDocument(
 	user shared.Object,
 	object shared.Object,
 	relation shared.Relation,
-	trace *[]string,
-	visited map[string]bool,
-) bool {
+	depth int,
+) (bool, error) {
 	// Step 3: rule expansion (e.g. can_edit → editor, editor → owner).
-	if g.expandByRules(documentRules, user, object, relation, trace, visited) {
-		return true
+	ok, err := r.expandByRules(documentRules, user, object, relation, depth)
+	if err != nil {
+		return false, err
+	}
+	if ok {
+		return true, nil
 	}
 
 	// Step 4: workspace inheritance.
@@ -361,8 +427,12 @@ func (g *GraphEvaluator) expandDocument(
 
 		// A document can have multiple workspace tuples in theory.
 		// In practice the fixtures have exactly one: roadmapDocument → productWorkspace.
-		for _, parent := range g.store.FindByObjectRelation(object, shared.RelationDocumentWorkspace) {
-			*trace = append(*trace, fmt.Sprintf(
+		parents, err := r.ev.store.FindByObjectRelation(r.ctx, object, shared.RelationDocumentWorkspace)
+		if err != nil {
+			return false, fmt.Errorf("store.FindByObjectRelation(%s, workspace): %w", object, err)
+		}
+		for _, parent := range parents {
+			r.trace = append(r.trace, fmt.Sprintf(
 				"%s %s can inherit %s from %s", object, relation, relation, parent.User,
 			))
 
@@ -378,11 +448,15 @@ func (g *GraphEvaluator) expandDocument(
 			}
 
 			// Recurse: does the user have this relation on the parent workspace?
-			if g.hasRelation(user, wsObj, relation, trace, visited) {
-				return true
+			ok, err := r.hasRelation(user, wsObj, relation, depth+1)
+			if err != nil {
+				return false, err
+			}
+			if ok {
+				return true, nil
 			}
 		}
 	}
 
-	return false
+	return false, nil
 }

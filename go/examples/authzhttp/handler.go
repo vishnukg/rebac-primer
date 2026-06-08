@@ -1,9 +1,10 @@
-package http
+package authzhttp
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"rebac-primer/internal/authz"
@@ -109,16 +110,21 @@ func (h *handler) handleListTuples(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"tuples": tuples})
 }
 
-// writeError maps domain errors to HTTP status codes.
-// [authz.TupleValidationError] → 422 Unprocessable Entity.
-// All other errors → 400 Bad Request.
+// writeError maps a service error to an HTTP status code.
+//
+//   - [authz.TupleValidationError] → 422 Unprocessable Entity. The caller sent a
+//     well-formed request whose tuple is semantically invalid; the message names
+//     the problem and is safe to return.
+//   - Anything else is an unexpected internal failure (store outage, cancelled
+//     context, bug): log it server-side and return a generic 500.
 func (h *handler) writeError(w http.ResponseWriter, err error) {
 	var tupleValidation *authz.TupleValidationError
 	if errors.As(err, &tupleValidation) {
 		writeJSON(w, http.StatusUnprocessableEntity, errorBody(err.Error()))
 		return
 	}
-	writeJSON(w, http.StatusBadRequest, errorBody(err.Error()))
+	log.Printf("authz: unhandled internal error: %v", err)
+	writeJSON(w, http.StatusInternalServerError, errorBody("internal server error"))
 }
 
 // parseTupleBody reads a JSON body of shape { "tuples": [{object,relation,user}] }.

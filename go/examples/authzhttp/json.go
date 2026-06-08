@@ -1,4 +1,4 @@
-package http
+package authzhttp
 
 import (
 	"encoding/json"

@@ -231,15 +231,17 @@ real request through this boundary in each language.
 A clean primer should be honest about where it trades architectural purity for
 teaching value. These are deliberate, not accidents:
 
-1. **The Go `graph/` package carries pedagogical extras.** Alongside the
-   evaluator it holds `Result[T]`/`Map`/`Collect` (generics demo, `result.go`),
-   `AllPermissions`/`BulkCheck` (concurrency demo, `parallel.go`), and
-   `AuditEvaluator`/`ReadOnlyStore` (embedding/decorator demo, `middleware.go`).
-   By strict cohesion these don't all belong to "graph traversal" —
-   `Result[T]` in particular is a generic utility that would live in its own
-   package in production. They sit here so `docs/22`–`24` can demonstrate the
-   language features against real authz types. `docs/21` flags them as
-   "Go-specific extras."
+1. **The repo ships Go-language lessons, quarantined under `go/examples/`.**
+   `Result[T]`/`Map`/`Collect` (generics, `examples/generics/`),
+   `AllPermissions`/`BulkCheck` (concurrency, `examples/concurrency/`),
+   `AuditEvaluator`/`ReadOnlyStore` (embedding/decorator, `examples/middleware/`),
+   and the authz HTTP adapter (`examples/authzhttp/`) are **not** part of the
+   running authorization path. They sit under `examples/` so `docs/22`–`24` and
+   `docs/33` can demonstrate language features and the client/server seam against
+   real authz types, while `internal/` stays purely about authorization.
+   `internal/` never imports `examples/` — delete the folder and the system still
+   runs. (Earlier these lived inside the `graph/` package; they were moved out so
+   the engine reads clean.)
 
 2. **Adapter helpers are duplicated across services.** The `json` helpers and
    HTTP body parsing appear in both services' HTTP adapters (and in both of Go's
@@ -252,7 +254,7 @@ teaching value. These are deliberate, not accidents:
    re-exports. Idiomatic for TS module ergonomics; mildly debated, harmless here.
 
 If this were a single production service rather than a teaching primer, you would
-relocate caveat (1) and likely keep (2) and (3) as-is.
+delete the `examples/` tree entirely (caveat 1) and likely keep (2) and (3) as-is.
 
 ---
 
@@ -276,8 +278,8 @@ Before adding code, ask:
 1. Why does `documents` define its own `AuthzClient` instead of importing
    `authz.Service` directly?
 2. Name the one grep that proves the core/adapter dependency direction.
-3. `Result[T]` lives in the `graph` package. Is that "correct" architecture?
-   Defend your answer.
+3. `Result[T]` lives in `examples/generics/`, separate from `internal/`. Why is
+   that the right home for it? Defend your answer.
 
 Good answers:
 1. Interface segregation: the documents core needs only `Check` and
@@ -287,7 +289,9 @@ Good answers:
 2. `grep -rn '/adapters/' go/internal/{authz,documents}/*.go | grep -v _test.go`
    (and the TS equivalent on `core/`) — both return nothing, proving the core
    never imports an adapter.
-3. Not by strict cohesion — `Result[T]` is a generic utility unrelated to graph
-   traversal and would live in its own package in production. It is a deliberate
-   teaching placement so `docs/23` can demonstrate generics against real types.
-   "Correct for a primer, would be refactored in production" is the honest answer.
+3. `Result[T]` is a generic utility unrelated to authorization. Keeping it in
+   `examples/generics/` (not `internal/`) means the engine has no dependency on a
+   teaching artifact: `internal/` imports nothing from `examples/`, so the lessons
+   can be deleted wholesale without touching the ReBAC code. In a real production
+   service you would simply drop the `examples/` tree; here it earns its keep only
+   as the subject of `docs/23`.

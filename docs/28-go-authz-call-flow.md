@@ -233,7 +233,7 @@ mapping in `writeError`:
 | Bad/absent token | `AuthenticationError` | 401 |
 | Forbidden by authz | `ForbiddenError` | 403 |
 | Document missing | `DocumentNotFoundError` | 404 |
-| Anything else | (any `error`) | 400 |
+| Anything else | (any `error`) | 500 (logged server-side, generic body) |
 
 ---
 

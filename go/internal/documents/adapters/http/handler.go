@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"rebac-primer/internal/documents"
@@ -126,7 +127,12 @@ func (h *handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"document": doc})
 }
 
-// writeError maps domain errors to HTTP status codes.
+// writeError maps a domain error to an HTTP status code.
+//
+// Each known domain error maps to a specific 4xx. Anything else is an
+// unexpected internal failure (a bug, a store outage, a cancelled context): we
+// log the real error server-side and return a generic 500, rather than leaking
+// internal details to the caller or mislabelling a server fault as a 400.
 func (h *handler) writeError(w http.ResponseWriter, err error) {
 	if documents.IsAuthenticationError(err) {
 		writeJSON(w, http.StatusUnauthorized, errorBody(err.Error()))
@@ -145,5 +151,6 @@ func (h *handler) writeError(w http.ResponseWriter, err error) {
 		return
 	}
 
-	writeJSON(w, http.StatusBadRequest, errorBody(err.Error()))
+	log.Printf("documents: unhandled internal error: %v", err)
+	writeJSON(w, http.StatusInternalServerError, errorBody("internal server error"))
 }

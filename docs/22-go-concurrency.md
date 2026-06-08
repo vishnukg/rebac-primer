@@ -1,7 +1,7 @@
 # Go concurrency: goroutines, channels, and WaitGroups
 
 Go's concurrency model is famously simple to write and famously easy to get wrong.
-This chapter grounds every concept in `go/internal/authz/adapters/graph/parallel.go`, which you
+This chapter grounds every concept in `go/examples/concurrency/parallel.go`, which you
 can run right now.
 
 ## The problem concurrency solves here
@@ -70,10 +70,10 @@ Two more facts you will rely on:
   close here because we collect an exact, known number of results.
 
 `AllPermissions` uses a **buffered channel** whose capacity equals the number of
-relations (`parallel.go:32`):
+relations (`examples/concurrency/parallel.go:44`):
 
 ```go
-// go/internal/authz/adapters/graph/parallel.go
+// go/examples/concurrency/parallel.go
 ch := make(chan outcome, len(relations))
 ```
 
@@ -139,10 +139,10 @@ but the explicit argument form is still the clearer idiom — it documents inten
 
 ## WaitGroups: wait without collecting
 
-`BulkCheck` uses `sync.WaitGroup` instead of a channel (`parallel.go:60`):
+`BulkCheck` uses `sync.WaitGroup` instead of a channel (`examples/concurrency/parallel.go:82`):
 
 ```go
-// go/internal/authz/adapters/graph/parallel.go
+// go/examples/concurrency/parallel.go
 func BulkCheck(ctx context.Context, auth Checker, reqs []shared.CheckRequest) []BulkResult {
     results := make([]BulkResult, len(reqs))
     var wg sync.WaitGroup

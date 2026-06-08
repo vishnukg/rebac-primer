@@ -1,14 +1,24 @@
-package graph_test
+package concurrency_test
 
 import (
 	"context"
 	"errors"
 	"testing"
 
+	"rebac-primer/examples/concurrency"
+	authzdb "rebac-primer/internal/authz/adapters/db"
 	"rebac-primer/internal/authz/adapters/graph"
 	"rebac-primer/internal/fixtures"
 	"rebac-primer/internal/shared"
 )
+
+// newEvaluator builds a graph evaluator over the standard fixture tuples.
+// The concurrency helpers under test work with any authz.Evaluator; here we
+// drive them with the real graph evaluator.
+func newEvaluator(extra ...shared.TupleKey) *graph.GraphEvaluator {
+	all := append(fixtures.SeedRelationshipTuples(), extra...)
+	return graph.NewGraphEvaluator(authzdb.New(all...))
+}
 
 // blockingEvaluator is a fake Checker whose Evaluate does no work until the
 // context is cancelled, then reports the context error. It lets us exercise
@@ -27,7 +37,7 @@ func TestAllPermissions_CancelledContextReturnsError(t *testing.T) {
 	cancel()
 
 	// Act
-	summary, err := graph.AllPermissions(ctx, blockingEvaluator{}, fixtures.Alice, fixtures.RoadmapDocument)
+	summary, err := concurrency.AllPermissions(ctx, blockingEvaluator{}, fixtures.Alice, fixtures.RoadmapDocument)
 
 	// Assert: AllPermissions must surface the cancellation, not block or return a
 	// partial summary. (-race confirms no goroutine writes after we return.)
@@ -42,7 +52,7 @@ func TestAllPermissions_CancelledContextReturnsError(t *testing.T) {
 func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
 	ev := newEvaluator()
 
-	summary, err := graph.AllPermissions(context.Background(), ev, fixtures.Alice, fixtures.RoadmapDocument)
+	summary, err := concurrency.AllPermissions(context.Background(), ev, fixtures.Alice, fixtures.RoadmapDocument)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -63,7 +73,7 @@ func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
 func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
 	ev := newEvaluator()
 
-	summary, err := graph.AllPermissions(context.Background(), ev, fixtures.Bob, fixtures.RoadmapDocument)
+	summary, err := concurrency.AllPermissions(context.Background(), ev, fixtures.Bob, fixtures.RoadmapDocument)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +94,7 @@ func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
 func TestAllPermissions_NonDocumentObjectReturnsEmptySummary(t *testing.T) {
 	ev := newEvaluator()
 
-	summary, err := graph.AllPermissions(context.Background(), ev, fixtures.Alice, fixtures.ProductWorkspace)
+	summary, err := concurrency.AllPermissions(context.Background(), ev, fixtures.Alice, fixtures.ProductWorkspace)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -101,7 +111,7 @@ func TestBulkCheck_ReturnsResultsInInputOrder(t *testing.T) {
 		{User: fixtures.Bob, Relation: shared.RelationDocumentCanRead, Object: fixtures.RoadmapDocument},
 	}
 
-	results := graph.BulkCheck(context.Background(), ev, reqs)
+	results := concurrency.BulkCheck(context.Background(), ev, reqs)
 
 	if len(results) != len(reqs) {
 		t.Fatalf("expected %d results, got %d", len(reqs), len(results))
@@ -122,7 +132,7 @@ func TestBulkCheck_ReturnsResultsInInputOrder(t *testing.T) {
 
 func TestBulkCheck_EmptyInputReturnsEmptySlice(t *testing.T) {
 	ev := newEvaluator()
-	results := graph.BulkCheck(context.Background(), ev, nil)
+	results := concurrency.BulkCheck(context.Background(), ev, nil)
 	if len(results) != 0 {
 		t.Errorf("expected empty results, got %d", len(results))
 	}

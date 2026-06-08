@@ -1,7 +1,7 @@
 # Go generics: type parameters, constraints, and why they are worth it
 
 Generics landed in Go 1.18. The syntax is deliberate and minimal. This chapter
-grounds every concept in `go/internal/authz/adapters/graph/result.go`, which you can read and
+grounds every concept in `go/examples/generics/result.go`, which you can read and
 run right now.
 
 ## The problem generics solve here
@@ -27,7 +27,7 @@ error handling — it demonstrates generics in a real context.
 ## Declaring a generic type
 
 ```go
-// go/internal/authz/adapters/graph/result.go
+// go/examples/generics/result.go
 type Result[T any] struct {
     value T
     err   error
@@ -70,7 +70,7 @@ need `comparable` instead of `any`.
 ## Generic constructors
 
 ```go
-// go/internal/authz/adapters/graph/result.go
+// go/examples/generics/result.go
 func OK[T any](v T) Result[T] {
     return Result[T]{value: v, ok: true}
 }
@@ -85,9 +85,9 @@ argument list, not after the function name. The compiler infers T from the
 argument type at the call site:
 
 ```go
-r := graph.OK(42)         // T inferred as int
-r := graph.OK("hello")    // T inferred as string
-r := graph.Fail[int](err) // T must be explicit — Fail has no T-typed argument
+r := generics.OK(42)         // T inferred as int
+r := generics.OK("hello")    // T inferred as string
+r := generics.Fail[int](err) // T must be explicit — Fail has no T-typed argument
 ```
 
 When the compiler cannot infer T (as in `Fail`), you must supply it explicitly.
@@ -97,7 +97,7 @@ TypeScript.
 ## Generic functions (not methods)
 
 ```go
-// go/internal/authz/adapters/graph/result.go
+// go/examples/generics/result.go
 func Map[T, U any](r Result[T], f func(T) U) Result[U] {
     if !r.ok {
         return Fail[U](r.err)
@@ -113,12 +113,12 @@ return type.
 Go 1.18 does not support adding new type parameters in methods — only in top-
 level functions. That is why `Map` and `Collect` are package-level functions
 rather than methods on `Result`. This is a known limitation. In TypeScript you
-can write `result.map(f)` fluently; in Go you write `graph.Map(r, f)`.
+can write `result.map(f)` fluently; in Go you write `generics.Map(r, f)`.
 
 ## `Collect` — the Promise.all of Go generics
 
 ```go
-// go/internal/authz/adapters/graph/result.go
+// go/examples/generics/result.go
 func Collect[T any](results []Result[T]) Result[[]T] {
     out := make([]T, 0, len(results))
     for _, r := range results {
@@ -155,7 +155,7 @@ The structure is identical. The syntax is Go.
 Most of the time you do not write type arguments:
 
 ```go
-mapped := graph.Map(graph.OK(3), func(n int) string {
+mapped := generics.Map(generics.OK(3), func(n int) string {
     return fmt.Sprintf("item-%d", n)
 })
 // T inferred as int, U inferred as string
@@ -165,7 +165,7 @@ The compiler figures it out from the arguments. You only write type arguments
 when inference fails:
 
 ```go
-r := graph.Fail[int](errors.New("bad"))
+r := generics.Fail[int](errors.New("bad"))
 ```
 
 `Fail` takes only an `error`, so there is nothing to infer `T` from.

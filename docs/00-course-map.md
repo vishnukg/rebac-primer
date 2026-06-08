@@ -99,9 +99,9 @@ Read these after the shared ReBAC track if Go is your implementation language.
 |-----|-------|-----------------|
 | 20 | Go language primer | `go/internal/shared/rebac.go`, `go/internal/documents/documents.go` |
 | 21 | Go ReBAC implementation walkthrough | `go/internal/authz/adapters/graph/evaluator.go`, `go/internal/documents/adapters/http/handler.go` |
-| 22 | Go concurrency: goroutines, channels, WaitGroups | `go/internal/authz/adapters/graph/parallel.go` |
-| 23 | Go generics: type parameters, constraints, Result[T] | `go/internal/authz/adapters/graph/result.go` |
-| 24 | Go interfaces and embedding: decorator pattern | `go/internal/authz/adapters/graph/middleware.go` |
+| 22 | Go concurrency: goroutines, channels, WaitGroups | `go/examples/concurrency/parallel.go` |
+| 23 | Go generics: type parameters, constraints, Result[T] | `go/examples/generics/result.go` |
+| 24 | Go interfaces and embedding: decorator pattern | `go/examples/middleware/middleware.go` |
 | 25 | Go testing: AAA, table-driven, benchmarks, fuzz | `go/internal/authz/adapters/graph/evaluator_test.go` |
 | 26 | From-scratch ReBAC vs OpenFGA: concept mapping + the shipped, flag-driven OpenFGA adapter | `go/internal/authz/adapters/openfga/openfga.go`, `typescript/src/authz-service/adapters/openfga/makeOpenFgaAuthzService.ts`, `deployments/openfga/model.fga` |
 | 27 | Graph evaluator deep dive: step-by-step walkthrough for non-graph-theory readers | `go/internal/authz/adapters/graph/evaluator.go` |
@@ -288,7 +288,7 @@ TypeScript:
 Go:
 
 1. Read `22-go-concurrency.md`, `23-go-generics.md`, and `24-go-interfaces-embedding.md`.
-2. Inspect `go/internal/authz/adapters/graph/parallel.go`, `go/internal/authz/adapters/graph/result.go`, and `go/internal/authz/adapters/graph/middleware.go`.
+2. Inspect `go/examples/concurrency/parallel.go`, `go/examples/generics/result.go`, and `go/examples/middleware/middleware.go`.
 3. Run `make go/test` and explain which tests document each language feature.
 
 Checkpoint: explain why relative ESM imports use explicit extensions, or

@@ -40,8 +40,9 @@ steps, you understand ReBAC:
 go/internal/authz/adapters/graph/evaluator.go
 ```
 
-Ignore `parallel.go`, `result.go`, `middleware.go`, the `openfga/` adapter, and
-the HTTP layer on your first pass. They are peripheral.
+Ignore everything under `go/examples/` (the Go-language lessons — generics,
+concurrency, middleware, the authz HTTP demo), the `openfga/` adapter, and the
+HTTP layer on your first pass. They are peripheral. See `go/examples/README.md`.
 
 ## 3 commands to run
 

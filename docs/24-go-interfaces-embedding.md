@@ -2,7 +2,7 @@
 
 This chapter covers three ideas that reinforce each other: implicit interface
 satisfaction, struct embedding, and the decorator pattern. All three appear in
-`go/internal/authz/adapters/graph/middleware.go`. Read that file alongside this doc.
+`go/examples/middleware/middleware.go`. Read that file alongside this doc.
 
 ## Interfaces are satisfied implicitly
 
@@ -38,7 +38,7 @@ Because satisfaction is implicit, it is easy to drift. You rename a method and
 silently stop satisfying an interface. The repo uses this idiom to catch it:
 
 ```go
-// go/internal/authz/adapters/graph/middleware.go
+// go/examples/middleware/middleware.go
 var _ Checker = (*AuditEvaluator)(nil)
 ```
 
@@ -65,7 +65,7 @@ In Go, a decorator is a struct that holds the inner value and implements the sam
 interface:
 
 ```go
-// go/internal/authz/adapters/graph/middleware.go
+// go/examples/middleware/middleware.go
 //
 // Checker is a local alias for authz.Evaluator — the interface that both
 // GraphEvaluator and AuditEvaluator satisfy.
@@ -89,7 +89,7 @@ type. You can wrap `GraphEvaluator`, an OpenFGA evaluator, or another
 In `cmd/server/main.go` (the composition root), wiring one in is one line:
 
 ```go
-evaluator := graph.NewAuditEvaluator(graph.NewGraphEvaluator(tupleStore), os.Stderr)
+evaluator := middleware.NewAuditEvaluator(graph.NewGraphEvaluator(tupleStore), os.Stderr)
 ```
 
 Nothing else changes. `documents.Service` depends on `authz.AuthzClient` and will
@@ -120,13 +120,13 @@ that separates read and write capabilities:
 ```go
 // Conceptual split — illustrates interface composition
 type TupleReader interface {
-    Has(object shared.Object, relation shared.Relation, user shared.Subject) bool
-    FindByObjectRelation(object shared.Object, relation shared.Relation) []shared.TupleKey
+    Has(ctx context.Context, object shared.Object, relation shared.Relation, user shared.Subject) (bool, error)
+    FindByObjectRelation(ctx context.Context, object shared.Object, relation shared.Relation) ([]shared.TupleKey, error)
 }
 
 type TupleWriter interface {
-    Write(tuple shared.TupleKey)
-    Delete(tuple shared.TupleKey)
+    Write(ctx context.Context, tuple shared.TupleKey) error
+    Delete(ctx context.Context, tuple shared.TupleKey) error
 }
 
 // TupleRepository composes both — satisfying either interface is enough for code
@@ -134,7 +134,7 @@ type TupleWriter interface {
 type TupleRepository interface {
     TupleReader  // embeds
     TupleWriter  // embeds
-    FindAll(filter ...TupleFilter) []TupleKey
+    FindAll(ctx context.Context, filter ...TupleFilter) ([]TupleKey, error)
 }
 ```
 
@@ -149,7 +149,7 @@ Struct embedding is Go's form of composition-as-inheritance. Embed a type and
 its method set is promoted onto the outer struct:
 
 ```go
-// go/internal/authz/adapters/graph/middleware.go
+// go/examples/middleware/middleware.go
 type ReadOnlyStore struct {
     authz.TupleRepository  // embedded interface — all methods are promoted
 }
@@ -160,7 +160,7 @@ Because `authz.TupleRepository` is embedded, `ReadOnlyStore` automatically has
 the embedded field. No delegation boilerplate required:
 
 ```go
-ro := graph.NewReadOnlyStore(store)
+ro := middleware.NewReadOnlyStore(store)
 ro.Has(...)                  // promoted from TupleRepository
 ro.FindByObjectRelation(...) // promoted from TupleRepository
 ```
@@ -210,9 +210,9 @@ The composition root (`cmd/server/main.go`) is where you decide the order:
 
 ```go
 tupleStore := authzdb.New(fixtures.SeedRelationshipTuples()...)
-ro         := graph.NewReadOnlyStore(tupleStore)   // signal: this path reads only
+ro         := middleware.NewReadOnlyStore(tupleStore)   // signal: this path reads only
 base       := graph.NewGraphEvaluator(ro)
-audited    := graph.NewAuditEvaluator(base, os.Stderr)
+audited    := middleware.NewAuditEvaluator(base, os.Stderr)
 authzSvc   := authz.New(tupleStore, audited)
 docsSvc    := documents.New(docRepo, authzSvc)
 ```
@@ -241,7 +241,7 @@ Wire it between `AuditEvaluator` and `GraphEvaluator` in `buildHandler()`:
 ```go
 base    := graph.NewGraphEvaluator(tupleStore)
 cached  := graph.NewCachingEvaluator(base)
-audited := graph.NewAuditEvaluator(cached, os.Stderr)
+audited := middleware.NewAuditEvaluator(cached, os.Stderr)
 ```
 
 Run `go test -race ./...` to confirm it is thread-safe.

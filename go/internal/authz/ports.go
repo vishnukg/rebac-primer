@@ -16,23 +16,29 @@ import (
 // The graph evaluator reads from it; write operations mutate it.
 // Adapters decide the backend: in-memory, Postgres, OpenFGA, etc.
 //
+// Every method takes a context.Context and returns an error. The in-memory
+// adapter never actually fails, but a real backend (Postgres, a network store)
+// can time out, lose its connection, or be cancelled mid-query. Putting ctx and
+// error in the port now means swapping in that backend later is a wiring change,
+// not an interface change — and a slow check can be cancelled instead of hanging.
+//
 // Mirrors typescript/src/authz-service/core/ports/tupleRepository.ts.
 type TupleRepository interface {
 	// Has reports whether the exact (object, relation, user) tuple exists.
-	Has(object shared.Object, relation shared.Relation, user shared.Subject) bool
+	Has(ctx context.Context, object shared.Object, relation shared.Relation, user shared.Subject) (bool, error)
 
 	// FindByObjectRelation returns all tuples matching (object, relation).
 	// Used during graph traversal.
-	FindByObjectRelation(object shared.Object, relation shared.Relation) []shared.TupleKey
+	FindByObjectRelation(ctx context.Context, object shared.Object, relation shared.Relation) ([]shared.TupleKey, error)
 
 	// FindAll returns all stored tuples, optionally filtered.
-	FindAll(filter ...TupleFilter) []shared.TupleKey
+	FindAll(ctx context.Context, filter ...TupleFilter) ([]shared.TupleKey, error)
 
 	// Write adds a tuple (idempotent).
-	Write(tuple shared.TupleKey)
+	Write(ctx context.Context, tuple shared.TupleKey) error
 
 	// Delete removes a tuple.  No-op if it does not exist.
-	Delete(tuple shared.TupleKey)
+	Delete(ctx context.Context, tuple shared.TupleKey) error
 }
 
 // TupleFilter narrows FindAll results.  Zero-value fields mean "match any".

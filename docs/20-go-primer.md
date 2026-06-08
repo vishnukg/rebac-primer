@@ -173,11 +173,11 @@ the interface, the easier it is to satisfy with a mock in tests.
 // TupleRepository is what GraphEvaluator depends on.
 // The interface lists only the methods the evaluator needs.
 type TupleRepository interface {
-    Has(object shared.Object, relation shared.Relation, user shared.Subject) bool
-    FindByObjectRelation(object shared.Object, relation shared.Relation) []shared.TupleKey
-    FindAll(filter ...TupleFilter) []shared.TupleKey
-    Write(tuple shared.TupleKey)
-    Delete(tuple shared.TupleKey)
+    Has(ctx context.Context, object shared.Object, relation shared.Relation, user shared.Subject) (bool, error)
+    FindByObjectRelation(ctx context.Context, object shared.Object, relation shared.Relation) ([]shared.TupleKey, error)
+    FindAll(ctx context.Context, filter ...TupleFilter) ([]shared.TupleKey, error)
+    Write(ctx context.Context, tuple shared.TupleKey) error
+    Delete(ctx context.Context, tuple shared.TupleKey) error
 }
 ```
 
@@ -388,8 +388,8 @@ are the most common. A method's receiver can be a value or a pointer:
 func (p Point) DistanceFromOrigin() float64 { ... }
 
 // Pointer receiver — sees the address; can mutate fields and shares state.
-func (s *InMemoryTupleStore) Write(key shared.TupleKey) { ... }
-func (s *InMemoryTupleStore) FindAll(filter ...authz.TupleFilter) []shared.TupleKey { ... } // also a pointer — needs the mutex
+func (s *InMemoryTupleStore) Write(ctx context.Context, key shared.TupleKey) error { ... }
+func (s *InMemoryTupleStore) FindAll(ctx context.Context, filter ...authz.TupleFilter) ([]shared.TupleKey, error) { ... } // also a pointer — needs the mutex
 ```
 
 The rule in this repo: use pointer receivers when the method mutates state,
@@ -437,11 +437,11 @@ regardless of how it returns — normal return, early return, or panic:
 
 ```go
 // go/internal/authz/adapters/db/store.go
-func (s *InMemoryTupleStore) Has(object Object, relation Relation, user Subject) bool {
+func (s *InMemoryTupleStore) Has(_ context.Context, object Object, relation Relation, user Subject) (bool, error) {
     s.mu.RLock()          // acquire a read lock
     defer s.mu.RUnlock()  // release it when this function exits — guaranteed
     _, ok := s.tuples[...]
-    return ok
+    return ok, nil
 }
 ```
 
@@ -467,13 +467,13 @@ type InMemoryTupleStore struct {
     tuples map[string]TupleKey
 }
 
-func (s *InMemoryTupleStore) Has(...) bool {
+func (s *InMemoryTupleStore) Has(...) (bool, error) {
     s.mu.RLock()            // any number of readers can hold RLock simultaneously
     defer s.mu.RUnlock()
     ...
 }
 
-func (s *InMemoryTupleStore) Write(key TupleKey) {
+func (s *InMemoryTupleStore) Write(_ context.Context, key TupleKey) error {
     s.mu.Lock()             // exclusive — blocks all readers and other writers
     defer s.mu.Unlock()
     ...

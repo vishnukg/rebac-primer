@@ -1,14 +1,14 @@
-package graph_test
+package generics_test
 
 import (
 	"errors"
 	"testing"
 
-	"rebac-primer/internal/authz/adapters/graph"
+	"rebac-primer/examples/generics"
 )
 
 func TestResult_OK_IsOKReturnsTrue(t *testing.T) {
-	r := graph.OK(42)
+	r := generics.OK(42)
 	if !r.IsOK() {
 		t.Error("expected IsOK()=true for OK result")
 	}
@@ -18,7 +18,7 @@ func TestResult_OK_IsOKReturnsTrue(t *testing.T) {
 }
 
 func TestResult_Fail_IsOKReturnsFalse(t *testing.T) {
-	r := graph.Fail[int](errors.New("something broke"))
+	r := generics.Fail[int](errors.New("something broke"))
 	if r.IsOK() {
 		t.Error("expected IsOK()=false for Fail result")
 	}
@@ -28,7 +28,7 @@ func TestResult_Fail_IsOKReturnsFalse(t *testing.T) {
 }
 
 func TestResult_Value_ReturnsTrueForOK(t *testing.T) {
-	r := graph.OK("hello")
+	r := generics.OK("hello")
 	v, ok := r.Value()
 	if !ok {
 		t.Error("expected ok=true")
@@ -39,7 +39,7 @@ func TestResult_Value_ReturnsTrueForOK(t *testing.T) {
 }
 
 func TestResult_Value_ReturnsFalseForFail(t *testing.T) {
-	r := graph.Fail[string](errors.New("oops"))
+	r := generics.Fail[string](errors.New("oops"))
 	v, ok := r.Value()
 	if ok {
 		t.Error("expected ok=false for Fail result")
@@ -50,7 +50,7 @@ func TestResult_Value_ReturnsFalseForFail(t *testing.T) {
 }
 
 func TestResult_Unwrap_ReturnsValueForOK(t *testing.T) {
-	r := graph.OK(99)
+	r := generics.OK(99)
 	got := r.Unwrap()
 	if got != 99 {
 		t.Errorf("expected 99, got %d", got)
@@ -58,7 +58,7 @@ func TestResult_Unwrap_ReturnsValueForOK(t *testing.T) {
 }
 
 func TestResult_Unwrap_PanicsForFail(t *testing.T) {
-	r := graph.Fail[int](errors.New("broken"))
+	r := generics.Fail[int](errors.New("broken"))
 	defer func() {
 		if rec := recover(); rec == nil {
 			t.Error("expected Unwrap to panic on a Fail result")
@@ -68,8 +68,8 @@ func TestResult_Unwrap_PanicsForFail(t *testing.T) {
 }
 
 func TestMap_TransformsValueOnSuccess(t *testing.T) {
-	r := graph.OK(3)
-	mapped := graph.Map(r, func(n int) string {
+	r := generics.OK(3)
+	mapped := generics.Map(r, func(n int) string {
 		return "x" + string(rune('0'+n))
 	})
 	if !mapped.IsOK() {
@@ -83,8 +83,8 @@ func TestMap_TransformsValueOnSuccess(t *testing.T) {
 
 func TestMap_PropagatesFailureWithoutCallingF(t *testing.T) {
 	called := false
-	r := graph.Fail[int](errors.New("upstream error"))
-	mapped := graph.Map(r, func(n int) string {
+	r := generics.Fail[int](errors.New("upstream error"))
+	mapped := generics.Map(r, func(n int) string {
 		called = true
 		return "should not run"
 	})
@@ -97,8 +97,8 @@ func TestMap_PropagatesFailureWithoutCallingF(t *testing.T) {
 }
 
 func TestCollect_AllOK_ReturnsSlice(t *testing.T) {
-	results := []graph.Result[int]{graph.OK(1), graph.OK(2), graph.OK(3)}
-	combined := graph.Collect(results)
+	results := []generics.Result[int]{generics.OK(1), generics.OK(2), generics.OK(3)}
+	combined := generics.Collect(results)
 	if !combined.IsOK() {
 		t.Fatalf("expected Collect to succeed, got err: %v", combined.Err())
 	}
@@ -109,12 +109,12 @@ func TestCollect_AllOK_ReturnsSlice(t *testing.T) {
 }
 
 func TestCollect_FirstFailureShortCircuits(t *testing.T) {
-	results := []graph.Result[int]{
-		graph.OK(1),
-		graph.Fail[int](errors.New("second failed")),
-		graph.OK(3),
+	results := []generics.Result[int]{
+		generics.OK(1),
+		generics.Fail[int](errors.New("second failed")),
+		generics.OK(3),
 	}
-	combined := graph.Collect(results)
+	combined := generics.Collect(results)
 	if combined.IsOK() {
 		t.Error("expected Collect to fail when any result is a failure")
 	}

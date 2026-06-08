@@ -4,6 +4,7 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -24,8 +25,10 @@ func New(seed ...shared.TupleKey) *InMemoryTupleStore {
 	s := &InMemoryTupleStore{
 		tuples: make(map[string]shared.TupleKey, len(seed)),
 	}
+	// Populate the map directly: during construction the store is not yet shared,
+	// so we need neither a lock nor a context.
 	for _, k := range seed {
-		s.Write(k)
+		s.tuples[keyFor(k)] = k
 	}
 	return s
 }
@@ -33,30 +36,36 @@ func New(seed ...shared.TupleKey) *InMemoryTupleStore {
 // Compile-time assertion: *InMemoryTupleStore must satisfy TupleRepository.
 var _ authz.TupleRepository = (*InMemoryTupleStore)(nil)
 
+// The context argument is unused here — an in-memory map never blocks — but it is
+// part of the port so a real backend can honour cancellation and deadlines. The
+// error return is always nil for the same reason.
+
 // Write adds a tuple to the store (idempotent).
-func (s *InMemoryTupleStore) Write(key shared.TupleKey) {
+func (s *InMemoryTupleStore) Write(_ context.Context, key shared.TupleKey) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tuples[keyFor(key)] = key
+	return nil
 }
 
 // Delete removes a tuple from the store.  No-op if the tuple does not exist.
-func (s *InMemoryTupleStore) Delete(key shared.TupleKey) {
+func (s *InMemoryTupleStore) Delete(_ context.Context, key shared.TupleKey) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.tuples, keyFor(key))
+	return nil
 }
 
 // Has reports whether the exact tuple (object, relation, user) exists.
-func (s *InMemoryTupleStore) Has(object shared.Object, relation shared.Relation, user shared.Subject) bool {
+func (s *InMemoryTupleStore) Has(_ context.Context, object shared.Object, relation shared.Relation, user shared.Subject) (bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	_, ok := s.tuples[keyFor(shared.TupleKey{Object: object, Relation: relation, User: user})]
-	return ok
+	return ok, nil
 }
 
 // FindByObjectRelation returns all tuples whose object and relation match.
-func (s *InMemoryTupleStore) FindByObjectRelation(object shared.Object, relation shared.Relation) []shared.TupleKey {
+func (s *InMemoryTupleStore) FindByObjectRelation(_ context.Context, object shared.Object, relation shared.Relation) ([]shared.TupleKey, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -66,11 +75,11 @@ func (s *InMemoryTupleStore) FindByObjectRelation(object shared.Object, relation
 			out = append(out, k)
 		}
 	}
-	return out
+	return out, nil
 }
 
 // FindAll returns a snapshot of tuples, optionally filtered.
-func (s *InMemoryTupleStore) FindAll(filter ...authz.TupleFilter) []shared.TupleKey {
+func (s *InMemoryTupleStore) FindAll(_ context.Context, filter ...authz.TupleFilter) ([]shared.TupleKey, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -80,7 +89,7 @@ func (s *InMemoryTupleStore) FindAll(filter ...authz.TupleFilter) []shared.Tuple
 			out = append(out, k)
 		}
 	}
-	return out
+	return out, nil
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────

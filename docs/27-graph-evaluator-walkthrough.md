@@ -402,8 +402,8 @@ Check "viewer" on workspace:productWorkspace for alice:
 
 | Concept | Code location |
 |---|---|
-| Entry point for a check | `GraphEvaluator.Evaluate()` |
-| The recursive traversal | `GraphEvaluator.hasRelation()` |
+| Entry point for a check | `GraphEvaluator.Evaluate()` (builds a per-request `resolution`) |
+| The recursive traversal | `resolution.hasRelation()` |
 | Step 1: direct lookup | `hasTuple()` — first `if` block |
 | Step 2: subject-set | `hasTuple()` — the `for` loop |
 | Subject-set recursion | `subjectSetContains()` |
@@ -411,7 +411,8 @@ Check "viewer" on workspace:productWorkspace for alice:
 | The rule tables | `permissionmodel.go` |
 | Step 4: workspace inherit | `expandDocument()` — the second `if` block |
 | Cycle detection | `hasRelation()` — the `visitKey` block at the top |
-| Trace output | `*trace = append(*trace, ...)` calls scattered through all functions |
+| Depth + cancellation guard | `hasRelation()` — the `depth`/`ctx.Err()` checks at the top |
+| Trace output | `r.trace = append(r.trace, ...)` calls scattered through all functions |
 
 ---
 

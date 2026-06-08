@@ -1,4 +1,7 @@
-package graph
+// Package generics is a Go-language teaching example, NOT part of the production
+// ReBAC path. It demonstrates generic type parameters via a value-or-error
+// container. See docs/23-go-generics.md.
+package generics
 
 import "fmt"
 

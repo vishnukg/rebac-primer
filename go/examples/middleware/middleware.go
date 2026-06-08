@@ -1,4 +1,7 @@
-package graph
+// Package middleware is a Go-language teaching example, NOT part of the
+// production ReBAC path. It demonstrates the decorator pattern (AuditEvaluator)
+// and interface embedding (ReadOnlyStore). See docs/24-go-interfaces-embedding.md.
+package middleware
 
 import (
 	"context"
@@ -10,6 +13,10 @@ import (
 	"rebac-primer/internal/authz"
 	"rebac-primer/internal/shared"
 )
+
+// Checker is a type alias for [authz.Evaluator] — see the concurrency example
+// for the same alias. It lets the decorator below name the thing it wraps.
+type Checker = authz.Evaluator
 
 // AuditEvaluator wraps any [Checker] ([authz.Evaluator]) and writes a one-line
 // audit record for every Evaluate call.  It is a decorator: it adds behaviour
