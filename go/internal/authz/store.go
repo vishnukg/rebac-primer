@@ -16,7 +16,7 @@ type InMemoryStore struct {
 	tuples map[string]rebac.TupleKey
 }
 
-// New creates a store pre-seeded with the given tuples.
+// NewInMemoryStore creates a store pre-seeded with the given tuples.
 func NewInMemoryStore(seed ...rebac.TupleKey) *InMemoryStore {
 	s := &InMemoryStore{
 		tuples: make(map[string]rebac.TupleKey, len(seed)),
@@ -44,7 +44,7 @@ func (s *InMemoryStore) Write(_ context.Context, key rebac.TupleKey) error {
 	return nil
 }
 
-// Delete removes a tuple from the store.  No-op if the tuple does not exist.
+// Delete removes a tuple from the store. No-op if the tuple does not exist.
 func (s *InMemoryStore) Delete(_ context.Context, key rebac.TupleKey) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

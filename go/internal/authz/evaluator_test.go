@@ -225,7 +225,7 @@ func TestGraphEvaluator_PermissionMatrix(t *testing.T) {
 }
 
 // BenchmarkGraphEvaluator_Evaluate measures a single graph traversal.
-// Run with: go test -bench=. -benchtime=5s ./internal/authz/adapters/graph/...
+// Run with: go test -bench=. -benchtime=5s ./internal/authz
 func BenchmarkGraphEvaluator_Evaluate(b *testing.B) {
 	ev := newEvaluator()
 	req := rebac.CheckRequest{
@@ -242,7 +242,7 @@ func BenchmarkGraphEvaluator_Evaluate(b *testing.B) {
 }
 
 // FuzzParseObject exercises ParseObject with arbitrary byte sequences.
-// Run with: go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/authz/adapters/graph/...
+// Run with: go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/authz
 func FuzzParseObject(f *testing.F) {
 	f.Add("user:alice")
 	f.Add("team:platformTeam")

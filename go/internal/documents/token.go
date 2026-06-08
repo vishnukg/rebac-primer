@@ -17,7 +17,7 @@ type DemoTokenVerifier struct {
 	tokens map[string]TokenClaims
 }
 
-// New creates a verifier from a token → claims map.
+// NewDemoTokenVerifier creates a verifier from a token → claims map.
 func NewDemoTokenVerifier(tokens map[string]TokenClaims) *DemoTokenVerifier {
 	return &DemoTokenVerifier{tokens: tokens}
 }

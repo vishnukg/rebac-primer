@@ -19,7 +19,7 @@ import (
 //	make go-server-openfga                 # start once so the document tuple is written
 //	OPENFGA_API_URL=http://127.0.0.1:8080 \
 //	OPENFGA_STORE_ID=<id> OPENFGA_MODEL_ID=<id> \
-//	  go test -run TestContract_OpenFGA ./internal/authz/adapters/openfga/
+//	  go test -run TestContract_OpenFGA ./internal/openfga
 func TestContract_OpenFGA(t *testing.T) {
 	apiURL := os.Getenv("OPENFGA_API_URL")
 	storeID := os.Getenv("OPENFGA_STORE_ID")

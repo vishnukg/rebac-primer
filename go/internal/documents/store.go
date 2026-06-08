@@ -13,7 +13,7 @@ type InMemoryRepository struct {
 	docs map[string]CollaborativeDocument
 }
 
-// New creates an empty repository.
+// NewInMemoryRepository creates an empty repository.
 func NewInMemoryRepository() *InMemoryRepository {
 	return &InMemoryRepository{
 		docs: make(map[string]CollaborativeDocument),
@@ -31,7 +31,7 @@ func (r *InMemoryRepository) Save(_ context.Context, doc CollaborativeDocument) 
 	return nil
 }
 
-// FindByID retrieves a document by ID.  Returns nil (not an error) when not found.
+// FindByID retrieves a document by ID. Returns nil (not an error) when not found.
 func (r *InMemoryRepository) FindByID(_ context.Context, id string) (*CollaborativeDocument, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

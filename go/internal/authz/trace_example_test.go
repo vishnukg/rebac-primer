@@ -14,7 +14,7 @@ import (
 //
 // Run it and read the output top to bottom:
 //
-//	go test -v -run TestTrace ./internal/authz/adapters/graph/
+//	go test -v -run TestTrace ./internal/authz
 //
 // Each sub-test is one question. The trace lines are the exact steps the
 // evaluator took to answer it — see docs/27-graph-evaluator-walkthrough.md for a

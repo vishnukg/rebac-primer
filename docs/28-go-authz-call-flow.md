@@ -46,12 +46,12 @@ domain and the authz engine. They talk through an interface, not a network:
  │         │ authn                                │            │ Evaluate() │
  │         ▼                                 AuthzClient        ▼           │
  │  ┌───────────────┐                       (interface)  ┌───────────────┐ │
- │  │ authn/        │                                     │ graph/        │ │
- │  │ token.go   │                                     │ evaluator.go  │ │
+ │  │ token.go      │                                     │ evaluator.go  │ │
+ │  │ documents/    │                                     │ authz/        │ │
  │  └───────────────┘                                     └──────┬────────┘ │
  │                                                               │ reads     │
  │                                                        ┌──────▼────────┐ │
- │                                                        │ db/store.go   │ │
+ │                                                        │ store.go      │ │
  │                                                        │ (tuples)      │ │
  │                                                        └───────────────┘ │
  └───────────────────────────────────────────────────────────────────────┘
@@ -181,7 +181,7 @@ rebac.CheckResult{Allowed: true, Trace: [...]}
 
 For the line-by-line recursion (and the trace lines it produces), read
 `docs/27-graph-evaluator-walkthrough.md`. The evaluator reads tuples from
-`db/store.go` (step 7→8) but never writes — it only answers questions.
+`authz/store.go` (step 7→8) but never writes — it only answers questions.
 
 ### 8. The answer propagates back
 
