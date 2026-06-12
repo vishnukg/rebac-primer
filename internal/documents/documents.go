@@ -99,6 +99,16 @@ func IsAuthenticationError(err error) bool {
 	return errors.As(err, &authErr)
 }
 
+// DocumentAlreadyExistsError is returned when Create is given an ID that is
+// already taken. The HTTP layer maps it to 409 Conflict.
+type DocumentAlreadyExistsError struct {
+	ID string
+}
+
+func (e *DocumentAlreadyExistsError) Error() string {
+	return fmt.Sprintf("document already exists: %s", e.ID)
+}
+
 // DocumentNotFoundError is returned when an ID matches no stored document. The
 // HTTP layer maps it to 404 Not Found.
 type DocumentNotFoundError struct {

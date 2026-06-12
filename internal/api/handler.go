@@ -150,6 +150,12 @@ func (h *handler) writeError(w http.ResponseWriter, err error) {
 		return
 	}
 
+	var alreadyExists *documents.DocumentAlreadyExistsError
+	if errors.As(err, &alreadyExists) {
+		writeJSON(w, http.StatusConflict, errorBody(err.Error()))
+		return
+	}
+
 	var forbidden *documents.ForbiddenError
 	if errors.As(err, &forbidden) {
 		writeJSON(w, http.StatusForbidden, errorBody(err.Error()))

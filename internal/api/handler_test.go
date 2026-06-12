@@ -121,6 +121,27 @@ func TestHandler_CreateDocument_Returns201ForEditor(t *testing.T) {
 	}
 }
 
+func TestHandler_CreateDocument_Returns409ForExistingID(t *testing.T) {
+	handler := newTestHandler(t)
+	payload := map[string]string{
+		"id":          "roadmapDocument", // seeded by newTestHandler
+		"title":       "Duplicate",
+		"body":        "should not overwrite",
+		"workspaceId": "productWorkspace",
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer demo-token-alice")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d — body: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandler_CreateDocument_Returns401WhenTokenMissing(t *testing.T) {
 	handler := newTestHandler(t)
 	payload := map[string]string{

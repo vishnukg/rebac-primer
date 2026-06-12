@@ -81,6 +81,35 @@ func TestDocumentService_Create_SucceedsForEditor(t *testing.T) {
 	}
 }
 
+func TestDocumentService_Create_RejectsExistingID(t *testing.T) {
+	svc := newSeededService(t)
+
+	// alice is a workspace editor, so the authorization check passes — the create
+	// must still fail because the ID is taken. Allowing it would overwrite the
+	// document and grant alice a fresh owner tuple on it.
+	_, err := svc.Create(context.Background(), documents.CreateDocumentInput{
+		ID:        "roadmapDocument",
+		Title:     "Hijack",
+		Body:      "overwritten",
+		Workspace: fixtures.ProductWorkspace,
+		Actor:     fixtures.Alice,
+	})
+
+	var alreadyExists *documents.DocumentAlreadyExistsError
+	if !errors.As(err, &alreadyExists) {
+		t.Fatalf("expected *DocumentAlreadyExistsError, got %T: %v", err, err)
+	}
+
+	// The stored document is untouched.
+	doc, err := svc.Read(context.Background(), "roadmapDocument", fixtures.Alice)
+	if err != nil {
+		t.Fatalf("read after rejected create: %v", err)
+	}
+	if doc.Body != "Initial roadmap document" {
+		t.Errorf("expected original body to survive, got %q", doc.Body)
+	}
+}
+
 func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	// Arrange: wire authz + documents over a shared tuple store so we can inspect
 	// the tuples Create writes.

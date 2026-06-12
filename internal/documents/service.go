@@ -43,6 +43,18 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 		return nil, err
 	}
 
+	// Reject duplicate IDs. Without this check Create would silently overwrite:
+	// an editor of any workspace could reuse an existing document's ID, replace
+	// its content, and gain an owner tuple on it — an authorization bypass, since
+	// the editor check above only covers the workspace the caller named.
+	existing, err := s.repo.FindByID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, &DocumentAlreadyExistsError{ID: input.ID}
+	}
+
 	doc := CollaborativeDocument{
 		ID:        input.ID,
 		Title:     input.Title,
@@ -85,7 +97,7 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 // exist even without access. That is fine for this tutorial — clear errors aid
 // learning — but high-security systems return 404 for both cases so the two are
 // indistinguishable (check authorization first, then map a denial to not-found).
-// See docs/40-production-readiness.md (Gap 13).
+// See the Security Notes in docs/40-production-readiness.md.
 func (s *documentService) Read(ctx context.Context, id string, actor rebac.Object) (*CollaborativeDocument, error) {
 	doc, err := s.requireDocument(ctx, id)
 	if err != nil {

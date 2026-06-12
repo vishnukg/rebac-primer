@@ -48,9 +48,11 @@ type Case struct {
 // has no relationships, and the roadmap document lives in the workspace.
 //
 // Every backend must produce these exact answers. To run it against OpenFGA, the
-// store must hold the same tuples (the policy tuples from deployments/openfga/
-// seed.sh plus the document's workspace tuple, which the server writes on
-// startup).
+// store must hold the same tuples: the policy tuples from deployments/openfga/
+// seed.sh plus the document's workspace tuple, which the OpenFGA contract test
+// writes itself. The store must hold nothing else — in particular, starting the
+// server seeds a demo document owned by alice, and that owner tuple changes the
+// can_delete answers this contract pins down.
 func Cases() []Case {
 	doc := fixtures.RoadmapDocument
 	ws := fixtures.ProductWorkspace

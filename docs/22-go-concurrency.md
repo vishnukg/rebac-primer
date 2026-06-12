@@ -198,20 +198,20 @@ the moment the context is cancelled. A receive on a closed channel returns
 immediately — so `<-ctx.Done()` is "block until cancelled." After that,
 `ctx.Err()` tells you why (`context.Canceled` or `context.DeadlineExceeded`).
 
-`GraphEvaluator.Evaluate` itself currently ignores the context (it is an
-in-memory traversal, so cancellation is not worth the complexity). A real network
-call would pass `ctx` to the HTTP client and abort automatically. The interface
-requires the parameter so swapping in the real OpenFGA client later needs no
-changes at the call site.
+`GraphEvaluator` honours the context: `hasRelation` checks `ctx.Err()` at the
+top of every recursive call, so a cancelled or timed-out check stops mid-walk
+and returns the context error instead of finishing work nobody is waiting for
+(`internal/authz/evaluator_errors_test.go` proves it). A network-backed
+evaluator like the OpenFGA adapter additionally passes `ctx` to its HTTP
+client, which aborts the request in flight.
 
 ```go
 // context.Background() in tests means "never cancel"
 result, err := ev.Evaluate(context.Background(), req)
 ```
 
-But `AllPermissions` *does* act on the context, even though the underlying
-evaluator ignores it — it stops collecting and returns as soon as the caller
-cancels. It does that with `select`.
+`AllPermissions` acts on the context at its own level too — it stops collecting
+and returns as soon as the caller cancels. It does that with `select`.
 
 ## `select`: waiting on multiple channels
 

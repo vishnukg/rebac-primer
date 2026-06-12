@@ -8,6 +8,7 @@ production direction, but several demo components are intentionally simple.
 | Area | Primer | Production |
 |---|---|---|
 | Authn | static demo bearer tokens | JWT/OIDC verification with issuer, audience, expiry, JWKS |
+| OAuth scopes | carried on the token but never enforced | reject requests whose token lacks the scope for the endpoint, then run the object-level ReBAC check |
 | Document storage | in-memory repository | durable database |
 | Authz backend | graph evaluator by default | OpenFGA service with durable datastore |
 | Policy deployment | local seed script | migration/deployment pipeline |

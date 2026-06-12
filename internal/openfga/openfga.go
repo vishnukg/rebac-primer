@@ -85,14 +85,25 @@ func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.Chec
 }
 
 // WriteTuples persists relationship facts to the OpenFGA store.
+//
+// Tuples that already exist are skipped before the write. The OpenFGA Write API
+// rejects a duplicate tuple as an error, but the authz.Service contract (and the
+// in-memory store) treats writes as idempotent — re-running the startup seed
+// against a populated store must be a no-op, not a crash. The read-then-write is
+// not atomic, so a concurrent writer can still race in a duplicate; that
+// best-effort idempotency is fine for this primer.
 func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
-	if len(tuples) == 0 {
-		return nil
-	}
 	writes := make([]openfga.ClientTupleKey, 0, len(tuples))
 	for _, t := range tuples {
 		if err := authz.ValidateTuple(t); err != nil {
 			return err
+		}
+		exists, err := s.tupleExists(ctx, t)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
 		}
 		writes = append(writes, openfga.ClientTupleKey{
 			User:     string(t.User),
@@ -100,10 +111,27 @@ func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) erro
 			Object:   string(t.Object),
 		})
 	}
+	if len(writes) == 0 {
+		return nil
+	}
 	if _, err := s.client.Write(ctx).Body(openfga.ClientWriteRequest{Writes: writes}).Execute(); err != nil {
 		return fmt.Errorf("openfga: write tuples: %w", err)
 	}
 	return nil
+}
+
+// tupleExists reports whether the exact tuple is already stored.
+func (s *Service) tupleExists(ctx context.Context, t rebac.TupleKey) (bool, error) {
+	stored, err := s.ListTuples(ctx, authz.TupleFilter{Object: t.Object, Relation: t.Relation})
+	if err != nil {
+		return false, err
+	}
+	for _, st := range stored {
+		if st == t {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // DeleteTuples removes relationship facts from the OpenFGA store.
