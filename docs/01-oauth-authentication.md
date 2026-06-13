@@ -333,18 +333,18 @@ The user never sees the `device_code`. The CLI never shows the `user_code` to
 the IdP — it only uses the `device_code` for polling.
 
 ```text
-CLI / Device                  Authorization Server        User's browser
+CLI / Device                Authorization Server         User's browser
       │                               │                         │
       │  1. POST /device_authorization│                         │
       │  client_id=my-cli             │                         │
       ├──────────────────────────────►│                         │
       │  2. {                         │                         │
-      │    "device_code": "Ag1x...",  │  ← CLI uses this       │
-      │    "user_code": "ABCD-1234",  │  ← user types this     │
+      │    "device_code": "Ag1x...",  │  ← CLI uses this        │
+      │    "user_code": "ABCD-1234",  │  ← user types this      │
       │    "verification_uri":        │                         │
       │      "example.com/activate",  │                         │
       │    "expires_in": 900,         │                         │
-      │    "interval": 5              │  ← poll every 5s       │
+      │    "interval": 5              │  ← poll every 5s        │
       │  }                            │                         │
       │◄──────────────────────────────┤                         │
       │                               │                         │
@@ -355,21 +355,21 @@ CLI / Device                  Authorization Server        User's browser
       │                               │     enters ABCD-1234,   │
       │                               │     logs in             │
       │                               │◄────────────────────────┤
-      │  5. POST /token (poll #1)      │                         │
+      │  5. POST /token (poll #1)     │                         │
       │  grant_type=urn:ietf:params:  │                         │
       │   oauth:grant-type:device_code│                         │
       │  device_code=Ag1x...          │                         │
       ├──────────────────────────────►│                         │
       │  { "error":                   │                         │
-      │    "authorization_pending" }  │  ← user not done yet   │
+      │    "authorization_pending" }  │  ← user not done yet    │
       │◄──────────────────────────────┤                         │
       │  ... waits 5 seconds, polls again                       │
-      │  6. POST /token (poll #N)      │                         │
+      │  6. POST /token (poll #N)     │                         │
       ├──────────────────────────────►│                         │
       │  {                            │                         │
       │    "access_token": "...",     │                         │
       │    "id_token": "..."          │                         │
-      │  }                            │  ← user finished       │
+      │  }                            │  ← user finished        │
       │◄──────────────────────────────┤                         │
 ```
 
@@ -537,16 +537,16 @@ Service B. The new token carries the user's identity in an `act` (actor) claim
 so Service B still knows the original user.
 
 ```text
-Browser         Your API (Resource Server)    Authorization Server   Service B
+Browser   Your API (Resource Server)        Authorization Server     Service B
    │                   │                              │                  │
-   │  user token        │                              │                  │
-   │  aud=your-api      │                              │                  │
+   │  user token       │                              │                  │
+   │  aud=your-api     │                              │                  │
    │──────────────────►│                              │                  │
    │                   │ 1. validate user token       │                  │
    │                   │                              │                  │
    │                   │ 2. POST /token               │                  │
    │                   │  grant_type=                 │                  │
-   │                   │   urn:ietf:params:oauth:      │                  │
+   │                   │   urn:ietf:params:oauth:     │                  │
    │                   │   grant-type:token-exchange  │                  │
    │                   │  subject_token=<user token>  │                  │
    │                   │  audience=service-b          │                  │
@@ -590,9 +590,9 @@ calling Service B, and passes the user's identity as a separate field in the
 request.
 
 ```text
-Browser         Your API (Resource Server)    Authorization Server   Service B
+Browser   Your API (Resource Server)        Authorization Server     Service B
    │                   │                              │                  │
-   │  user token        │                              │                  │
+   │  user token       │                              │                  │
    │──────────────────►│                              │                  │
    │                   │ 1. validate user token       │                  │
    │                   │    extract sub: github|12345 │                  │
@@ -606,7 +606,7 @@ Browser         Your API (Resource Server)    Authorization Server   Service B
    │                   │─────────────────────────────►│                  │
    │                   │  service token               │                  │
    │                   │  { "sub": "your-api",        │                  │
-   │                   │    "aud": "service-b" }       │                  │
+   │                   │    "aud": "service-b" }      │                  │
    │                   │◄─────────────────────────────│                  │
    │                   │                              │                  │
    │                   │ 3. Authorization: Bearer service_token          │
