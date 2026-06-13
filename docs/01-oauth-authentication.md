@@ -86,31 +86,31 @@ Here is a typical login, step by step:
 ```text
 Browser                  Your App                  IdP
    │                         │                       │
-   │  1. GET /login           │                       │
+   │  1. GET /login          │                       │
    │────────────────────────►│                       │
    │                         │ generates:            │
    │                         │  state (random nonce) │
    │                         │  code_verifier        │
    │                         │  code_challenge       │
-   │                         │   = hash(code_verifier)
-   │  2. 302 → /authorize     │                       │
-   │     ?response_type=code  │                       │
-   │     &client_id=...       │                       │
-   │     &redirect_uri=...    │                       │
-   │     &scope=openid        │                       │
-   │     &state=<nonce>       │                       │
-   │     &code_challenge=...  │                       │
+   │                         │  = hash(code_verifier)│
+   │  2. 302 → /authorize    │                       │
+   │     ?response_type=code │                       │
+   │     &client_id=...      │                       │
+   │     &redirect_uri=...   │                       │
+   │     &scope=openid       │                       │
+   │     &state=<nonce>      │                       │
+   │     &code_challenge=... │                       │
    │◄────────────────────────│                       │
-   │  3. follows redirect     │                       │
+   │  3. follows redirect    │                       │
    │────────────────────────────────────────────────►│
-   │                         │     Alice logs in      │
-   │  4. 302 → /callback      │                       │
-   │     ?code=AUTH_CODE      │                       │
-   │     &state=<nonce>       │                       │
+   │                         │    Alice logs in      │
+   │  4. 302 → /callback     │                       │
+   │     ?code=AUTH_CODE     │                       │
+   │     &state=<nonce>      │                       │
    │◄────────────────────────────────────────────────┤
-   │  5. GET /callback        │                       │
-   │     ?code=AUTH_CODE      │                       │
-   │     &state=<nonce>       │                       │
+   │  5. GET /callback       │                       │
+   │     ?code=AUTH_CODE     │                       │
+   │     &state=<nonce>      │                       │
    │────────────────────────►│                       │
    │                         │ verify state matches  │
    │                         │  6. POST /token       │
@@ -125,7 +125,7 @@ Browser                  Your App                  IdP
    │                         │  7. access_token,     │
    │                         │     id_token          │
    │                         │◄──────────────────────┤
-   │  8. Set-Cookie: session  │                       │
+   │  8. Set-Cookie: session │                       │
    │◄────────────────────────│                       │
 ```
 
