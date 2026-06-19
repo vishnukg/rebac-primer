@@ -38,7 +38,7 @@ Read a tuple as: object has relation to user.
 
 ## Authz Service
 
-Open `internal/authz/authz.go` and `service.go`.
+Open `internal/authz/authz.go` and `internal/authz/service.go`.
 
 `authz.Service` is the app-facing port:
 
@@ -52,7 +52,9 @@ type Service interface {
 ```
 
 The service delegates checks to an `Evaluator` and writes to a
-`TupleRepository`. Tuple writes are validated before they reach a backend.
+`TupleRepository`. Check requests and tuple writes are validated against the
+known model before they reach a backend. This avoids turning caller mistakes
+into silent denials or storing facts that can never match.
 
 ## Graph Evaluator
 
@@ -62,7 +64,7 @@ For each `(user, relation, object)` check, the evaluator tries:
 
 1. direct tuple
 2. subject-set tuple
-3. relation expansion from `model.go`
+3. relation expansion from `internal/authz/model.go`
 4. document workspace inheritance
 
 `docs/27-graph-evaluator-walkthrough.md` traces those steps line by line.
@@ -74,25 +76,32 @@ Open `internal/documents/service.go`.
 The document operations are:
 
 ```text
-Create -> check workspace editor -> save doc -> write document tuples
+Create -> check workspace editor -> atomically create doc -> write document tuples
 Read   -> load doc -> check can_read
 Update -> load doc -> check can_edit -> save update
 ```
 
-The service depends on narrow ports from `documents.go`:
+If tuple creation fails, `Create` performs compensating cleanup. This keeps the
+example coherent without pretending two independent stores share a transaction.
+
+The document service depends on two narrow ports from
+`internal/documents/documents.go`:
 
 ```text
 DocumentRepository
 AuthzClient
-Authenticator
 ```
+
+`Authenticator` is also declared in the documents package, but it is consumed
+by the HTTP adapter rather than by `documentService`.
 
 ## HTTP Adapter
 
 Open `internal/api/handler.go`.
 
-The handler authenticates the bearer token, decodes JSON, calls the documents
-service, and maps domain errors to HTTP statuses.
+The handler authenticates the bearer token, enforces the endpoint's coarse OAuth
+scope, decodes bounded JSON, calls the documents service, and maps domain errors
+to HTTP statuses. ReBAC remains the separate object-level decision.
 
 ## Composition Root
 
@@ -114,3 +123,15 @@ Trace the evaluator:
 ```bash
 go test -v -run TestTrace ./internal/authz
 ```
+
+## Read It Actively
+
+After each package, answer one question:
+
+- `rebac`: what values can represent a graph edge?
+- `authz`: where are policy facts stored, and where are rules stored?
+- `documents`: which business operations require which permissions?
+- `api`: which failures are authentication, scope, ReBAC, or malformed input?
+- `cmd/server`: which concrete implementations are selected?
+
+If you cannot answer one, return to that package before continuing.

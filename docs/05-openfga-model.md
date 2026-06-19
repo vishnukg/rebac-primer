@@ -20,6 +20,9 @@ The Go in-process mirror lives in:
 internal/authz/model.go
 ```
 
+Read the model as a type system plus set algebra. Type restrictions say what may
+be written directly; relation expressions say what may be derived.
+
 ## Types
 
 The model contains:
@@ -88,12 +91,30 @@ read, so the evaluator can derive `can_read` from `viewer`.
 
 ## Try It
 
-Add a new permission:
+Add a new computed permission:
 
 ```text
-define archiver: [user] or owner
-define can_archive: archiver
+define can_archive: owner
 ```
 
-Then mirror it in `internal/rebac/rebac.go`, `internal/authz/model.go`, and
-the evaluator tests.
+To keep both backends aligned, update:
+
+1. `deployments/openfga/model.fga`
+2. the relation constant in `internal/rebac/rebac.go`
+3. `documentRules` in `internal/authz/model.go`
+4. `relationDefinedFor` and computed-relation validation in
+   `internal/authz/validate.go`
+5. the shared authorization contract and evaluator tests
+
+The traversal algorithm itself should not change. If adding a simple permission
+requires editing DFS code, the model and evaluator are becoming too tightly
+coupled.
+
+## Checkpoint
+
+Why is `can_edit` not stored as a tuple? Because it is a computed permission:
+the model derives it from `editor`, while tuples store changing relationship
+facts.
+
+Next: [Graph evaluator walkthrough](27-graph-evaluator-walkthrough.md) follows
+one real check through every recursive branch.

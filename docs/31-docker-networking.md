@@ -43,6 +43,16 @@ for the container.
 make openfga/up
 docker compose -f deployments/docker-compose.yml ps
 curl http://127.0.0.1:8080/healthz
-make server
+make openfga/seed
+make server-openfga
 curl http://127.0.0.1:4001/health
 ```
+
+Run the final two commands in separate terminals because the server command
+remains attached to logs.
+
+## Checkpoint
+
+Why does `localhost:8080` work from your laptop but not from the app container?
+Inside a container, `localhost` means that same container. Compose DNS resolves
+the peer service as `openfga`.

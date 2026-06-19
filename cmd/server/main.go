@@ -15,11 +15,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 
 	"rebac-primer/internal/api"
 	"rebac-primer/internal/authz"
@@ -29,7 +33,8 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	port, err := readPort()
 	if err != nil {
@@ -77,9 +82,38 @@ func main() {
 	}
 
 	addr := fmt.Sprintf(":%d", port)
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           api.NewServer(verifier, documentsService),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	log.Printf("Go ReBAC server listening on http://127.0.0.1%s", addr)
-	if err := http.ListenAndServe(addr, api.NewServer(verifier, documentsService)); err != nil {
-		log.Fatalf("server error: %v", err)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- server.ListenAndServe()
+	}()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server error: %v", err)
+		}
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("server shutdown: %v", err)
+			if closeErr := server.Close(); closeErr != nil {
+				log.Printf("server close: %v", closeErr)
+			}
+		}
+		if err := <-errCh; !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server error: %v", err)
+		}
 	}
 }
 

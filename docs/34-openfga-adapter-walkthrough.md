@@ -39,6 +39,9 @@ resp, err := s.client.Check(ctx).Body(openfga.ClientCheckRequest{
 
 OpenFGA evaluates `model.fga` plus stored tuples and returns allow/deny.
 
+The adapter validates the check shape before making the network call, matching
+the in-process service's behavior.
+
 ## WriteTuples
 
 When a document is created, the documents service writes document-level
@@ -46,6 +49,21 @@ relationship facts. In OpenFGA mode, `WriteTuples` sends those facts to the
 OpenFGA Write API.
 
 That is why a later `can_delete` check can see that Alice owns the document.
+
+The adapter pins an authorization model ID. That avoids silently changing check
+semantics when a newer model is deployed. Its read-before-write duplicate check
+is intentionally simple and not atomic; production event consumers should use
+idempotency and retry policy at the workflow level.
+
+## Read and Pagination
+
+OpenFGA's Read API is paginated. `ListTuples` follows continuation tokens until
+all matching pages are collected. Missing this loop would silently return a
+partial tuple set and could break duplicate detection or cleanup.
+
+The method exists to satisfy the primer's shared service contract. Production
+applications should prefer purpose-built OpenFGA query APIs for authorization
+questions and avoid treating tuple reads as a general listing/search API.
 
 ## Run
 
@@ -70,3 +88,7 @@ curl -X PATCH localhost:4001/documents/roadmapDocument \
   -H "content-type: application/json" \
   -d '{"body":"no"}'
 ```
+
+In the demo, Bob's token also lacks `documents:write`, so this request is denied
+by the OAuth scope gate before ReBAC. The authorization contract tests separately
+prove that Bob is not a document editor.

@@ -294,6 +294,19 @@ func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAnd
 			Relation: rebac.RelationDocumentOwner,
 			User:     "platformTeam#member",
 		},
+		"unknown relation for object": {
+			Object: rebac.Team("platformTeam"), Relation: rebac.RelationDocumentCanRead, User: rebac.Subject(rebac.User("alice")),
+		},
+		"computed relation cannot be written": {
+			Object: rebac.Document("d1"), Relation: rebac.RelationDocumentCanEdit, User: rebac.Subject(rebac.User("alice")),
+		},
+		"workspace pointer must reference workspace": {
+			Object: rebac.Document("d1"), Relation: rebac.RelationDocumentWorkspace, User: rebac.Subject(rebac.User("alice")),
+		},
+		"workspace owner requires team admin subject set": {
+			Object: rebac.Workspace("productWorkspace"), Relation: rebac.RelationWorkspaceOwner,
+			User: rebac.SubjectSet(rebac.Team("platformTeam"), rebac.RelationTeamMember),
+		},
 	}
 
 	for name, tk := range cases {
@@ -311,6 +324,25 @@ func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAnd
 				t.Errorf("expected no writes when a tuple is invalid, got %d", len(repo.writes))
 			}
 		})
+	}
+}
+
+func TestService_GivenInvalidCheck_WhenCheck_ThenRejectsBeforeEvaluator(t *testing.T) {
+	evaluator := &mockEvaluator{}
+	svc := authz.New(stubRepository{}, evaluator)
+
+	_, err := svc.Check(context.Background(), rebac.CheckRequest{
+		User:     rebac.Team("platformTeam"),
+		Relation: rebac.RelationDocumentCanEdit,
+		Object:   rebac.Document("d1"),
+	})
+
+	var validationErr *authz.TupleValidationError
+	if !errors.As(err, &validationErr) {
+		t.Fatalf("expected *TupleValidationError, got %v", err)
+	}
+	if len(evaluator.calls) != 0 {
+		t.Errorf("evaluator called %d times, want 0", len(evaluator.calls))
 	}
 }
 

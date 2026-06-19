@@ -3,9 +3,14 @@
 The repo has two authz backends:
 
 1. in-process graph evaluator, for learning
-2. OpenFGA adapter, for the production direction
+2. OpenFGA adapter, showing the external authorization-service direction
 
 Both satisfy the same app-facing `authz.Service` shape.
+
+This is a backend substitution, not proof that the surrounding demo is
+production-ready. Token verification, durable document storage, OpenFGA
+authentication, consistency choices, and operational controls remain separate
+production concerns.
 
 ## Mapping
 
@@ -72,3 +77,23 @@ Runtime document tuples:
 ```
 
 The local OpenFGA container uses an in-memory datastore, so restart means reseed.
+
+## Prove Parity
+
+Run the in-process contract normally:
+
+```bash
+go test ./internal/authz
+```
+
+After seeding a fresh OpenFGA store, source the generated IDs and run:
+
+```bash
+set -a
+. deployments/openfga/.ids.env
+set +a
+go test -run TestContract_OpenFGA ./internal/openfga
+```
+
+Both backends should satisfy the same allow/deny matrix. That behavioral
+contract—not similar-looking code—is the meaningful migration guarantee.

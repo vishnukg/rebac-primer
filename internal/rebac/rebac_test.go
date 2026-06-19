@@ -55,6 +55,7 @@ func TestParseObject_GivenMalformedReference_WhenParsed_ThenReturnsError(t *test
 		"no separator":      "user",
 		"empty type":        ":alice",
 		"empty id":          "user:",
+		"blank id":          "workspace: ",
 		"unrecognised type": "robot:r2d2",
 		"separator only":    ":",
 	}

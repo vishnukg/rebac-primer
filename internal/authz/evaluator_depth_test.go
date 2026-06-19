@@ -18,7 +18,7 @@ func TestGraphEvaluator_ExceedingMaxDepthReturnsError(t *testing.T) {
 	// depth guard can stop it.
 	var seed []rebac.TupleKey
 	const chain = 6
-	for i := 0; i < chain; i++ {
+	for i := range chain {
 		obj := rebac.Team(fmt.Sprintf("t%d", i))
 		next := rebac.SubjectSet(rebac.Team(fmt.Sprintf("t%d", i+1)), rebac.RelationTeamMember)
 		seed = append(seed, rebac.Tuple(obj, rebac.RelationTeamMember, next))

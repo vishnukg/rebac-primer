@@ -5,6 +5,19 @@ actually came from Alice. That is the login problem. OAuth and OIDC are the
 modern standards for solving it — without your app ever handling Alice's password
 directly.
 
+## How to read this chapter
+
+This chapter contains both the essential identity handoff and production-depth
+material. On a first pass:
+
+1. read through Authorization Code + PKCE
+2. jump to [From identity to ReBAC](#from-identity-to-rebac)
+3. read Scopes vs. ReBAC, patterns to avoid, and the checkpoint
+
+Return later for client credentials, device authorization, token validation,
+token exchange, and service-to-service identity. Those sections are important,
+but they are not prerequisites for understanding the graph evaluator.
+
 ## Two acronyms, one sentence each
 
 **OAuth 2.0** — a framework for delegated access: a user authorizes your app to
@@ -14,10 +27,10 @@ call APIs on their behalf without giving your app their password.
 standard way for your app to learn *who* the user is, not just *that* they
 authenticated.
 
-In practice, almost every "log in with GitHub / Google / Auth0" button uses
-both:
-- OAuth handles the token plumbing
-- OIDC adds the "who is this person?" answer
+Many "log in with ..." integrations use both:
+
+- OAuth provides delegated authorization and token delivery.
+- OIDC adds the interoperable authentication and identity layer.
 
 ## Authentication vs. authorization
 
@@ -26,11 +39,12 @@ Authentication  →  Who are you?
 Authorization   →  What can you do?
 ```
 
-OAuth/OIDC handles authentication. Your ReBAC system handles authorization.
+OIDC handles user authentication. OAuth access tokens authorize API access.
+Your ReBAC system handles application-specific, object-level authorization.
 They hand off to each other:
 
 ```text
-OAuth/OIDC proves:   "This request is from user:alice"
+OIDC/token validation establishes: "This request is from user:alice"
                             │
                             ▼
 ReBAC decides:       "Can user:alice edit document:roadmapDocument?"
@@ -39,12 +53,13 @@ ReBAC decides:       "Can user:alice edit document:roadmapDocument?"
                      allow or deny
 ```
 
-Keep these two questions separate. OAuth does not decide document permissions.
-It only proves identity.
+Keep these questions separate. OAuth scopes do not decide document permissions,
+and OAuth by itself is not an authentication protocol. OIDC supplies the login
+identity; the resource server validates the access token presented to its API.
 
 ## The four players
 
-Any OAuth/OIDC flow involves four roles:
+OAuth authorization flows use four roles:
 
 ```text
 Resource Owner       Alice — the user who wants to use the app
@@ -58,8 +73,8 @@ In a small app, your backend is both the Client and the Resource Server. That is
 fine — they are different roles in the protocol, not necessarily different
 servers.
 
-The Authorization Server is also called an **Identity Provider (IdP)** when it
-does OIDC (which it almost always does today).
+An Authorization Server is also acting as an **Identity Provider (IdP)** when it
+implements OIDC. The roles are related, but not interchangeable in every system.
 
 ## OAuth flows
 
@@ -90,16 +105,20 @@ Browser                  Your App                  IdP
    │────────────────────────►│                       │
    │                         │ generates:            │
    │                         │  state (random nonce) │
+   │                         │  OIDC nonce           │
    │                         │  code_verifier        │
    │                         │  code_challenge       │
-   │                         │  = hash(code_verifier)│
+   │                         │  = S256(verifier)     │
    │  2. 302 → /authorize    │                       │
    │     ?response_type=code │                       │
    │     &client_id=...      │                       │
    │     &redirect_uri=...   │                       │
    │     &scope=openid       │                       │
    │     &state=<nonce>      │                       │
+   │     &nonce=<oidc_nonce> │                       │
    │     &code_challenge=... │                       │
+   │     &code_challenge_    │                       │
+   │       method=S256       │                       │
    │◄────────────────────────│                       │
    │  3. follows redirect    │                       │
    │────────────────────────────────────────────────►│
@@ -132,10 +151,10 @@ Browser                  Your App                  IdP
 In plain English:
 
 1. Alice's browser requests `/login` from your app
-2. Your app generates three values: a random `state` (CSRF protection), a
-   `code_verifier` (random secret), and a `code_challenge` (a hash of the
-   verifier). It responds with a redirect to the IdP's `/authorize` endpoint
-   carrying all these parameters. The browser follows automatically.
+2. Your app generates `state` (request/callback correlation and CSRF defense),
+   an OIDC `nonce` (binds the ID token to this login), a random
+   `code_verifier`, and an S256 `code_challenge`. It responds with a redirect to
+   the authorization endpoint carrying the public values. The browser follows.
 3. Alice's browser arrives at the IdP. She logs in (password, MFA, etc.) — your
    app is not involved and never sees her credentials.
 4. The IdP redirects Alice's browser back to your `redirect_uri` (your app's
@@ -145,8 +164,9 @@ In plain English:
 6. Your app verifies the `state` matches what it stored (prevents CSRF), then
    makes a **server-to-server** POST to the IdP's token endpoint — never in the
    browser URL — sending the `code` and the original `code_verifier`.
-7. The IdP verifies `hash(code_verifier) == code_challenge` from step 2, then
-   returns the access token and ID token.
+7. The authorization server verifies the PKCE value and returns an access token
+   plus an ID token for the OIDC request. The client validates the ID token,
+   including issuer, audience, signature, expiry, and nonce.
 8. Your app creates a session cookie. Alice is logged in.
 
 Your app never sees Alice's password. The token exchange in step 6 is
@@ -157,13 +177,12 @@ server-to-server only — nothing sensitive ever appears in a browser URL.
 Step 7 gives you up to three things:
 
 ```text
-Authorization code  →  short-lived, one-time value (like a coat-check ticket)
+Authorization code  →  short-lived, one-time credential (like a coat-check ticket)
                         your app exchanges this for real tokens — then it expires
-                        (not a token itself, just a stepping stone)
 
-Access token        →  proves "this client is authorized to call this API"
-                        sent with every API request as a Bearer token
-                        expires quickly (minutes to an hour)
+Access token        →  carries delegated authority for a resource server
+                        commonly sent as a Bearer token
+                        should be short-lived according to the threat model
 
 ID token            →  OIDC's contribution — proves "this person authenticated"
                         contains the user's identity (name, stable ID, email)
@@ -180,13 +199,15 @@ ID token     →  tells YOUR APP who the user is
 Access token →  tells THE API that the client is authorized to call it
 ```
 
-Do not use the ID token to call APIs. Do not use the access token to identify
-the user.
+Do not use the ID token to call APIs. At the API, use the validated access
+token's subject and authorization details according to the authorization
+server's documented token profile. Do not assume an arbitrary access token is
+an OIDC ID token or that it always contains user identity claims.
 
 ## OIDC: the "who" layer
 
-Without OIDC, OAuth only answers: "is this client allowed to call this API?" It
-does not tell you *who* the user is.
+OAuth defines delegated API authorization, not a login protocol. OIDC adds the
+standard authentication response and identity claims needed for login.
 
 OIDC adds the ID token — a JWT containing standard **claims** about the user:
 
@@ -264,6 +285,9 @@ Client                           Authorization Server
 
 ## Flow 2: Client Credentials
 
+> Optional depth begins here. If your immediate goal is ReBAC, jump to
+> [From identity to ReBAC](#from-identity-to-rebac).
+
 **Use when:** a service needs to call another service and there is no user
 involved — background jobs, billing workers, microservice calls.
 
@@ -304,14 +328,15 @@ No browser. No user. No redirect. No ID token — there is no user to identify.
 The access token proves "Service A is authorized to call this API." The API can
 still make authorization decisions about what the service is allowed to do.
 
-ReBAC can model service identities just like user identities:
+ReBAC can model service identities too:
 
 ```text
-user:service-billing-worker  →  can_read on document:invoiceTemplate
+service:billing-worker  →  can_read on document:invoiceTemplate
 ```
 
-The `user:` prefix does not mean it has to be a human. It is just a subject in
-your authorization model.
+This repository models only `user`, `team`, `workspace`, and `document`, so the
+example would require adding a `service` type. In production, distinct principal
+types make policy and audit records clearer than placing machines under `user:`.
 
 ## Flow 3: Device Authorization
 
@@ -383,13 +408,15 @@ In plain English:
    `user_code`, and logs in normally
 5. Meanwhile the CLI polls the token endpoint every `interval` seconds using the
    `device_code`. The IdP returns `authorization_pending` until the user finishes.
-6. Once the user completes login, the next poll returns real tokens — same
-   access token and ID token as any other flow
+6. Once the user completes login, the next poll returns an access token and,
+   when OIDC was requested and supported, an ID token
 
 The user authenticates on a device that *can* open a browser. The CLI receives
 tokens without redirecting anything.
 
-This is what `gh auth login` and `aws sso login` use.
+This pattern is commonly used by CLIs and input-constrained devices. A specific
+tool may instead use Authorization Code with a loopback or claimed-HTTPS
+redirect, so check that tool's current documentation.
 
 ## How the API validates an access token
 
@@ -405,30 +432,36 @@ approaches.
 
 ### Option 1: JWT validation (local)
 
-Most modern IdPs issue access tokens as JWTs. The API can validate them locally
-without calling the IdP on every request.
+Some authorization servers issue JWT access tokens. When the server documents
+that token profile, the API can validate them locally without calling the
+authorization server on every request. Other access tokens are intentionally
+opaque and must not be decoded as JWTs.
 
-The IdP publishes its public keys at a well-known URL:
+The authorization server publishes its public keys through metadata/JWKS. Do
+not hard-code the example path below; discover the advertised `jwks_uri`:
 
 ```text
 GET https://idp.example.com/.well-known/jwks.json
 ```
 
-The API fetches and caches these keys on startup. When a request arrives:
+The API fetches and caches these keys, and refreshes them safely when keys
+rotate. When a request arrives:
 
 ```text
-1. Decode the JWT header  →  get algorithm + key ID (kid)
+1. Parse the JWT header   →  get algorithm + key ID (kid)
 2. Find the matching public key from the cached JWKS
-3. Verify the signature   →  proves the IdP issued this, not a forgery
+3. Enforce the expected algorithm and verify the signature
 4. Check claims:
      exp  →  is the token still valid?
+     nbf  →  if present, is the token active yet?
      iss  →  is it from the expected IdP?
      aud  →  is it intended for this API?
      scope → does it include the permission this endpoint requires?
 5. Extract sub  →  map to app user id  →  run ReBAC check
 ```
 
-No network call needed after the initial JWKS fetch.
+No per-request authorization-server call is needed, but key rotation still
+requires safe JWKS refresh and caching.
 
 For a user token (from Flow 1 or Flow 3), the JWT payload looks like this:
 
@@ -496,10 +529,10 @@ Token introspection (remote)
   - the IdP becomes a bottleneck at scale
 ```
 
-In practice: issue short-lived access tokens (15–60 minutes), use JWT
-validation, and treat expiry as your revocation window. For high-security
-scenarios that need instant revocation, use introspection or combine very
-short-lived tokens with refresh token rotation.
+In practice, choose short access-token lifetimes from your threat model rather
+than copying a universal number. JWT validation trades immediate revocation for
+local verification; introspection can provide fresher status at the cost of a
+network dependency.
 
 ## When your API calls another service
 
@@ -517,7 +550,7 @@ The user's access token has an `aud` (audience) claim set to *your* API:
 
 If your API forwards that token to Service B, Service B should reject it —
 the token was not issued for Service B. A strict API enforcing audience
-validation will return a 401.
+validation will normally return `401 Unauthorized`.
 
 Even if it does not enforce `aud` today, forwarding a user token to internal
 services violates least-privilege: Service B receives more credential than it
@@ -533,8 +566,9 @@ There are two proper patterns.
 ### Pattern 1: Token Exchange (RFC 8693)
 
 Your API exchanges the user token for a new token specifically scoped for
-Service B. The new token carries the user's identity in an `act` (actor) claim
-so Service B still knows the original user.
+Service B. In the standard delegation representation, `sub` remains the user
+whose authority is being delegated and `act.sub` identifies the current actor
+acting for that user.
 
 ```text
 Browser   Your API (Resource Server)        Authorization Server     Service B
@@ -556,10 +590,10 @@ Browser   Your API (Resource Server)        Authorization Server     Service B
    │                   │                              │ user token       │
    │                   │ 3. new token                 │                  │
    │                   │  {                           │                  │
-   │                   │    "sub": "your-api",        │                  │
+   │                   │    "sub": "github|12345",    │                  │
    │                   │    "aud": "service-b",       │                  │
    │                   │    "act": {                  │                  │
-   │                   │      "sub": "github|12345"   │                  │
+   │                   │      "sub": "your-api"       │                  │
    │                   │    },                        │                  │
    │                   │    "scope": "invoices.read"  │                  │
    │                   │  }                           │                  │
@@ -570,13 +604,13 @@ Browser   Your API (Resource Server)        Authorization Server     Service B
 ```
 
 Service B sees:
-- `sub=your-api` — the caller is your API (machine identity)
-- `act.sub=github|12345` — acting on behalf of this user
+- `sub=github|12345` — the user whose authority is delegated
+- `act.sub=your-api` — the service currently acting for that user
 - `aud=service-b` — this token was issued specifically for it
 - `scope=invoices.read` — narrower scope than the original user token
 
-Service B can still run a ReBAC check using the original user identity from
-`act.sub`.
+Service B can run the ReBAC check using the delegated subject from `sub`, while
+retaining `act.sub` for actor-aware policy and audit records.
 
 Use token exchange when:
 - Services are across trust boundaries
@@ -610,21 +644,21 @@ Browser   Your API (Resource Server)        Authorization Server     Service B
    │                   │◄─────────────────────────────│                  │
    │                   │                              │                  │
    │                   │ 3. Authorization: Bearer service_token          │
-   │                   │    X-User-ID: user:github:12345                 │
+   │                   │    signed/internal user context                 │
    │                   │────────────────────────────────────────────────►│
 ```
 
 Service B receives:
 - A valid service token proving the caller is your API
-- The user identity as a trusted header or request field
+- The user identity as authenticated internal request context
 
-Service B trusts the `X-User-ID` value because it already trusts your API
-(authenticated via the service token). It can still run a ReBAC check using
-that user id.
+Service B must accept that identity only from authenticated, authorized callers
+and must strip or overwrite any equivalent value supplied by an external
+request. A plain forwarded header plus "internal network" trust is not enough.
 
 Use client credentials + forwarding when:
-- Services are within the same trust boundary (internal network, service mesh)
-- You control all services and can enforce that the caller is trusted
+- Services are within one controlled trust boundary
+- You authenticate the calling workload and integrity-protect the user context
 - You want simplicity over the overhead of token exchange
 
 ### What NOT to do: forwarding the user token
@@ -655,9 +689,10 @@ Client credentials + user identity forwarding
   - only appropriate for internal services you control
 ```
 
-For a small internal architecture with services you own, client credentials +
-forwarding is pragmatic. For calls that cross organizational or trust boundaries,
-use token exchange.
+For a controlled internal architecture, workload authentication plus
+integrity-protected user context can be pragmatic. For calls that cross
+organizational or trust boundaries, prefer a token issued for the downstream
+audience, such as token exchange when your authorization server supports it.
 
 ### ReBAC across services
 
@@ -665,11 +700,11 @@ Both patterns give Service B what it needs to run a ReBAC check:
 
 ```text
 Token exchange:
-  Service B extracts act.sub → "github|12345" → user:github:12345
+  Service B extracts sub → "github|12345" → user:github:12345
   Check(user:github:12345, can_read, invoice:INV-001)
 
 Client credentials + forwarding:
-  Service B reads X-User-ID header → "user:github:12345"
+  Service B reads authenticated internal user context → "user:github:12345"
   Check(user:github:12345, can_read, invoice:INV-001)
 ```
 
@@ -677,6 +712,8 @@ The ReBAC check is identical. The difference is only in how Service B learns
 which user to check.
 
 ## From identity to ReBAC
+
+> Core path resumes here.
 
 Authentication gives you the user id. ReBAC uses it:
 
@@ -769,7 +806,8 @@ If a tutorial still recommends either of these, treat it as outdated.
 
 ## JWTs in thirty seconds
 
-Tokens are often JWTs (JSON Web Tokens). A JWT has three parts:
+OIDC ID tokens are JWTs. Access tokens may be JWTs or opaque values, depending
+on the authorization server. A JWT has three parts:
 
 ```text
 header.payload.signature
@@ -839,14 +877,14 @@ This course teaches the modern posture:
 
 ## Checkpoint
 
-> What does OAuth/OIDC give ReBAC?
+> What do OIDC and access-token validation give ReBAC?
 
-OAuth/OIDC verifies who is making the request and gives your app a stable user
-identity. ReBAC then uses that identity to decide what the user can do on a
-specific object.
+OIDC establishes the login identity, and the resource server validates the
+access token used for the API request. ReBAC then uses the resulting stable
+subject identity to decide what it may do on a specific object.
 
 Two separate questions:
-- OAuth/OIDC answers: **who?**
+- OIDC/token validation establishes: **who is calling, and may this token call this API?**
 - ReBAC answers: **what may they do with this?**
 
 ## Further reading

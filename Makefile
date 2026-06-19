@@ -12,7 +12,7 @@ APP      := $(COMPOSE) --profile app
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build test vet lint check shell server server-down server-openfga \
+.PHONY: help build test test-race vet lint modernize check shell server server-down server-openfga \
         openfga/up openfga/down openfga/seed compose/config clean
 
 help:
@@ -23,9 +23,11 @@ help:
 	@printf '%s\n' 'Go:'
 	@printf '%s\n' '  make build          Compile Go packages'
 	@printf '%s\n' '  make test           Run Go tests'
+	@printf '%s\n' '  make test-race      Run tests with the race detector'
 	@printf '%s\n' '  make vet            Run go vet'
 	@printf '%s\n' '  make lint           Run staticcheck (go tool)'
-	@printf '%s\n' '  make check          Vet, staticcheck, and test'
+	@printf '%s\n' '  make modernize      Report Go 1.26 modernization suggestions'
+	@printf '%s\n' '  make check          Vet, staticcheck, tests, and race tests'
 	@printf '%s\n' '  make shell          Open shell in the Go tools container'
 	@printf '%s\n' '  make server         Run the Go app on http://127.0.0.1:4001'
 	@printf '%s\n' ''
@@ -44,6 +46,9 @@ build:
 test:
 	$(GO_TOOLS) go test ./...
 
+test-race:
+	$(GO_TOOLS) go test -race ./...
+
 vet:
 	$(GO_TOOLS) go vet ./...
 
@@ -52,8 +57,11 @@ vet:
 lint:
 	$(GO_TOOLS) go tool staticcheck ./...
 
+modernize:
+	$(GO_TOOLS) go fix -diff ./...
+
 check:
-	$(GO_TOOLS) sh -c 'go vet ./... && go tool staticcheck ./... && go test ./...'
+	$(GO_TOOLS) sh -c 'go vet ./... && go tool staticcheck ./... && go test ./... && go test -race ./...'
 
 shell:
 	$(GO_TOOLS) sh

@@ -11,6 +11,23 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
+type failingWriteAuthz struct {
+	deleted []rebac.TupleKey
+}
+
+func (f *failingWriteAuthz) Check(context.Context, rebac.CheckRequest) (rebac.CheckResult, error) {
+	return rebac.CheckResult{Allowed: true}, nil
+}
+
+func (f *failingWriteAuthz) WriteTuples(context.Context, []rebac.TupleKey) error {
+	return errors.New("tuple write failed")
+}
+
+func (f *failingWriteAuthz) DeleteTuples(_ context.Context, tuples []rebac.TupleKey) error {
+	f.deleted = append(f.deleted, tuples...)
+	return nil
+}
+
 // newSeededService wires together a documents.Service backed by the standard
 // fixture store and pre-creates the roadmap document so tests can read/update it.
 func newSeededService(t *testing.T) documents.Service {
@@ -147,6 +164,31 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	}
 	if viewerCheck.Allowed {
 		t.Error("expected workspace viewer bob to NOT have can_delete")
+	}
+}
+
+func TestDocumentService_Create_WhenTupleWriteFails_RollsBackDocument(t *testing.T) {
+	repo := documents.NewInMemoryRepository()
+	authzClient := &failingWriteAuthz{}
+	svc := documents.New(repo, authzClient)
+
+	_, err := svc.Create(context.Background(), documents.CreateDocumentInput{
+		ID: "d1", Title: "Roadmap", Body: "v1",
+		Workspace: fixtures.ProductWorkspace, Actor: fixtures.Alice,
+	})
+	if err == nil {
+		t.Fatal("expected tuple write error")
+	}
+
+	doc, findErr := repo.FindByID(context.Background(), "d1")
+	if findErr != nil {
+		t.Fatalf("FindByID returned error: %v", findErr)
+	}
+	if doc != nil {
+		t.Errorf("document still exists after rollback: %+v", doc)
+	}
+	if len(authzClient.deleted) != 2 {
+		t.Errorf("deleted %d tuples during rollback, want 2", len(authzClient.deleted))
 	}
 }
 

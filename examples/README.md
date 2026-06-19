@@ -30,3 +30,12 @@ the separation: the production engine has no idea these lessons exist.
 When you open `internal/` you should see *only* authorization logic — nothing
 competing for your attention. When you want a Go lesson, you come here and it's
 clearly labelled as a lesson, not as something you must understand to ship ReBAC.
+
+Run every example package with:
+
+```bash
+go test ./examples/...
+```
+
+The examples are executable lessons: read the paired doc, predict a test result,
+then change one small thing and rerun it.

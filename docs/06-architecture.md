@@ -44,11 +44,13 @@ cmd/server/main.go chooses adapters
 type AuthzClient interface {
     Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
     WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+    DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
 }
 ```
 
 The full `authz.Service` satisfies that interface, but the document domain only
-depends on the two methods it actually uses.
+depends on the three methods it actually uses. Delete is used only for
+compensating cleanup if document creation cannot write its authorization tuples.
 
 ## Backend Swap
 
@@ -69,12 +71,19 @@ and HTTP handler do not change.
 
 ## Cleanliness Check
 
-Only `cmd/server` should import swappable backend packages such as
-`internal/openfga` and `internal/api`:
+Production packages outside an adapter and the composition root should not
+import concrete adapters. Excluding tests, this command should show OpenFGA
+being selected only in `cmd/server`:
 
 ```bash
-grep -rn 'internal/openfga\|internal/api' internal/
+rg '"rebac-primer/internal/openfga"' --glob '*.go' --glob '!**/*_test.go'
 ```
 
-That should print nothing. If domain code imports a concrete adapter directly,
-move that dependency behind a port.
+If domain code imports `internal/openfga` directly, move that dependency behind
+a port.
+
+## Checkpoint
+
+Why does `documents` own `AuthzClient` instead of importing an OpenFGA client?
+Because the document use case should describe the capability it needs, while
+the composition root chooses how that capability is implemented.

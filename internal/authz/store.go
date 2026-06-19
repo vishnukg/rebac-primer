@@ -2,7 +2,6 @@ package authz
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"sync"
 
@@ -14,18 +13,18 @@ import (
 // harmless overwrite.
 type InMemoryStore struct {
 	mu     sync.RWMutex
-	tuples map[string]rebac.TupleKey
+	tuples map[rebac.TupleKey]struct{}
 }
 
 // NewInMemoryStore creates a store pre-seeded with the given tuples.
 func NewInMemoryStore(seed ...rebac.TupleKey) *InMemoryStore {
 	s := &InMemoryStore{
-		tuples: make(map[string]rebac.TupleKey, len(seed)),
+		tuples: make(map[rebac.TupleKey]struct{}, len(seed)),
 	}
 	// Populate the map directly: during construction the store is not yet shared,
 	// so we need neither a lock nor a context.
 	for _, k := range seed {
-		s.tuples[keyFor(k)] = k
+		s.tuples[k] = struct{}{}
 	}
 	return s
 }
@@ -41,7 +40,7 @@ var _ TupleRepository = (*InMemoryStore)(nil)
 func (s *InMemoryStore) Write(_ context.Context, key rebac.TupleKey) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.tuples[keyFor(key)] = key
+	s.tuples[key] = struct{}{}
 	return nil
 }
 
@@ -49,7 +48,7 @@ func (s *InMemoryStore) Write(_ context.Context, key rebac.TupleKey) error {
 func (s *InMemoryStore) Delete(_ context.Context, key rebac.TupleKey) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.tuples, keyFor(key))
+	delete(s.tuples, key)
 	return nil
 }
 
@@ -57,7 +56,7 @@ func (s *InMemoryStore) Delete(_ context.Context, key rebac.TupleKey) error {
 func (s *InMemoryStore) Has(_ context.Context, object rebac.Object, relation rebac.Relation, user rebac.Subject) (bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	_, ok := s.tuples[keyFor(rebac.TupleKey{Object: object, Relation: relation, User: user})]
+	_, ok := s.tuples[rebac.TupleKey{Object: object, Relation: relation, User: user}]
 	return ok, nil
 }
 
@@ -67,7 +66,7 @@ func (s *InMemoryStore) FindByObjectRelation(_ context.Context, object rebac.Obj
 	defer s.mu.RUnlock()
 
 	var out []rebac.TupleKey
-	for _, k := range s.tuples {
+	for k := range s.tuples {
 		if k.Object == object && k.Relation == relation {
 			out = append(out, k)
 		}
@@ -82,7 +81,7 @@ func (s *InMemoryStore) FindAll(_ context.Context, filter ...TupleFilter) ([]reb
 	defer s.mu.RUnlock()
 
 	out := make([]rebac.TupleKey, 0, len(s.tuples))
-	for _, k := range s.tuples {
+	for k := range s.tuples {
 		if len(filter) == 0 || matchesFilter(k, filter[0]) {
 			out = append(out, k)
 		}
@@ -92,10 +91,6 @@ func (s *InMemoryStore) FindAll(_ context.Context, filter ...TupleFilter) ([]reb
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
-
-func keyFor(k rebac.TupleKey) string {
-	return fmt.Sprintf("%s|%s|%s", k.Object, k.Relation, k.User)
-}
 
 func matchesFilter(k rebac.TupleKey, f TupleFilter) bool {
 	if f.Object != "" && k.Object != f.Object {
@@ -109,6 +104,12 @@ func matchesFilter(k rebac.TupleKey, f TupleFilter) bool {
 
 func sortTuples(tuples []rebac.TupleKey) {
 	sort.Slice(tuples, func(i, j int) bool {
-		return keyFor(tuples[i]) < keyFor(tuples[j])
+		if tuples[i].Object != tuples[j].Object {
+			return tuples[i].Object < tuples[j].Object
+		}
+		if tuples[i].Relation != tuples[j].Relation {
+			return tuples[i].Relation < tuples[j].Relation
+		}
+		return tuples[i].User < tuples[j].User
 	})
 }

@@ -28,16 +28,15 @@ docs/                      Tutorial chapters
 Read [START-HERE.md](START-HERE.md), then follow
 [docs/00-course-map.md](docs/00-course-map.md).
 
-Minimal path:
+Minimal ReBAC path:
 
-1. `docs/01-oauth-authentication.md`
-2. `docs/02-authorization-fundamentals.md`
-3. `docs/03-graph-theory-for-rebac.md`
-4. `docs/04-rebac-concepts.md`
-5. `docs/05-openfga-model.md`
-6. `docs/21-go-rebac-implementation.md`
-7. `docs/27-graph-evaluator-walkthrough.md`
-8. `docs/28-go-authz-call-flow.md`
+1. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
+2. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
+3. [ReBAC concepts](docs/04-rebac-concepts.md)
+4. [OpenFGA model](docs/05-openfga-model.md)
+5. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
+
+Then choose the Go implementation or production path from the course map.
 
 ## Commands
 
@@ -90,5 +89,6 @@ Casey has no path through the graph, so access is denied.
 | Roadmap Document | `document:roadmapDocument` | protected document |
 
 The in-process graph evaluator is the learning implementation. The OpenFGA
-adapter is the production direction: it implements the same `authz.Service` port
-and stores/evaluates relationships in OpenFGA.
+adapter demonstrates the external authorization-service direction: it implements
+the same `authz.Service` port and stores/evaluates relationships in OpenFGA. The
+rest of the demo still requires the production work listed in doc 40.

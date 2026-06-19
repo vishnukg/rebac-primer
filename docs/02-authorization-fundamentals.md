@@ -10,6 +10,15 @@ subject + action + object -> allow or deny
 Before ReBAC makes sense, you need to understand the common authorization models
 and where they break.
 
+By the end, you should be able to turn a product sentence into:
+
+```text
+Check(subject, relation, object)
+```
+
+The core path ends after "Authorization architecture in this repo." The agentic
+systems section is an optional application of the same principles.
+
 ## Scene
 
 The product starts simple:
@@ -327,7 +336,7 @@ Most serious systems use a combination.
 Example:
 
 ```text
-OAuth/OIDC authenticates the user.
+OIDC authenticates the user; OAuth access tokens authorize API access.
 RBAC may grant broad admin capability.
 ReBAC grants object-specific access.
 ABAC may add context checks like tenant or risk.
@@ -392,7 +401,7 @@ Authorizer answers allow/deny.
 Tuple store holds facts.
 ```
 
-## Future Agentic Systems
+## Optional: Agentic Systems
 
 Agentic systems make authorization more important because a model or agent may
 take many actions on behalf of a user:
@@ -431,7 +440,7 @@ A useful mental model:
 
 ```text
 human user
-  authenticates with OAuth/OIDC
+  authenticates with OIDC and presents a validated OAuth access token
   |
   v
 app session
@@ -599,3 +608,6 @@ Why does ReBAC fit collaborative documents better than global RBAC?
 Good answer: collaborative documents need object-specific permissions that
 follow relationships between users, teams, workspaces, and documents. ReBAC
 models those relationships directly.
+
+Next: [Graph theory for ReBAC](03-graph-theory-for-rebac.md) turns that
+explanation into nodes, labeled edges, paths, and traversal.

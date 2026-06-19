@@ -6,7 +6,7 @@ one example. Depth versions live in `docs/03-graph-theory-for-rebac.md` and
 
 ---
 
-# Part 1 — Graph theory (only what ReBAC needs)
+## Part 1 — Graph theory (only what ReBAC needs)
 
 You need ~6 ideas. That's it. Skip everything else you've heard about graphs.
 
@@ -63,7 +63,7 @@ A **path** is hops you can follow end to end:
 alice ─member─► team ─editor─► workspace ◄─workspace─ document
 ```
 
-**Reachability** is the only question ReBAC ever asks:
+**Reachability** is the core question behind a ReBAC permission check:
 
 > Starting from the document, following allowed edges, can I reach the user?
 
@@ -78,16 +78,19 @@ down; if it dead-ends, back up and try the next branch. You already watched this
 in the trace program — the `owner` branch fails, it backs out, the `editor`
 branch succeeds. That explore-and-backtrack *is* traversal.
 
-### 6. Cycles, and why there's a "visited" set
+### 6. Cycles, and why there is an active-path set
 
 A **cycle** is a path that loops back on itself (A → B → A). If a document's
-workspace pointed at itself, naive traversal would recurse forever. The guard:
-remember every `(object, relation)` pair you've already tried in this request; if
-you see it again, stop that branch. In the trace those are the lines:
+workspace pointed at itself, naive traversal would recurse forever. The guard
+remembers every `(object, relation)` pair in the current recursion chain. If it
+sees the same pair before the earlier call returns, it stops that cycle:
 
 ```
-Already evaluated workspace:productWorkspace#owner; stop this branch
+Cycle detected at workspace:productWorkspace#owner; stop this branch
 ```
+
+The pair is removed when the call returns. That detail lets another independent
+branch evaluate the same node without causing a false denial.
 
 ### Graph word ↔ ReBAC word
 
@@ -102,13 +105,13 @@ Already evaluated workspace:productWorkspace#owner; stop this branch
 
 ---
 
-# Part 2 — OpenFGA and its DSL
+## Part 2 — OpenFGA and its DSL
 
 ### What OpenFGA is
 
 A dedicated **authorization service**. Instead of scattering `if` checks across
-your app, you ask one service: *"can user X do Y on object Z?"* It's open source,
-based on Google's **Zanzibar** paper (the system behind Google Drive sharing).
+your app, you ask one service: *"can user X do Y on object Z?"* It is open
+source and inspired by Google's **Zanzibar** authorization-system paper.
 This repo first *builds the idea from scratch* (the graph evaluator) so OpenFGA
 stops looking like magic — `evaluator.go` does in-process what OpenFGA does as a
 service.
@@ -127,13 +130,17 @@ model "editors are also viewers," and it applies to everyone forever.
 
 ### Tuples = the facts (the edges from Part 1)
 
-A tuple is `(user, relation, object)`:
+OpenFGA commonly displays tuple keys as `(user, relation, object)`:
 
 ```
 user:alice              member   team:platformTeam
 team:platformTeam#member editor   workspace:productWorkspace
 document:roadmapDocument workspace workspace:productWorkspace
 ```
+
+This repository's Go `TupleKey` struct orders the fields as
+`(object, relation, user)`. The values mean the same thing; only the display
+order differs. Always read the field names rather than relying on position.
 
 The `team:platformTeam#member` form is a **subject set**: "everyone who has
 `member` on `team:platformTeam`," not one person. One tuple grants a whole group —
@@ -233,8 +240,9 @@ read?"), `BatchCheck` (many checks at once), `Expand` (debug a relation).
 | the Check | `GraphEvaluator.Evaluate` | OpenFGA `/check` |
 
 The repo can run **either** backend behind the same interface — set
-`AUTHZ_BACKEND=openfga` (see `docs/26` and `docs/34`). Same questions, same
-answers; one is in your process, one is a real service.
+`AUTHZ_BACKEND=openfga` (see `docs/26-openfga-migration.md` and
+`docs/34-openfga-adapter-walkthrough.md`). Same questions, same answers; one is
+in your process, one is a real service.
 
 ### Play with it (optional, fun)
 
@@ -254,7 +262,8 @@ answers; one is in your process, one is a real service.
 - **Check** — the allow/deny question; under the hood, graph reachability.
 - **Tuple-to-userset (`from`)** — inheritance: follow an edge to a parent and
   check there.
-- **Zanzibar** — Google's paper that OpenFGA implements.
+- **Zanzibar** — Google's authorization-system paper that inspired OpenFGA's
+  relationship-based model.
 
 ## Checkpoint
 

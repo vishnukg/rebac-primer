@@ -18,6 +18,10 @@ import (
 // These are integration-level tests: they exercise the full stack
 // (authn → authz → domain → HTTP) without starting a real server.
 func newTestHandler(t *testing.T) http.Handler {
+	return newTestHandlerWithTokens(t, fixtures.DemoTokens())
+}
+
+func newTestHandlerWithTokens(t *testing.T, tokens map[string]documents.TokenClaims) http.Handler {
 	t.Helper()
 
 	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
@@ -25,7 +29,7 @@ func newTestHandler(t *testing.T) http.Handler {
 	authzSvc := authz.New(tupleStore, evaluator)
 
 	docRepo := documents.NewInMemoryRepository()
-	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	tokenVerifier := documents.NewDemoTokenVerifier(tokens)
 	docsSvc := documents.New(docRepo, authzSvc)
 
 	_, err := docsSvc.Create(context.Background(), documents.CreateDocumentInput{
@@ -174,6 +178,36 @@ func TestHandler_CreateDocument_Returns400ForUnknownJSONField(t *testing.T) {
 	}
 }
 
+func TestHandler_CreateDocument_Returns415ForUnsupportedMediaType(t *testing.T) {
+	handler := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewBufferString("not json"))
+	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set("Authorization", "Bearer demo-token-alice")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Errorf("expected 415, got %d — body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandler_CreateDocument_Returns413ForOversizedBody(t *testing.T) {
+	handler := newTestHandler(t)
+	payload := append([]byte(`{"id":"`), bytes.Repeat([]byte("x"), (1<<20)+1)...)
+	payload = append(payload, []byte(`","title":"Test","body":"Body","workspaceId":"productWorkspace"}`)...)
+	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer demo-token-alice")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("expected 413, got %d — body: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandler_PatchDocument_Returns400ForMultipleJSONValues(t *testing.T) {
 	handler := newTestHandler(t)
 	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader([]byte(`{"body":"updated"} {}`)))
@@ -237,7 +271,7 @@ func TestHandler_GetDocument_Returns403ForOutsider(t *testing.T) {
 	}
 }
 
-func TestHandler_PatchDocument_Returns403ForViewer(t *testing.T) {
+func TestHandler_PatchDocument_Returns403WhenWriteScopeMissing(t *testing.T) {
 	handler := newTestHandler(t)
 	payload := map[string]string{"body": "should not save"}
 	body, _ := json.Marshal(payload)
@@ -246,6 +280,59 @@ func TestHandler_PatchDocument_Returns403ForViewer(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer demo-token-bob")
 	rec := httptest.NewRecorder()
 
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d — body: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("WWW-Authenticate"); got != `Bearer error="insufficient_scope", scope="documents:write"` {
+		t.Errorf("WWW-Authenticate = %q, want insufficient_scope challenge", got)
+	}
+}
+
+func TestHandler_PatchDocument_Returns403WhenReBACDeniesViewerWithWriteScope(t *testing.T) {
+	tokens := fixtures.DemoTokens()
+	tokens["demo-token-bob"] = documents.TokenClaims{
+		Sub:    "bob",
+		Scopes: []string{"documents:read", "documents:write"},
+	}
+	handler := newTestHandlerWithTokens(t, tokens)
+	payload := map[string]string{"body": "should not save"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer demo-token-bob")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d — body: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("WWW-Authenticate"); got != "" {
+		t.Errorf("WWW-Authenticate = %q, want empty for a ReBAC denial", got)
+	}
+}
+
+func TestHandler_GetDocument_Returns403WhenReadScopeMissing(t *testing.T) {
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docsSvc := documents.New(documents.NewInMemoryRepository(), authzSvc)
+	_, err := docsSvc.Create(context.Background(), documents.CreateDocumentInput{
+		ID: "roadmapDocument", Title: "Roadmap", Body: "body",
+		Workspace: fixtures.ProductWorkspace, Actor: fixtures.Alice,
+	})
+	if err != nil {
+		t.Fatalf("seed document: %v", err)
+	}
+	verifier := documents.NewDemoTokenVerifier(map[string]documents.TokenClaims{
+		"write-only": {Sub: "alice", Scopes: []string{"documents:write"}},
+	})
+	handler := api.NewServer(verifier, docsSvc)
+
+	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument", nil)
+	req.Header.Set("Authorization", "Bearer write-only")
+	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusForbidden {

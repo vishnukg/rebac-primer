@@ -2,7 +2,9 @@ package documents
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"rebac-primer/internal/rebac"
 )
@@ -43,18 +45,6 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 		return nil, err
 	}
 
-	// Reject duplicate IDs. Without this check Create would silently overwrite:
-	// an editor of any workspace could reuse an existing document's ID, replace
-	// its content, and gain an owner tuple on it — an authorization bypass, since
-	// the editor check above only covers the workspace the caller named.
-	existing, err := s.repo.FindByID(ctx, input.ID)
-	if err != nil {
-		return nil, err
-	}
-	if existing != nil {
-		return nil, &DocumentAlreadyExistsError{ID: input.ID}
-	}
-
 	doc := CollaborativeDocument{
 		ID:        input.ID,
 		Title:     input.Title,
@@ -62,14 +52,16 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 		Workspace: input.Workspace,
 		UpdatedBy: input.Actor,
 	}
-	if err := s.repo.Save(ctx, doc); err != nil {
+	// Create is atomic at the repository boundary. A separate FindByID followed
+	// by Save would allow concurrent requests to race and overwrite the same ID.
+	if err := s.repo.Create(ctx, doc); err != nil {
 		return nil, err
 	}
 
 	// Register the document relationships so the graph evaluator can resolve
 	// can_read / can_edit for workspace members and owner-only actions for the
 	// creator.
-	if err := s.authzClient.WriteTuples(ctx, []rebac.TupleKey{
+	tuples := []rebac.TupleKey{
 		rebac.Tuple(
 			rebac.Document(input.ID),
 			rebac.RelationDocumentWorkspace,
@@ -80,7 +72,21 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 			rebac.RelationDocumentOwner,
 			rebac.Subject(input.Actor),
 		),
-	}); err != nil {
+	}
+	if err := s.authzClient.WriteTuples(ctx, tuples); err != nil {
+		// The document and authorization stores do not share a transaction.
+		// Compensate on failure so the demo does not leave an inaccessible
+		// document or partially written relationships behind. Cleanup gets a
+		// short independent deadline because the request may already be canceled.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		cleanupErr := errors.Join(
+			s.authzClient.DeleteTuples(cleanupCtx, tuples),
+			s.repo.Delete(cleanupCtx, input.ID),
+		)
+		if cleanupErr != nil {
+			return nil, errors.Join(err, fmt.Errorf("rollback failed: %w", cleanupErr))
+		}
 		return nil, err
 	}
 

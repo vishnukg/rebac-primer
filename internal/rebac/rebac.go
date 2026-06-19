@@ -129,6 +129,9 @@ func ParseObject(s string) (ObjectType, string, error) {
 	if !isObjectType(typ) {
 		return "", "", fmt.Errorf("unknown object type %q in %q", typ, s)
 	}
+	if strings.TrimSpace(id) == "" {
+		return "", "", fmt.Errorf("invalid object %q: id cannot be blank", s)
+	}
 	return typ, id, nil
 }
 

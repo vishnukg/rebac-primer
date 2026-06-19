@@ -20,6 +20,7 @@ package openfga
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	openfga "github.com/openfga/go-sdk/client"
 
@@ -69,6 +70,9 @@ func New(cfg Config) (*Service, error) {
 // our evaluator.go does in process; it returns only allow/deny, so the trace is
 // a single synthetic line rather than the step-by-step trace the graph produces.
 func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
+	if err := authz.ValidateCheckRequest(req); err != nil {
+		return rebac.CheckResult{}, err
+	}
 	resp, err := s.client.Check(ctx).Body(openfga.ClientCheckRequest{
 		User:     string(req.User),
 		Relation: string(req.Relation),
@@ -126,12 +130,7 @@ func (s *Service) tupleExists(ctx context.Context, t rebac.TupleKey) (bool, erro
 	if err != nil {
 		return false, err
 	}
-	for _, st := range stored {
-		if st == t {
-			return true, nil
-		}
-	}
-	return false, nil
+	return slices.Contains(stored, t), nil
 }
 
 // DeleteTuples removes relationship facts from the OpenFGA store.
@@ -167,19 +166,29 @@ func (s *Service) ListTuples(ctx context.Context, filter ...authz.TupleFilter) (
 			body.Relation = &relation
 		}
 	}
-	resp, err := s.client.Read(ctx).Body(body).Execute()
-	if err != nil {
-		return nil, fmt.Errorf("openfga: read tuples: %w", err)
+	var out []rebac.TupleKey
+	var continuationToken *string
+	for {
+		resp, err := s.client.Read(ctx).
+			Body(body).
+			Options(openfga.ClientReadOptions{ContinuationToken: continuationToken}).
+			Execute()
+		if err != nil {
+			return nil, fmt.Errorf("openfga: read tuples: %w", err)
+		}
+		for _, t := range resp.GetTuples() {
+			key := t.GetKey()
+			out = append(out, rebac.TupleKey{
+				Object:   rebac.Object(key.GetObject()),
+				Relation: rebac.Relation(key.GetRelation()),
+				User:     rebac.Subject(key.GetUser()),
+			})
+		}
+
+		token := resp.GetContinuationToken()
+		if token == "" {
+			return out, nil
+		}
+		continuationToken = &token
 	}
-	tuples := resp.GetTuples()
-	out := make([]rebac.TupleKey, 0, len(tuples))
-	for _, t := range tuples {
-		key := t.GetKey()
-		out = append(out, rebac.TupleKey{
-			Object:   rebac.Object(key.GetObject()),
-			Relation: rebac.Relation(key.GetRelation()),
-			User:     rebac.Subject(key.GetUser()),
-		})
-	}
-	return out, nil
 }

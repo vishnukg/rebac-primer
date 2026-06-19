@@ -9,9 +9,14 @@ can run right now.
 When a UI renders a permissions panel it needs to know all four computed
 permissions for a document at once: can_read, can_comment, can_edit, can_delete.
 
-Running four checks sequentially takes four times as long. Running them
-concurrently takes as long as the slowest one. For a UI that renders eagerly,
-the difference is visible.
+If checks are independent network calls, sequential execution roughly adds
+their latencies, while concurrent execution can approach the latency of the
+slowest call. That can matter for an OpenFGA-backed UI.
+
+For this repository's tiny in-memory evaluator, concurrency is likely slower
+because goroutine and channel overhead dominates. This chapter uses permission
+checks because they are familiar—not because every authorization check should
+be parallelized. Measure before choosing concurrency.
 
 `AllPermissions` and `BulkCheck` in `parallel.go` solve this with two different
 Go concurrency primitives. Read both, because each one teaches something the
@@ -70,7 +75,7 @@ Two more facts you will rely on:
   close here because we collect an exact, known number of results.
 
 `AllPermissions` uses a **buffered channel** whose capacity equals the number of
-relations (`examples/concurrency/parallel.go:44`):
+relations:
 
 ```go
 // examples/concurrency/parallel.go
@@ -114,10 +119,10 @@ If the caller *does* cancel, the loop returns early. The goroutines that are
 still running each send one value into `ch`, but because the channel is buffered
 with room for every result, those sends succeed against the buffer instead of
 blocking forever on a receiver that has gone away. That is the subtle reason the
-buffer matters: it guarantees no goroutine leaks *even when we stop receiving
-early*.
+buffer matters: once a worker returns, its final send cannot leak merely because
+the collector stopped receiving.
 
-## Why the goroutine captures `rel` as an argument
+## Why the goroutine passes `rel` as an argument
 
 Look at this pattern:
 
@@ -129,17 +134,14 @@ for _, rel := range relations {
 }
 ```
 
-If `rel` were closed over directly (not passed as an argument), all goroutines
-would share the same variable — and by the time they run, the loop may have
-already advanced it to the last value. Passing it as an argument gives each
-goroutine its own copy, frozen at the moment the goroutine was started.
-
-In Go 1.22+ this is less of a trap because loop variables are now per-iteration,
-but the explicit argument form is still the clearer idiom — it documents intent.
+Since Go 1.22, range variables declared by the loop are created per iteration,
+so closing over `rel` is safe in this example. Passing it explicitly is still a
+reasonable teaching style because the goroutine's inputs are visible at the call
+site. It is clarity, not a correctness requirement for this module's Go version.
 
 ## WaitGroups: wait without collecting
 
-`BulkCheck` uses `sync.WaitGroup` instead of a channel (`examples/concurrency/parallel.go:82`):
+`BulkCheck` uses `sync.WaitGroup` instead of a channel:
 
 ```go
 // examples/concurrency/parallel.go
@@ -184,6 +186,10 @@ a map.
 
 `BulkCheck` uses WaitGroup because callers need results in the same position as
 their input requests.
+
+It also starts one goroutine per request. That is fine for a small teaching
+slice, but a production bulk API should bound concurrency with a worker pool or
+semaphore so a huge request cannot create an unbounded number of goroutines.
 
 ## Context cancellation: letting callers abort
 
@@ -244,13 +250,18 @@ An *unbuffered* channel would be a bug here: those orphaned goroutines would blo
 forever on a send with no receiver, leaking one goroutine per outstanding check.
 This is the concrete payoff of choosing a buffered channel.
 
+This still depends on `auth.Evaluate` eventually returning—normally because it
+honors the canceled context. A backend that ignores context and hangs forever
+can still leak its worker. Buffering solves the abandoned-send problem, not an
+uncooperative dependency.
+
 ## Race detector
 
 Go ships a built-in race detector. Run your tests with `-race` to catch unsafe
 concurrent access:
 
 ```bash
-go test -race ./internal/authz/...
+go test -race ./examples/concurrency ./internal/authz
 ```
 
 A race condition occurs when two goroutines access the same memory location and
@@ -259,26 +270,12 @@ and reports violations immediately. Run it on every PR.
 
 ## Try it
 
-**Break the goroutine capture pattern:**
+**Measure instead of guessing:**
 
-In `AllPermissions`, change the goroutine from:
-
-```go
-go func(rel Relation) {
-    // uses the parameter rel
-}(rel)
-```
-
-to:
-
-```go
-go func() {
-    // closes over loop variable rel
-}()
-```
-
-Run `go test -race ./internal/authz/...`. The race detector will flag the
-closure reading the loop variable concurrently.
+Add a benchmark that compares four sequential in-memory checks with
+`AllPermissions`. The sequential version should usually win at this scale.
+Then replace the evaluator with a fake that sleeps for 20 ms per check; the
+concurrent version should finish much closer to 20 ms than 80 ms.
 
 **Observe ordering:**
 

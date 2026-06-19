@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"rebac-primer/internal/rebac"
 )
@@ -55,8 +56,10 @@ type UpdateDocumentInput struct {
 // DocumentRepository stores documents. NewInMemoryRepository is the default
 // implementation.
 type DocumentRepository interface {
+	Create(ctx context.Context, doc CollaborativeDocument) error
 	Save(ctx context.Context, doc CollaborativeDocument) error
 	FindByID(ctx context.Context, id string) (*CollaborativeDocument, error)
+	Delete(ctx context.Context, id string) error
 }
 
 // AuthzClient is what the service needs from authorization: check a permission
@@ -68,6 +71,7 @@ type DocumentRepository interface {
 type AuthzClient interface {
 	Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
 	WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+	DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
 }
 
 // AuthenticatedUser is the verified identity returned after a successful token check.
@@ -97,6 +101,22 @@ func (e *AuthenticationError) Error() string { return e.Message }
 func IsAuthenticationError(err error) bool {
 	var authErr *AuthenticationError
 	return errors.As(err, &authErr)
+}
+
+// InsufficientScopeError is returned when a valid access token does not grant
+// the coarse API scope required by an endpoint. ReBAC still performs the
+// separate object-level decision after this check passes.
+type InsufficientScopeError struct {
+	Required string
+}
+
+func (e *InsufficientScopeError) Error() string {
+	return fmt.Sprintf("access token requires scope %q", e.Required)
+}
+
+// HasScope reports whether an authenticated token includes scope.
+func (u AuthenticatedUser) HasScope(scope string) bool {
+	return slices.Contains(u.Scopes, scope)
 }
 
 // DocumentAlreadyExistsError is returned when Create is given an ID that is

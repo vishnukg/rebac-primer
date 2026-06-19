@@ -2,6 +2,7 @@ package documents_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"rebac-primer/internal/documents"
@@ -57,6 +58,27 @@ func TestRepository_GivenUnknownID_WhenFoundByID_ThenReturnsNilWithoutError(t *t
 	}
 	if got != nil {
 		t.Errorf("FindByID = %+v, want nil", got)
+	}
+}
+
+func TestRepository_GivenExistingID_WhenCreatedAgain_ThenRejectsWithoutOverwrite(t *testing.T) {
+	repo := documents.NewInMemoryRepository()
+	original := sampleDoc()
+	if err := repo.Create(context.Background(), original); err != nil {
+		t.Fatalf("Create returned unexpected error: %v", err)
+	}
+	replacement := original
+	replacement.Body = "replacement"
+
+	err := repo.Create(context.Background(), replacement)
+
+	var alreadyExists *documents.DocumentAlreadyExistsError
+	if !errors.As(err, &alreadyExists) {
+		t.Fatalf("expected *DocumentAlreadyExistsError, got %v", err)
+	}
+	got, _ := repo.FindByID(context.Background(), original.ID)
+	if got.Body != original.Body {
+		t.Errorf("stored body = %q, want original %q", got.Body, original.Body)
 	}
 }
 

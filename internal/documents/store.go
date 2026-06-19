@@ -23,6 +23,17 @@ func NewInMemoryRepository() *InMemoryRepository {
 // Compile-time assertion: *InMemoryRepository must satisfy DocumentRepository.
 var _ DocumentRepository = (*InMemoryRepository)(nil)
 
+// Create stores a new document and atomically rejects an existing ID.
+func (r *InMemoryRepository) Create(_ context.Context, doc CollaborativeDocument) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.docs[doc.ID]; exists {
+		return &DocumentAlreadyExistsError{ID: doc.ID}
+	}
+	r.docs[doc.ID] = doc
+	return nil
+}
+
 // Save stores or replaces a document (idempotent on ID).
 func (r *InMemoryRepository) Save(_ context.Context, doc CollaborativeDocument) error {
 	r.mu.Lock()
@@ -40,4 +51,12 @@ func (r *InMemoryRepository) FindByID(_ context.Context, id string) (*Collaborat
 		return nil, nil
 	}
 	return &doc, nil
+}
+
+// Delete removes a document. It is a no-op when the ID does not exist.
+func (r *InMemoryRepository) Delete(_ context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.docs, id)
+	return nil
 }

@@ -61,9 +61,11 @@
 // # Cycle detection
 //
 // Some graphs can have cycles (e.g. a document whose workspace pointer points to
-// itself).  Without a guard, the traversal would recurse forever.  The visited
-// set records every (object#relation) pair already evaluated in this request.
-// If we visit the same pair again, we stop that branch and return false.
+// itself). Without a guard, the traversal would recurse forever. The active-path
+// set records every (object#relation) pair on the current recursion path. If we
+// encounter the same pair before unwinding, we found a cycle and stop that
+// branch. Removing entries as calls return still allows a shared node to be
+// evaluated through a different, independent path.
 
 package authz
 
@@ -88,6 +90,11 @@ type GraphEvaluator struct {
 	maxDepth int
 }
 
+type relationVisit struct {
+	object   rebac.Object
+	relation rebac.Relation
+}
+
 // NewGraphEvaluator creates a GraphEvaluator backed by the given TupleRepository.
 func NewGraphEvaluator(store TupleRepository) *GraphEvaluator {
 	return &GraphEvaluator{store: store, maxDepth: defaultMaxDepth}
@@ -103,10 +110,10 @@ var _ Evaluator = (*GraphEvaluator)(nil)
 // A fresh resolution is created per Evaluate, so concurrent checks never share
 // state — the GraphEvaluator itself stays immutable and safe to share.
 type resolution struct {
-	ev      *GraphEvaluator
-	ctx     context.Context
-	trace   []string
-	visited map[string]bool
+	ev       *GraphEvaluator
+	ctx      context.Context
+	trace    []string
+	visiting map[relationVisit]bool
 }
 
 // Evaluate is the entry point for a permission check.
@@ -123,6 +130,12 @@ type resolution struct {
 // log of every step the traversal took, useful for debugging.  The trace is
 // what you see when you run the tests with -v.
 func (g *GraphEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
+	// Validate here even though authzService.Check also validates. GraphEvaluator
+	// is exported and used directly by tests and teaching examples, so each
+	// public entry point protects its own contract.
+	if err := ValidateCheckRequest(req); err != nil {
+		return rebac.CheckResult{}, err
+	}
 	r := &resolution{
 		ev:  g,
 		ctx: ctx,
@@ -130,9 +143,7 @@ func (g *GraphEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
 		trace: []string{
 			fmt.Sprintf("Check whether %s has %s on %s", req.User, req.Relation, req.Object),
 		},
-		// visited prevents infinite loops on cyclic graphs.
-		// Key format: "object#relation", e.g. "workspace:productWorkspace#editor".
-		visited: make(map[string]bool),
+		visiting: make(map[relationVisit]bool),
 	}
 
 	allowed, err := r.hasRelation(req.User, req.Object, req.Relation, 0)
@@ -208,16 +219,14 @@ func (r *resolution) hasRelation(
 	}
 
 	// ── Cycle guard ───────────────────────────────────────────────────────────
-	// If we have already visited this (object, relation) pair in this request,
-	// stop.  Without this, a cyclic graph would recurse forever.
-	// The key intentionally omits the user — if we could not reach user from
-	// this (object, relation) before, we cannot reach them now via the same path.
-	visitKey := fmt.Sprintf("%s#%s", object, relation)
-	if r.visited[visitKey] {
-		r.trace = append(r.trace, fmt.Sprintf("Already evaluated %s; stop this branch", visitKey))
+	// If this pair is already on the active recursion path, stop the cycle.
+	visitKey := relationVisit{object: object, relation: relation}
+	if r.visiting[visitKey] {
+		r.trace = append(r.trace, fmt.Sprintf("Cycle detected at %s#%s; stop this branch", object, relation))
 		return false, nil
 	}
-	r.visited[visitKey] = true
+	r.visiting[visitKey] = true
+	defer delete(r.visiting, visitKey)
 
 	// ── Steps 1 & 2: direct tuple + subject-set ───────────────────────────────
 	// Look in the tuple store.  This covers both:

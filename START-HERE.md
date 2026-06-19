@@ -15,23 +15,40 @@ a graph of relationships.
 user:alice --member--> team:platformTeam --editor--> workspace:productWorkspace <--workspace-- document:roadmapDocument
 ```
 
-## Six Docs, In Order
+## Choose Your Route
 
-| # | Doc | What you get |
-|---|---|---|
-| 1 | `docs/01-oauth-authentication.md` | who is this user? |
-| 2 | `docs/02-authorization-fundamentals.md` | what may they do? |
-| 3 | `docs/03-graph-theory-for-rebac.md` | nodes, edges, paths |
-| 4 | `docs/04-rebac-concepts.md` | tuples, subject sets, checks |
-| 5 | `docs/05-openfga-model.md` | the policy model as schema |
-| 6 | `docs/27-graph-evaluator-walkthrough.md` | the evaluator, line by line |
+You do not need the same route as every other reader.
 
-Everything else is optional depth: OpenFGA migration, Docker, production
-readiness, and Go examples.
+### Fast route: understand ReBAC
+
+1. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
+2. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
+3. [ReBAC concepts](docs/04-rebac-concepts.md)
+4. [OpenFGA model](docs/05-openfga-model.md)
+5. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
+
+### Go route: understand the implementation
+
+Read the fast route, then:
+
+1. [Go language guide](docs/20-go-language-guide.md)
+2. [Architecture](docs/06-architecture.md)
+3. [Go ReBAC implementation](docs/21-go-rebac-implementation.md)
+4. [Go authz call flow](docs/28-go-authz-call-flow.md)
+5. [Go testing](docs/25-go-testing.md)
+
+### Production route: understand the boundaries
+
+Read [OAuth and OIDC](docs/01-oauth-authentication.md), then
+[migration](docs/26-openfga-migration.md),
+[the OpenFGA adapter](docs/34-openfga-adapter-walkthrough.md), and
+[production readiness](docs/40-production-readiness.md). The OAuth chapter is
+intentionally substantial; its "core path" markers tell you where a first
+reading can stop.
 
 ## One File To Read
 
-Open this with `docs/27` beside it:
+Open this with `docs/27-graph-evaluator-walkthrough.md` beside it:
 
 ```text
 internal/authz/evaluator.go
@@ -64,3 +81,7 @@ document -> workspace -> team#member -> user:alice
 5. Run the trace test again.
 
 That predict-then-check loop teaches faster than passive reading.
+
+Every core chapter ends with either an experiment or a checkpoint. Do it before
+moving on. ReBAC becomes intuitive when you repeatedly predict an answer and
+then ask the evaluator to prove you right or wrong.

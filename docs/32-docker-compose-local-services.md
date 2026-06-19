@@ -22,6 +22,11 @@ make shell
 
 ```bash
 make server
+```
+
+In another terminal:
+
+```bash
 curl http://127.0.0.1:4001/health
 ```
 
@@ -42,3 +47,10 @@ the demo policy tuples, and records the generated IDs in
 ```bash
 make clean
 ```
+
+## What to Notice
+
+Profiles keep optional services out of commands that do not need them.
+`make test` starts the tools profile; `make server` starts the app profile; OpenFGA can
+run independently. This is orchestration for local learning, not a production
+deployment topology.

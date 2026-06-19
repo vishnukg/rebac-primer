@@ -37,10 +37,12 @@ edge.
 
 ## The four fixture tuples as a graph
 
-The project seeds four tuples.  Here they are as edges:
+The project seeds four tuples. The table stores them in this repository's
+`(object, relation, subject)` order, then paraphrases them from the user's point
+of view:
 
 ```
-Tuple                                                    Edge it creates
+Stored tuple                                             Human-readable relationship
 ───────────────────────────────────────────────────────────────────────────────
 (team:platformTeam,       member,    user:alice)         alice──[member]──►team
 (workspace:productWS,     editor,    team:platTeam#mbr)  team─[editor via #member]──►workspace
@@ -51,6 +53,11 @@ Tuple                                                    Edge it creates
 Drawn as one picture:
 
 ```
+
+The picture is for human explanation and draws Alice outward toward the resource.
+The evaluator itself starts at the requested object and follows stored
+object-to-subject edges until it can prove the user is in the resulting set.
+Both views describe the same facts; do not mix up the storage order.
 user:alice ──[member]──────────────────────► team:platformTeam
                                                      │
                                     [editor] (via team:platformTeam#member)
@@ -341,6 +348,10 @@ What happens if the graph has a loop?  For example:
 (document:cyclicDoc, workspace, document:cyclicDoc)   ← points to itself
 ```
 
+That tuple is intentionally malformed and would be rejected by
+`ValidateTuple`; the cycle test inserts it directly into the low-level store to
+prove the traversal remains safe even if corrupted data bypasses normal writes.
+
 Without a guard, `hasRelation` would recurse forever:
 
 ```
@@ -350,27 +361,31 @@ hasRelation(bob, document:cyclicDoc, can_read)
           → ... forever
 ```
 
-The **visited set** prevents this.  At the start of every `hasRelation` call,
-the evaluator checks whether `"object#relation"` is already in the set:
+The **active-path set** prevents this. At the start of every `hasRelation` call,
+the evaluator checks whether the `(object, relation)` pair is already in the
+current recursion chain:
 
 ```go
-visitKey := fmt.Sprintf("%s#%s", object, relation)
-if visited[visitKey] {
-    // Already evaluated this pair — stop this branch.
+visitKey := relationVisit{object: object, relation: relation}
+if r.visiting[visitKey] {
+    // This pair is already active — stop the cycle.
     return false
 }
-visited[visitKey] = true
+r.visiting[visitKey] = true
+defer delete(r.visiting, visitKey)
 ```
 
 The second time `hasRelation(bob, document:cyclicDoc, viewer)` is called, the
-key `"document:cyclicDoc#viewer"` is already in the set, so it returns `false`
-immediately instead of recursing again.
+pair is already active, so it returns `false` immediately instead of recursing
+again. When a call returns, `defer delete` removes its pair. That allows a
+different branch to revisit the same graph node without being incorrectly
+denied.
 
 ---
 
 ## The permission model rules
 
-`model.go` holds three tables — one per object type.  Each table maps
+`internal/authz/model.go` holds three tables—one per object type. Each table maps
 a relation to the *stronger* relations that imply it.
 
 ```
@@ -408,9 +423,9 @@ Check "viewer" on workspace:productWorkspace for alice:
 | Step 2: subject-set | `hasTuple()` — the `for` loop |
 | Subject-set recursion | `subjectSetContains()` |
 | Step 3: rule expansion | `expandByRules()` |
-| The rule tables | `model.go` |
+| The rule tables | `internal/authz/model.go` |
 | Step 4: workspace inherit | `expandDocument()` — the second `if` block |
-| Cycle detection | `hasRelation()` — the `visitKey` block at the top |
+| Cycle detection | `hasRelation()` — the `visiting` block at the top |
 | Depth + cancellation guard | `hasRelation()` — the `depth`/`ctx.Err()` checks at the top |
 | Trace output | `r.trace = append(r.trace, ...)` calls scattered through all functions |
 
@@ -435,7 +450,18 @@ var documentRules = impliedBy{
 }
 ```
 
-**3. Add a test** in `internal/authz/evaluator_test.go`:
+**3. Add the relation to model validation** in `internal/authz/validate.go`.
+`relationDefinedFor` is the in-process guard that rejects unknown checks and
+tuple writes. Computed permissions such as `can_share` belong in
+`relationDefinedFor`, but remain unwritable through `isComputedRelation`.
+
+**4. Mirror the rule in OpenFGA** in `deployments/openfga/model.fga`:
+
+```text
+define can_share: owner
+```
+
+**5. Add a test** in `internal/authz/evaluator_test.go`:
 
 ```go
 func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
@@ -470,5 +496,10 @@ func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
 }
 ```
 
-No changes to `evaluator.go` — the rule table drives everything.  That is the
-payoff of separating the rule schema from the traversal logic.
+No changes to the traversal algorithm are needed—the rule tables drive it. The
+extra model and validation edits are important because this repository keeps a
+teaching evaluator and an OpenFGA model intentionally aligned.
+
+Next: choose `20-go-language-guide.md` and `21-go-rebac-implementation.md` to
+study the Go design, or docs 26 and 34 to replace the teaching evaluator with
+OpenFGA.

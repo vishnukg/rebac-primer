@@ -21,6 +21,11 @@ func New(repository TupleRepository, evaluator Evaluator) Service {
 
 // Check delegates permission evaluation to the [Evaluator] port.
 func (d *authzService) Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
+	// Validate at the service boundary because callers may supply a different
+	// Evaluator implementation that does not validate requests itself.
+	if err := ValidateCheckRequest(req); err != nil {
+		return rebac.CheckResult{}, err
+	}
 	return d.evaluator.Evaluate(ctx, req)
 }
 

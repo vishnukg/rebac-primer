@@ -2,6 +2,7 @@ package authz_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"rebac-primer/internal/authz"
@@ -48,14 +49,7 @@ func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
 	// The trace must show the subject-set resolution step so readers can see how
 	// the chain team → workspace → document is walked.
 	wantStep := "Resolve subject set team:platformTeam#member: does it contain user:alice?"
-	found := false
-	for _, line := range result.Trace {
-		if line == wantStep {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(result.Trace, wantStep) {
 		t.Errorf("expected trace to contain:\n  %q\ngot trace:", wantStep)
 		for _, line := range result.Trace {
 			t.Logf("  %s", line)
@@ -119,7 +113,7 @@ func TestGraphEvaluator_CaseyIsDenied(t *testing.T) {
 
 func TestGraphEvaluator_CycleDetectionDoesNotHang(t *testing.T) {
 	// A document whose workspace pointer points back to itself creates a cycle.
-	// The visited set must prevent infinite recursion.
+	// The active-path cycle guard must prevent infinite recursion.
 	cyclicDoc := rebac.Document("cyclicDoc")
 	store := authz.NewInMemoryStore(
 		rebac.Tuple(cyclicDoc, rebac.RelationDocumentWorkspace, rebac.Subject(cyclicDoc)),
@@ -161,14 +155,7 @@ func TestGraphEvaluator_TeamAdminIsAlsoMember(t *testing.T) {
 		t.Error("expected team admin to also satisfy member=true but got false")
 	}
 	wantStep := "team:platformTeam member includes admin"
-	found := false
-	for _, line := range result.Trace {
-		if line == wantStep {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(result.Trace, wantStep) {
 		t.Errorf("expected trace to contain %q", wantStep)
 		for _, line := range result.Trace {
 			t.Logf("  trace: %s", line)
@@ -251,6 +238,7 @@ func FuzzParseObject(f *testing.F) {
 	f.Add("")
 	f.Add(":")
 	f.Add("user:")
+	f.Add("workspace: ")
 	f.Add(":alice")
 	f.Add("unknown:something")
 

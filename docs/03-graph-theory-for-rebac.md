@@ -15,6 +15,9 @@ You do need a few graph ideas:
 
 This chapter teaches only the graph theory needed for authorization.
 
+Keep a pencil nearby. The chapter works better if you redraw the four-node graph
+yourself instead of only reading the diagrams.
+
 ## One Sentence Version
 
 A graph is just things connected to other things.
@@ -53,7 +56,7 @@ When you read ReBAC code, keep asking:
 What node am I on?
 What relation am I checking?
 Which edge can I follow next?
-Have I already visited this place?
+Is this place already on my current recursion path?
 ```
 
 ## Scene
@@ -375,7 +378,7 @@ If tuples are data, the model is logic.
 
 ## The complete tutorial graph
 
-Here is all four nodes and their edges in one diagram:
+Here are the five connected objects in the seeded graph:
 
 ```text
 user:alice        user:bob
@@ -398,7 +401,7 @@ Three things to notice:
 
 - Alice reaches the workspace through the platform team, not directly.
 - Bob has a direct viewer edge to the workspace.
-- Casey has no node in this graph — no path, no access.
+- Casey has no relationship edge in this graph—no path, no access.
 
 Keep this diagram in mind. Every check in this repo is a reachability question against it.
 
@@ -451,23 +454,26 @@ A -> B -> C -> A
 Cycles can happen in relationship graphs. A traversal algorithm must avoid
 walking forever.
 
-The Go evaluator keeps a `visited` set that records every `(object, relation)`
-pair already evaluated in this request. If the same pair is seen again, the
-branch stops immediately.
+The Go evaluator keeps an **active-path set** containing each
+`(object, relation)` pair in the current recursion chain. If the same pair
+appears before the earlier call has returned, the traversal found a cycle and
+stops that branch.
 
 Go (`evaluator.go`):
 
 ```go
-visitKey := fmt.Sprintf("%s#%s", object, relation)
-if visited[visitKey] {
+visitKey := relationVisit{object: object, relation: relation}
+if r.visiting[visitKey] {
     return false
 }
-visited[visitKey] = true
+r.visiting[visitKey] = true
+defer delete(r.visiting, visitKey)
 ```
 
-That is basic cycle protection. The key format — `"document:roadmapDocument#viewer"` —
-intentionally omits the user. If a path from `(object, relation)` cannot reach the
-user, it will not reach them through the same node a second time.
+The `defer delete` matters. It removes the pair when that recursive call
+finishes, so another independent branch may legitimately evaluate the same node.
+A global "seen forever" set would prevent cycles, but it could also cause false
+denials in a graph where two branches converge.
 
 ## Depth and complexity
 
@@ -551,7 +557,7 @@ If you want to see how these graph concepts map line-by-line to running code,
 read `docs/27-graph-evaluator-walkthrough.md`.
 
 It walks through the complete `alice / can_edit / roadmapDocument` check step
-by step — every recursive call, every visited-set lookup, every subject-set
+by step — every recursive call, every cycle-guard lookup, every subject-set
 resolution — against the actual Go evaluator source.
 
 No graph theory experience required; the walkthrough is designed for readers
@@ -568,3 +574,6 @@ on an object.
 ```
 
 If that sentence makes sense, you have enough graph theory to continue.
+
+Next: [ReBAC concepts](04-rebac-concepts.md) gives the graph pieces their ReBAC
+names: object, relation, tuple, subject set, and check.

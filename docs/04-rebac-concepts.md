@@ -12,6 +12,9 @@ In this repo:
 does user:alice have can_edit on document:roadmapDocument?
 ```
 
+This chapter gives names to the pieces you already saw in the graph chapter.
+It is deliberately compact: learn the vocabulary, then use it immediately.
+
 ## Objects
 
 Objects are typed IDs:
@@ -110,3 +113,18 @@ go test -v -run TestTrace ./internal/authz
 
 Then edit `internal/fixtures/fixtures.go`, change one tuple, and predict which
 checks change before rerunning the test.
+
+## Checkpoint
+
+Explain the difference between these two values:
+
+```text
+user:alice
+team:platformTeam#member
+```
+
+The first is one subject. The second is a set of subjects defined by a relation
+on another object.
+
+Next: [OpenFGA model](05-openfga-model.md) shows how the schema decides which
+tuple paths count for a permission.

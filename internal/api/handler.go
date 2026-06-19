@@ -44,6 +44,10 @@ func (h *handler) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
+	if err := requireScope(user, "documents:write"); err != nil {
+		h.writeError(w, err)
+		return
+	}
 
 	var body struct {
 		ID          string `json:"id"`
@@ -51,8 +55,8 @@ func (h *handler) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
 		Body        string `json:"body"`
 		WorkspaceID string `json:"workspaceId"`
 	}
-	if err := readJSON(r, &body); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorBody("invalid JSON: "+err.Error()))
+	if err := readJSON(w, r, &body); err != nil {
+		writeJSONReadError(w, err)
 		return
 	}
 	if body.ID == "" || body.Title == "" || body.Body == "" || body.WorkspaceID == "" {
@@ -82,6 +86,10 @@ func (h *handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
+	if err := requireScope(user, "documents:read"); err != nil {
+		h.writeError(w, err)
+		return
+	}
 
 	id := r.PathValue("id")
 	doc, err := h.docs.Read(r.Context(), id, user.Subject)
@@ -100,13 +108,17 @@ func (h *handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
+	if err := requireScope(user, "documents:write"); err != nil {
+		h.writeError(w, err)
+		return
+	}
 
 	id := r.PathValue("id")
 	var body struct {
 		Body string `json:"body"`
 	}
-	if err := readJSON(r, &body); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorBody("invalid JSON: "+err.Error()))
+	if err := readJSON(w, r, &body); err != nil {
+		writeJSONReadError(w, err)
 		return
 	}
 	if body.Body == "" {
@@ -132,6 +144,13 @@ func (h *handler) authenticate(r *http.Request) (documents.AuthenticatedUser, er
 	return h.authenticator.VerifyAccessToken(r.Header.Get("Authorization"))
 }
 
+func requireScope(user documents.AuthenticatedUser, scope string) error {
+	if user.HasScope(scope) {
+		return nil
+	}
+	return &documents.InsufficientScopeError{Required: scope}
+}
+
 // writeError maps a domain error to an HTTP status code.
 //
 // Each known domain error maps to a specific 4xx. Anything else is an
@@ -140,7 +159,15 @@ func (h *handler) authenticate(r *http.Request) (documents.AuthenticatedUser, er
 // internal details to the caller or mislabelling a server fault as a 400.
 func (h *handler) writeError(w http.ResponseWriter, err error) {
 	if documents.IsAuthenticationError(err) {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="rebac-primer"`)
 		writeJSON(w, http.StatusUnauthorized, errorBody(err.Error()))
+		return
+	}
+
+	var insufficientScope *documents.InsufficientScopeError
+	if errors.As(err, &insufficientScope) {
+		w.Header().Set("WWW-Authenticate", `Bearer error="insufficient_scope", scope="`+insufficientScope.Required+`"`)
+		writeJSON(w, http.StatusForbidden, errorBody(err.Error()))
 		return
 	}
 

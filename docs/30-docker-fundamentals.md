@@ -17,6 +17,9 @@ runtime  -> compiled server binary
 The `tools` Compose service uses the `dev` stage. The `app` service uses the
 runtime image.
 
+The final image contains only the compiled binary and a non-root user. The Go
+toolchain stays in the build stages.
+
 ## Commands
 
 ```bash
@@ -34,6 +37,9 @@ go vet ./...
 go run ./cmd/server
 ```
 
+`make server` stays attached to the server logs. Run curl commands from a second
+terminal, and stop the stack with `make server-down`.
+
 ## OpenFGA
 
 OpenFGA runs as its own container:
@@ -45,3 +51,8 @@ make server-openfga
 ```
 
 The local OpenFGA setup uses an in-memory datastore, so restart means reseed.
+
+## Checkpoint
+
+Why use a multi-stage build? It keeps compilers and source files out of the
+runtime image while preserving a reproducible build environment.

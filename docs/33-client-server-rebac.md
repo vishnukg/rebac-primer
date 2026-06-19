@@ -1,8 +1,16 @@
-# Client/Server ReBAC Demo
+# HTTP Boundaries: Product API and Authz API
 
-The Go server exposes the document service over HTTP.
+This repository contains two different HTTP examples:
 
-## Run
+1. `cmd/server` exposes the document product API and uses authorization
+   internally.
+2. `examples/authzhttp` exposes the authorization service itself, demonstrating
+   the seam used when authz becomes a separate service.
+
+Do not confuse them. The product API is runnable; the authz HTTP package is a
+tested teaching adapter and has no standalone command.
+
+## Run the Product API
 
 ```bash
 make server
@@ -69,3 +77,28 @@ With `AUTHZ_BACKEND=openfga`, the last hop becomes:
 ```text
 internal/documents -> internal/openfga -> OpenFGA server
 ```
+
+## Inspect the Authz-Service Seam
+
+`examples/authzhttp` defines:
+
+```text
+POST   /check
+POST   /tuples
+DELETE /tuples
+GET    /tuples
+```
+
+Run its integration tests:
+
+```bash
+go test -v ./examples/authzhttp
+```
+
+Those tests exercise HTTP decoding, tuple validation, writes, revocation, and
+permission checks over the real in-process authorization service.
+
+In production, exposing tuple mutation is a privileged administrative API. It
+requires strong service authentication, authorization, audit logging, request
+limits, and careful ownership rules. The example intentionally focuses only on
+the client/server shape.
