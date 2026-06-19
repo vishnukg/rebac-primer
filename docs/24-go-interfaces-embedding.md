@@ -8,7 +8,7 @@ Go has implicit interface satisfaction. A type implements an interface when it
 has the required methods.
 
 ```go
-var _ authz.Evaluator = (*AuditEvaluator)(nil)
+var _ Checker = (*AuditEvaluator)(nil)
 ```
 
 That compile-time assertion fails if `AuditEvaluator` stops satisfying the
@@ -16,8 +16,9 @@ interface.
 
 Interfaces are satisfied implicitly: no `implements` declaration is required.
 Prefer small interfaces at the point of use. `AuditEvaluator` needs only the
-ability to evaluate a check, so it depends on that behavior rather than a
-concrete graph evaluator.
+ability to evaluate a check, so the middleware package declares its own
+one-method `Checker` interface rather than depending on a concrete graph
+evaluator or aliasing a provider interface.
 
 ## Decorator Pattern
 

@@ -12,7 +12,7 @@ type TokenClaims struct {
 	Scopes []string
 }
 
-// DemoTokenVerifier satisfies [Authenticator] using a static token → claims map.
+// DemoTokenVerifier verifies bearer tokens using a static token-to-claims map.
 type DemoTokenVerifier struct {
 	tokens map[string]TokenClaims
 }
@@ -28,9 +28,6 @@ func NewDemoTokenVerifier(tokens map[string]TokenClaims) *DemoTokenVerifier {
 	}
 	return &DemoTokenVerifier{tokens: copied}
 }
-
-// Compile-time assertion: *DemoTokenVerifier must satisfy Authenticator.
-var _ Authenticator = (*DemoTokenVerifier)(nil)
 
 // VerifyAccessToken extracts the bearer token from the Authorization header,
 // looks it up in the static map, and returns the verified identity.

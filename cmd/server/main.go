@@ -41,9 +41,10 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
-	// Choose the authorization backend from the environment. Both branches yield
-	// an authz.Service, so everything downstream is identical either way.
-	var authzService authz.Service
+	// Choose the authorization backend from the environment. The documents
+	// package defines the narrow authorization interface it consumes, and both
+	// concrete backends satisfy it implicitly.
+	var authzService documents.AuthorizationService
 	if os.Getenv("AUTHZ_BACKEND") == "openfga" {
 		cfg := openfga.Config{
 			APIURL:  envOr("OPENFGA_API_URL", "http://127.0.0.1:8080"),

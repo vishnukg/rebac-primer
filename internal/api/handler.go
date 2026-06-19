@@ -11,8 +11,8 @@ import (
 
 // handler holds the domain operations and authenticator.
 type handler struct {
-	authenticator documents.Authenticator
-	docs          documents.Service
+	authenticator Authenticator
+	docs          DocumentService
 }
 
 // handleHealth responds with {"ok": true}.

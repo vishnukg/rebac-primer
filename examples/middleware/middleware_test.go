@@ -69,7 +69,7 @@ func TestAuditEvaluator_SatisfiesCheckerInterface(t *testing.T) {
 	ev := newEvaluator()
 	var buf bytes.Buffer
 
-	// Assign to Checker (= authz.Evaluator) — if the interface is not satisfied, this fails.
+	// Assign to Checker — if the interface is not satisfied, this fails.
 	var c middleware.Checker = middleware.NewAuditEvaluator(ev, &buf)
 
 	result, err := c.Evaluate(context.Background(), rebac.CheckRequest{

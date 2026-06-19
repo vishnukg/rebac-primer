@@ -22,8 +22,11 @@ The documents service still calls the same methods:
 Check
 WriteTuples
 DeleteTuples
-ListTuples
 ```
+
+Those methods form `documents.AuthorizationService`, an interface owned by the
+consumer. The authz HTTP example has a separate interface that also includes
+`ListTuples`.
 
 ## Check
 
@@ -61,7 +64,7 @@ OpenFGA's Read API is paginated. `ListTuples` follows continuation tokens until
 all matching pages are collected. Missing this loop would silently return a
 partial tuple set and could break duplicate detection or cleanup.
 
-The method exists to satisfy the primer's shared service contract. Production
+The method supports consumers such as the authz HTTP example. Production
 applications should prefer purpose-built OpenFGA query APIs for authorization
 questions and avoid treating tuple reads as a general listing/search API.
 

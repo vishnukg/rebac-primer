@@ -49,7 +49,7 @@ func ParseObject(s string) (ObjectType, string, error)
 A method has a receiver before its name:
 
 ```go
-func (s *documentService) Read(ctx context.Context, id string, actor rebac.Object) (...)
+func (s *Service) Read(ctx context.Context, id string, actor rebac.Object) (...)
 ```
 
 Go returns errors as values. Check them immediately and add context with `%w`
@@ -69,7 +69,7 @@ panic for normal request failures.
 Interfaces describe behavior:
 
 ```go
-type AuthzClient interface {
+type AuthorizationService interface {
     Check(context.Context, rebac.CheckRequest) (rebac.CheckResult, error)
     WriteTuples(context.Context, []rebac.TupleKey) error
     DeleteTuples(context.Context, []rebac.TupleKey) error
@@ -78,7 +78,8 @@ type AuthzClient interface {
 
 Go interface satisfaction is implicit. The package that consumes behavior
 usually owns the small interface it needs. `cmd/server` supplies concrete
-implementations.
+implementations. Provider constructors return concrete pointers; they do not
+publish broad interfaces for unknown consumers.
 
 Read `internal/documents/documents.go` before
 `internal/documents/service.go`: the interfaces make the service's dependencies

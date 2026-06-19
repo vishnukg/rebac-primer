@@ -5,7 +5,8 @@ The repo has two authz backends:
 1. in-process graph evaluator, for learning
 2. OpenFGA adapter, showing the external authorization-service direction
 
-Both satisfy the same app-facing `authz.Service` shape.
+Both satisfy the `documents.AuthorizationService` interface. Other consumers,
+such as the authz HTTP example, declare their own required interface.
 
 This is a backend substitution, not proof that the surrounding demo is
 production-ready. Token verification, durable document storage, OpenFGA
@@ -22,7 +23,7 @@ production concerns.
 | `internal/authz/model.go` | authorization model DSL |
 | `authz.InMemoryStore` | OpenFGA tuple store |
 | `authz.GraphEvaluator` | OpenFGA check engine |
-| `openfga.Service` | SDK-backed `authz.Service` |
+| `openfga.Service` | concrete SDK-backed authorization service |
 
 ## Model
 
@@ -56,7 +57,7 @@ make server-openfga
 4. writes generated IDs to `deployments/openfga/.ids.env`
 
 The Go server creates the demo document at startup. That writes the document's
-runtime tuples through `authzService.WriteTuples`, so in OpenFGA mode they land
+runtime tuples through the selected service's `WriteTuples`, so in OpenFGA mode they land
 in the OpenFGA tuple store.
 
 ## Tuple Split

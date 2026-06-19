@@ -4,16 +4,14 @@
 // walking a graph of relationship tuples, and it stores those tuples. The public
 // surface is small:
 //
-//	Service          — what callers use: Check / WriteTuples / DeleteTuples / ListTuples.
-//	New              — builds a Service from a TupleRepository and an Evaluator.
+//	Service          — the in-process authorization implementation.
+//	New              — builds a *Service from a TupleRepository and an Evaluator.
 //	NewInMemoryStore — a TupleRepository backed by a map (the default store).
 //	NewGraphEvaluator — an Evaluator that walks the tuple graph (the default strategy).
 //	ValidateTuple    — validates tuple shape before writes reach a backend.
 //
-// Callers depend on the Service interface, never the concrete type. The store and
-// the evaluation strategy are themselves interfaces, so either can be swapped: the
-// openfga package, for instance, implements Service directly against a remote
-// OpenFGA server.
+// Consumers define the smallest interface they need. The store and evaluation
+// strategy are interfaces here because this package consumes them.
 package authz
 
 import (
@@ -22,16 +20,6 @@ import (
 
 	"rebac-primer/internal/rebac"
 )
-
-// Service answers authorization questions and manages the tuples behind them.
-// It is what HTTP handlers, tests, and other services call into; New returns the
-// default in-process implementation.
-type Service interface {
-	Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
-	WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
-	DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
-	ListTuples(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error)
-}
 
 // TupleRepository stores relationship tuples. The evaluator reads from it; the
 // service's write operations mutate it.

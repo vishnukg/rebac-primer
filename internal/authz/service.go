@@ -7,20 +7,24 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// authzService is the concrete implementation returned by [New].
-// It is unexported — callers hold a [Service] interface value.
-type authzService struct {
+// Service answers authorization questions and manages relationship tuples.
+// Construct it with [New]; its zero value is not usable.
+//
+// Its methods have pointer receivers because Service contains collaborators and
+// should not be copied. Consumers normally accept *Service through a narrow
+// interface declared in the consuming package.
+type Service struct {
 	repository TupleRepository
 	evaluator  Evaluator
 }
 
-// New creates a [Service] from a TupleRepository and an Evaluator.
-func New(repository TupleRepository, evaluator Evaluator) Service {
-	return &authzService{repository: repository, evaluator: evaluator}
+// New creates a Service from a TupleRepository and an Evaluator.
+func New(repository TupleRepository, evaluator Evaluator) *Service {
+	return &Service{repository: repository, evaluator: evaluator}
 }
 
 // Check delegates permission evaluation to the [Evaluator] port.
-func (d *authzService) Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
+func (d *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
 	// Validate at the service boundary because callers may supply a different
 	// Evaluator implementation that does not validate requests itself.
 	if err := ValidateCheckRequest(req); err != nil {
@@ -36,7 +40,7 @@ func (d *authzService) Check(ctx context.Context, req rebac.CheckRequest) (rebac
 // leaving a half-applied write. Validation guards the graph: a tuple whose
 // object or user does not parse would silently never match during a check, which
 // is the kind of bug that quietly grants or denies the wrong access.
-func (d *authzService) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
+func (d *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
 	for _, t := range tuples {
 		if err := ValidateTuple(t); err != nil {
 			return err
@@ -55,7 +59,7 @@ func (d *authzService) WriteTuples(ctx context.Context, tuples []rebac.TupleKey)
 // Deletes are intentionally lenient: removing a malformed or non-existent tuple
 // is a harmless no-op, so we do not validate here. Rejecting a delete would only
 // make it harder to clean up bad data that somehow got in.
-func (d *authzService) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
+func (d *Service) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
 	for _, t := range tuples {
 		if err := d.repository.Delete(ctx, t); err != nil {
 			return fmt.Errorf("delete tuple (%s, %s, %s): %w", t.Object, t.Relation, t.User, err)
@@ -65,6 +69,6 @@ func (d *authzService) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey
 }
 
 // ListTuples returns stored tuples, optionally filtered.
-func (d *authzService) ListTuples(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error) {
+func (d *Service) ListTuples(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error) {
 	return d.repository.FindAll(ctx, filter...)
 }

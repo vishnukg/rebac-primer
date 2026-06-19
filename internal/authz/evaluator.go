@@ -130,7 +130,7 @@ type resolution struct {
 // log of every step the traversal took, useful for debugging.  The trace is
 // what you see when you run the tests with -v.
 func (g *GraphEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
-	// Validate here even though authzService.Check also validates. GraphEvaluator
+	// Validate here even though Service.Check also validates. GraphEvaluator
 	// is exported and used directly by tests and teaching examples, so each
 	// public entry point protects its own contract.
 	if err := ValidateCheckRequest(req); err != nil {

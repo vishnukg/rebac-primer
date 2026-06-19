@@ -1,12 +1,11 @@
 // Package documents is the document service: it creates, reads, and updates
 // collaborative documents, gating every operation on an authorization check.
 //
-// New builds a Service from the things it needs — a DocumentRepository for
-// persistence and an AuthzClient for permission checks. This package ships an
-// in-memory DocumentRepository (NewInMemoryRepository) and a demo Authenticator
-// (NewDemoTokenVerifier) for the HTTP layer; production swaps either for a real
-// implementation. Callers depend on the Service interface, never the concrete
-// type.
+// New builds a *Service from the things it needs — a DocumentRepository for
+// persistence and an AuthorizationService for permission checks. This package
+// ships an in-memory DocumentRepository (NewInMemoryRepository) and a demo token
+// verifier (NewDemoTokenVerifier); production swaps either for a real
+// implementation.
 package documents
 
 import (
@@ -18,16 +17,8 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// Service creates, reads, and updates documents. It is what the HTTP handler and
-// tests call into; New returns the concrete implementation.
-type Service interface {
-	Create(ctx context.Context, input CreateDocumentInput) (*CollaborativeDocument, error)
-	Read(ctx context.Context, id string, actor rebac.Object) (*CollaborativeDocument, error)
-	Update(ctx context.Context, input UpdateDocumentInput) (*CollaborativeDocument, error)
-}
-
 // CollaborativeDocument is a stored document. It is defined here, alongside the
-// Service, so the repository and the service share one type with no conversion
+// service, so the repository and the service share one type with no conversion
 // or alias. The JSON tags are the wire format the HTTP layer emits.
 type CollaborativeDocument struct {
 	ID        string       `json:"id"`
@@ -62,13 +53,13 @@ type DocumentRepository interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// AuthzClient is what the service needs from authorization: check a permission
+// AuthorizationService is what the document service needs from authorization:
+// check a permission
 // and write the relationship tuples a new document implies.
 //
-// The in-process authz.Service satisfies this directly (its method set is a
-// superset), and so would an HTTP client to a standalone authz server — the
-// service never knows which.
-type AuthzClient interface {
+// Both the in-process service and the OpenFGA adapter satisfy this interface
+// implicitly, as could an HTTP client to a standalone authorization server.
+type AuthorizationService interface {
 	Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
 	WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
 	DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
@@ -78,13 +69,6 @@ type AuthzClient interface {
 type AuthenticatedUser struct {
 	Subject rebac.Object // e.g. "user:alice"
 	Scopes  []string     // OAuth scopes granted to this token
-}
-
-// Authenticator establishes caller identity from an Authorization header. The
-// HTTP handler calls it before every request; NewDemoTokenVerifier is the
-// development implementation.
-type Authenticator interface {
-	VerifyAccessToken(authorizationHeader string) (AuthenticatedUser, error)
 }
 
 // AuthenticationError is returned when a token is missing or invalid. The HTTP

@@ -9,16 +9,16 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// documentService is the concrete implementation returned by [New].
-// It is unexported — callers hold a [Service] interface value.
-type documentService struct {
-	repo        DocumentRepository
-	authzClient AuthzClient
+// Service creates, reads, and updates collaborative documents.
+// Construct it with [New]; its zero value is not usable.
+type Service struct {
+	repo  DocumentRepository
+	authz AuthorizationService
 }
 
-// New creates a [Service] from a DocumentRepository and an AuthzClient.
-func New(repo DocumentRepository, authzClient AuthzClient) Service {
-	return &documentService{repo: repo, authzClient: authzClient}
+// New creates a Service from a DocumentRepository and an AuthorizationService.
+func New(repo DocumentRepository, authz AuthorizationService) *Service {
+	return &Service{repo: repo, authz: authz}
 }
 
 // ── Operations ────────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ func New(repo DocumentRepository, authzClient AuthzClient) Service {
 //
 // This is the write-back pattern: the documents service owns document-level
 // tuples; the authz service owns workspace/team tuples.
-func (s *documentService) Create(ctx context.Context, input CreateDocumentInput) (*CollaborativeDocument, error) {
+func (s *Service) Create(ctx context.Context, input CreateDocumentInput) (*CollaborativeDocument, error) {
 	if err := s.requireAllowed(ctx,
 		input.Actor,
 		rebac.RelationWorkspaceEditor,
@@ -73,7 +73,7 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 			rebac.Subject(input.Actor),
 		),
 	}
-	if err := s.authzClient.WriteTuples(ctx, tuples); err != nil {
+	if err := s.authz.WriteTuples(ctx, tuples); err != nil {
 		// The document and authorization stores do not share a transaction.
 		// Compensate on failure so the demo does not leave an inaccessible
 		// document or partially written relationships behind. Cleanup gets a
@@ -81,7 +81,7 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		cleanupErr := errors.Join(
-			s.authzClient.DeleteTuples(cleanupCtx, tuples),
+			s.authz.DeleteTuples(cleanupCtx, tuples),
 			s.repo.Delete(cleanupCtx, input.ID),
 		)
 		if cleanupErr != nil {
@@ -104,7 +104,7 @@ func (s *documentService) Create(ctx context.Context, input CreateDocumentInput)
 // learning — but high-security systems return 404 for both cases so the two are
 // indistinguishable (check authorization first, then map a denial to not-found).
 // See the Security Notes in docs/40-production-readiness.md.
-func (s *documentService) Read(ctx context.Context, id string, actor rebac.Object) (*CollaborativeDocument, error) {
+func (s *Service) Read(ctx context.Context, id string, actor rebac.Object) (*CollaborativeDocument, error) {
 	doc, err := s.requireDocument(ctx, id)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (s *documentService) Read(ctx context.Context, id string, actor rebac.Objec
 }
 
 // Update saves new body text if the actor has can_edit access.
-func (s *documentService) Update(ctx context.Context, input UpdateDocumentInput) (*CollaborativeDocument, error) {
+func (s *Service) Update(ctx context.Context, input UpdateDocumentInput) (*CollaborativeDocument, error) {
 	existing, err := s.requireDocument(ctx, input.ID)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (s *documentService) Update(ctx context.Context, input UpdateDocumentInput)
 // ── Shared helpers ──────────────────────────────────────────────────────────────
 
 // requireDocument fetches a document and wraps a missing one in [DocumentNotFoundError].
-func (s *documentService) requireDocument(ctx context.Context, id string) (*CollaborativeDocument, error) {
+func (s *Service) requireDocument(ctx context.Context, id string) (*CollaborativeDocument, error) {
 	doc, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -163,14 +163,14 @@ func (s *documentService) requireDocument(ctx context.Context, id string) (*Coll
 }
 
 // requireAllowed runs an authorization check and returns [ForbiddenError] on denial.
-func (s *documentService) requireAllowed(
+func (s *Service) requireAllowed(
 	ctx context.Context,
 	actor rebac.Object,
 	relation rebac.Relation,
 	object rebac.Object,
 	action string,
 ) error {
-	result, err := s.authzClient.Check(ctx, rebac.CheckRequest{
+	result, err := s.authz.Check(ctx, rebac.CheckRequest{
 		User:     actor,
 		Relation: relation,
 		Object:   object,

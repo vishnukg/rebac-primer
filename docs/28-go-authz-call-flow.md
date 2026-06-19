@@ -31,7 +31,8 @@ OpenFGA mode:
 openfga.New(...)
 ```
 
-Both are passed to `documents.New(...)` through the same `AuthzClient` shape.
+Both are passed to `documents.New(...)` through the same
+`documents.AuthorizationService` interface.
 
 ## 1. HTTP Route
 

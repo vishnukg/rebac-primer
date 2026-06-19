@@ -1,15 +1,13 @@
-// Package openfga adapts a real OpenFGA server to the [authz.Service] driving
-// port, so it can replace the from-scratch graph evaluator with a one-line
+// Package openfga adapts a real OpenFGA server to the authorization operations
+// consumed by the application. It can replace the in-process service with a
 // wiring change in cmd/server/main.go (selected by AUTHZ_BACKEND=openfga).
 //
-// Why this implements authz.Service (not the inner Evaluator port):
+// Why this implements the whole application-facing capability (not Evaluator):
 // The graph build swaps the Evaluator port (Evaluate has ctx + error — a good
 // network seam) and keeps the in-memory TupleRepository for writes. But
 // TupleRepository.Write is sync and has no ctx/error, which does not fit a
-// network backend. authz.Service, by contrast, has ctx + error on every method
-// (Check/WriteTuples/DeleteTuples/ListTuples), so it is the right seam to back
-// the WHOLE authz service with OpenFGA. Checks and tuple writes both go to the
-// OpenFGA store, which keeps them consistent.
+// network backend. The public operations here all carry ctx + error, so checks
+// and tuple writes can both go to OpenFGA and remain consistent.
 //
 // The model and the workspace/team policy tuples are seeded into the store out
 // of band (deployments/openfga/seed.sh). Document-level tuples are still written
@@ -35,13 +33,11 @@ type Config struct {
 	ModelID string
 }
 
-// Service satisfies [authz.Service] by delegating to an OpenFGA server.
+// Service delegates authorization operations to an OpenFGA server. Consumers
+// accept it through interfaces declared at their point of use.
 type Service struct {
 	client *openfga.OpenFgaClient
 }
-
-// Compile-time assertion: *Service must satisfy the authz driving port.
-var _ authz.Service = (*Service)(nil)
 
 // New builds an OpenFGA-backed authz service.
 func New(cfg Config) (*Service, error) {
@@ -91,7 +87,7 @@ func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.Chec
 // WriteTuples persists relationship facts to the OpenFGA store.
 //
 // Tuples that already exist are skipped before the write. The OpenFGA Write API
-// rejects a duplicate tuple as an error, but the authz.Service contract (and the
+// rejects a duplicate tuple as an error, but the application contract (and the
 // in-memory store) treats writes as idempotent — re-running the startup seed
 // against a populated store must be a no-op, not a crash. The read-then-write is
 // not atomic, so a concurrent writer can still race in a duplicate; that

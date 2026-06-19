@@ -29,8 +29,8 @@ import (
 )
 
 // CheckFunc is the single operation a backend must provide to be held to the
-// contract: answer one CheckRequest. Both authz.Evaluator.Evaluate and
-// authz.Service.Check have this exact signature.
+// contract: answer one CheckRequest. Both an evaluator's Evaluate method and a
+// backend service's Check method have this exact signature.
 type CheckFunc func(context.Context, rebac.CheckRequest) (rebac.CheckResult, error)
 
 // Case is one row of the truth table: a question and its required answer.

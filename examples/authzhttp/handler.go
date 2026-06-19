@@ -12,7 +12,7 @@ import (
 
 // handler holds the authz service.
 type handler struct {
-	authz authz.Service
+	authz AuthorizationService
 }
 
 // handleHealth responds with {"ok": true}.

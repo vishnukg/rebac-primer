@@ -8,15 +8,13 @@ import (
 	"fmt"
 	"sync"
 
-	"rebac-primer/internal/authz"
 	"rebac-primer/internal/rebac"
 )
 
-// Checker is a minimal interface for permission evaluation.
-// It is a type alias for [authz.Evaluator] — the two are interchangeable.
-// Defining it here lets these helpers accept any evaluator adapter without
-// repeating the long authz package path at every call site.
-type Checker = authz.Evaluator
+// Checker is the permission-evaluation capability consumed by this example.
+type Checker interface {
+	Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
+}
 
 // PermissionSummary maps a Relation to whether it is allowed for a given user
 // and object.  It is the return type of [AllPermissions].

@@ -40,17 +40,16 @@ Read a tuple as: object has relation to user.
 
 Open `internal/authz/authz.go` and `internal/authz/service.go`.
 
-`authz.Service` is the app-facing port:
+`authz.Service` is the concrete in-process implementation:
 
 ```go
-type Service interface {
-    Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
-    WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
-    DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
-    ListTuples(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error)
+type Service struct {
+    repository TupleRepository
+    evaluator  Evaluator
 }
 ```
 
+Consumers declare narrow interfaces that `*authz.Service` satisfies implicitly.
 The service delegates checks to an `Evaluator` and writes to a
 `TupleRepository`. Check requests and tuple writes are validated against the
 known model before they reach a backend. This avoids turning caller mistakes
@@ -89,11 +88,11 @@ The document service depends on two narrow ports from
 
 ```text
 DocumentRepository
-AuthzClient
+AuthorizationService
 ```
 
-`Authenticator` is also declared in the documents package, but it is consumed
-by the HTTP adapter rather than by `documentService`.
+The HTTP adapter declares its own `DocumentService` and `Authenticator`
+interfaces because it is the package that consumes those capabilities.
 
 ## HTTP Adapter
 

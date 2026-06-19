@@ -6,12 +6,15 @@ capabilities it needs, and concrete infrastructure is wired at the edge.
 ## Shape
 
 ```text
-HTTP handler -> documents.Service -> AuthzClient port -> authz.Service
-                                      Repository port -> document store
-                                      Authenticator port -> token verifier
+HTTP handler -> api.DocumentService port -> documents.Service
+                api.Authenticator port   -> token verifier
 
-authz.Service -> Evaluator port -> graph evaluator
-              -> TupleRepository port -> tuple store
+documents.Service -> documents.AuthorizationService port -> authz.Service
+                                                       or -> openfga.Service
+                  -> documents.DocumentRepository port   -> document store
+
+authz.Service -> authz.Evaluator port       -> graph evaluator
+              -> authz.TupleRepository port -> tuple store
 
 cmd/server/main.go wires the concrete implementations.
 ```
@@ -29,10 +32,10 @@ cmd/server/main.go chooses adapters
 | Package | Role |
 |---|---|
 | `internal/rebac` | shared ReBAC vocabulary: objects, relations, tuples, checks |
-| `internal/authz` | authorization service, evaluator interface, tuple repository interface |
+| `internal/authz` | concrete authorization service plus the evaluator and tuple repository interfaces it consumes |
 | `internal/documents` | document use cases and the ports they need |
-| `internal/api` | HTTP adapter for the documents service |
-| `internal/openfga` | OpenFGA adapter implementing `authz.Service` |
+| `internal/api` | HTTP adapter and the narrow interfaces it consumes |
+| `internal/openfga` | concrete OpenFGA authorization adapter |
 | `internal/fixtures` | demo users, tuples, and tokens |
 | `cmd/server` | composition root |
 
@@ -41,16 +44,21 @@ cmd/server/main.go chooses adapters
 `documents` does not need every authz operation. It needs only:
 
 ```go
-type AuthzClient interface {
+type AuthorizationService interface {
     Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
     WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
     DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
 }
 ```
 
-The full `authz.Service` satisfies that interface, but the document domain only
-depends on the three methods it actually uses. Delete is used only for
+Both `*authz.Service` and `*openfga.Service` satisfy that interface implicitly,
+but the document domain depends only on the three methods it actually uses.
+Delete is used only for
 compensating cleanup if document creation cannot write its authorization tuples.
+
+The HTTP adapter follows the same rule. `internal/api` declares
+`DocumentService` and `Authenticator`; the documents package exports concrete
+implementations and does not define interfaces on behalf of its consumers.
 
 ## Backend Swap
 
@@ -66,8 +74,8 @@ The OpenFGA backend is selected at startup:
 documents -> openfga.Service -> OpenFGA server
 ```
 
-Both implement the same app-facing authz service shape, so the documents domain
-and HTTP handler do not change.
+Both satisfy `documents.AuthorizationService`, so the documents domain and HTTP
+handler do not change.
 
 ## Cleanliness Check
 
@@ -84,6 +92,6 @@ a port.
 
 ## Checkpoint
 
-Why does `documents` own `AuthzClient` instead of importing an OpenFGA client?
+Why does `documents` own `AuthorizationService` instead of importing an OpenFGA client?
 Because the document use case should describe the capability it needs, while
 the composition root chooses how that capability is implemented.

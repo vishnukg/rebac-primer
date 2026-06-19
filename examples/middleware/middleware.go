@@ -14,18 +14,19 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// Checker is a type alias for [authz.Evaluator] — see the concurrency example
-// for the same alias. It lets the decorator below name the thing it wraps.
-type Checker = authz.Evaluator
+// Checker is the permission-evaluation capability consumed by this decorator.
+type Checker interface {
+	Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
+}
 
-// AuditEvaluator wraps any [Checker] ([authz.Evaluator]) and writes a one-line
+// AuditEvaluator wraps any [Checker] and writes a one-line
 // audit record for every Evaluate call.  It is a decorator: it adds behaviour
 // without touching the inner implementation.
 //
 // This is the classic Go middleware pattern: take an interface, return the same
 // interface, do something before/after the inner call.
 type AuditEvaluator struct {
-	inner  Checker // Checker = authz.Evaluator
+	inner  Checker
 	logger *log.Logger
 }
 
@@ -59,7 +60,7 @@ func (a *AuditEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
 	return result, err
 }
 
-// Compile-time assertion: *AuditEvaluator must implement Checker (= authz.Evaluator).
+// Compile-time assertion: *AuditEvaluator must implement Checker.
 var _ Checker = (*AuditEvaluator)(nil)
 
 // ── ReadOnlyStore ─────────────────────────────────────────────────────────────

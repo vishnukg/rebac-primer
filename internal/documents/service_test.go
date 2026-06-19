@@ -28,9 +28,9 @@ func (f *failingWriteAuthz) DeleteTuples(_ context.Context, tuples []rebac.Tuple
 	return nil
 }
 
-// newSeededService wires together a documents.Service backed by the standard
+// newSeededService wires together a *documents.Service backed by the standard
 // fixture store and pre-creates the roadmap document so tests can read/update it.
-func newSeededService(t *testing.T) documents.Service {
+func newSeededService(t *testing.T) *documents.Service {
 	t.Helper()
 
 	// Authz service wired in-process (no HTTP hop in tests)

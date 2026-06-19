@@ -18,14 +18,24 @@
 package authzhttp
 
 import (
+	"context"
 	"net/http"
 
 	"rebac-primer/internal/authz"
+	"rebac-primer/internal/rebac"
 )
 
+// AuthorizationService is the capability exposed by this HTTP adapter.
+// It is intentionally declared by the consumer rather than by either backend.
+type AuthorizationService interface {
+	Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
+	WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+	DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+	ListTuples(ctx context.Context, filter ...authz.TupleFilter) ([]rebac.TupleKey, error)
+}
+
 // NewServer returns an http.Handler with all authz routes registered.
-// It accepts an [authz.Service] — the driving port the handler calls into.
-func NewServer(svc authz.Service) http.Handler {
+func NewServer(svc AuthorizationService) http.Handler {
 	h := &handler{authz: svc}
 	mux := http.NewServeMux()
 

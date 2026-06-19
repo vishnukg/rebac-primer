@@ -9,7 +9,7 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// This file unit-tests the authz [authz.Service] returned by [authz.New] in
+// This file unit-tests the *authz.Service returned by [authz.New] in
 // isolation from any real adapter. The Service is a thin orchestrator over two
 // driven ports — TupleRepository and Evaluator — which makes it the right place
 // to demonstrate the difference between stubs and mocks:

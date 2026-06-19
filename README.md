@@ -13,7 +13,7 @@ to show the important ReBAC ideas.
 ```text
 internal/rebac/          ReBAC primitives: Object, Relation, TupleKey, CheckRequest
 internal/authz/          AuthZ service, tuple store, graph evaluator, model rules
-internal/openfga/        OpenFGA-backed authz.Service
+internal/openfga/        OpenFGA-backed authorization service
 internal/documents/      Documents service, repository, demo token verifier
 internal/api/            HTTP server for the documents service
 internal/fixtures/       Shared demo/test data
@@ -89,6 +89,7 @@ Casey has no path through the graph, so access is denied.
 | Roadmap Document | `document:roadmapDocument` | protected document |
 
 The in-process graph evaluator is the learning implementation. The OpenFGA
-adapter demonstrates the external authorization-service direction: it implements
-the same `authz.Service` port and stores/evaluates relationships in OpenFGA. The
-rest of the demo still requires the production work listed in doc 40.
+adapter demonstrates the external authorization-service direction. Both concrete
+backends satisfy the narrow interface declared by each consumer, while OpenFGA
+stores and evaluates the relationships remotely. The rest of the demo still
+requires the production work listed in doc 40.
