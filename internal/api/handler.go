@@ -44,7 +44,7 @@ func (h *handler) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
-	if err := requireScope(user, "documents:write"); err != nil {
+	if err = requireScope(user, "documents:write"); err != nil {
 		h.writeError(w, err)
 		return
 	}
@@ -55,7 +55,7 @@ func (h *handler) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
 		Body        string `json:"body"`
 		WorkspaceID string `json:"workspaceId"`
 	}
-	if err := readJSON(w, r, &body); err != nil {
+	if err = readJSON(w, r, &body); err != nil {
 		writeJSONReadError(w, err)
 		return
 	}
@@ -86,7 +86,7 @@ func (h *handler) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
-	if err := requireScope(user, "documents:read"); err != nil {
+	if err = requireScope(user, "documents:read"); err != nil {
 		h.writeError(w, err)
 		return
 	}
@@ -108,7 +108,7 @@ func (h *handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
-	if err := requireScope(user, "documents:write"); err != nil {
+	if err = requireScope(user, "documents:write"); err != nil {
 		h.writeError(w, err)
 		return
 	}
@@ -117,7 +117,7 @@ func (h *handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Body string `json:"body"`
 	}
-	if err := readJSON(w, r, &body); err != nil {
+	if err = readJSON(w, r, &body); err != nil {
 		writeJSONReadError(w, err)
 		return
 	}
