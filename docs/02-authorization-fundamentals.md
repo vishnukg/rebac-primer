@@ -308,8 +308,14 @@ are introduced in detail in `04-rebac-concepts.md`; for now read the line as
 Diagram:
 
 ```text
-user:alice -> team:platformTeam -> workspace:productWorkspace -> document:roadmapDocument
+document:roadmapDocument
+  --workspace--> workspace:productWorkspace
+  --editor--> team:platformTeam#member
+  --member--> user:alice
 ```
+
+This uses the tuple direction `object --relation--> subject`. In product prose,
+you can read the final edge in reverse as "Alice is a member of the team."
 
 ReBAC is strong when your product is naturally relational:
 

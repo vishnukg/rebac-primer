@@ -50,6 +50,10 @@ make openfga/seed
 make server-openfga
 ```
 
+The OpenFGA server is containerized, but the seed script uses the `fga` CLI and
+`jq` from your host. Check those prerequisites in chapter 26 before running the
+seed target.
+
 The local OpenFGA setup uses an in-memory datastore, so restart means reseed.
 
 ## Checkpoint

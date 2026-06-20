@@ -15,7 +15,7 @@ You do need a few graph ideas:
 
 This chapter teaches only the graph theory needed for authorization.
 
-Keep a pencil nearby. The chapter works better if you redraw the four-node graph
+Keep a pencil nearby. The chapter works better if you redraw the five-node graph
 yourself instead of only reading the diagrams.
 
 ## One Sentence Version
@@ -30,9 +30,9 @@ ReBAC asks whether a user is connected to a resource through relationships that
 the model says are useful.
 
 ```text
-user:alice --member--> team:platformTeam
-team:platformTeam    --editor--> workspace:productWorkspace
-document:roadmap...  --workspace--> workspace:productWorkspace
+document:roadmap...       --workspace--> workspace:productWorkspace
+workspace:productWorkspace --editor--> team:platformTeam#member
+team:platformTeam          --member--> user:alice
 ```
 
 The hard part is not graph theory. The hard part is being precise about what
@@ -43,11 +43,11 @@ each connection means.
 | Word | Meaning in plain English | Example in this repo |
 |------|--------------------------|----------------------|
 | Node | A thing | `user:alice` |
-| Edge | A connection between two nodes | `user:alice → team:platformTeam` |
+| Edge | A connection between two nodes | `team:platformTeam → user:alice` |
 | Label | The name on an edge | `member`, `editor`, `viewer`, `workspace` |
 | Direction | Which way the relationship points | document points to workspace |
-| Path | A chain of edges | user -> team -> workspace |
-| Reachability | Whether a path exists | can this user reach this permission? |
+| Path | A chain of edges | document -> workspace -> team -> user |
+| Reachability | Whether a path exists | can this object/relation reach this user? |
 | Cycle | A path that loops back | A points to B, B points to A |
 
 When you read ReBAC code, keep asking:
@@ -67,8 +67,11 @@ to the product workspace.
 
 That sentence is already a graph.
 
+In ordinary language, you might say "Alice → team → workspace → document."
+The stored tuple graph uses the reverse, object-to-subject direction:
+
 ```text
-Alice -> platform team -> product workspace -> roadmap document
+document -> workspace -> team#member -> Alice
 ```
 
 ReBAC makes that graph explicit and asks whether a useful path exists.
@@ -92,7 +95,7 @@ Can Alice get from Station A to Station D?
 ReBAC question:
 
 ```text
-Can user:alice reach document:roadmapDocument#can_edit?
+Can document:roadmapDocument#can_edit reach user:alice?
 ```
 
 The model is the transit rulebook. It says which lines count for which trip.
@@ -145,36 +148,37 @@ Nodes are the nouns.
 An edge connects two nodes.
 
 ```text
-user:alice --member--> team:platformTeam
+team:platformTeam --member--> user:alice
 ```
 
-In OpenFGA tuple form, the same fact is stored as:
+In OpenFGA tuple form, that fact is stored as:
 
 ```text
 (team:platformTeam, member, user:alice)
 ```
 
-The tuple is written from object perspective:
+The tuple and arrow are written from the object perspective:
 
 ```text
 team:platformTeam has member user:alice
 ```
 
-When drawing it for intuition, it is often easier to read from user outward:
+Product prose usually phrases it from the user's perspective:
 
 ```text
-user:alice is member of team:platformTeam
+user:alice is a member of team:platformTeam
 ```
 
-Both are the same relationship. Be comfortable flipping the sentence.
+That reverses the sentence, not the graph edge. In diagrams in this course,
+arrows consistently use the stored `object --relation--> subject` direction.
 
 ## Labels
 
 Edges have labels.
 
 ```text
-user:alice --member--> team:platformTeam
-user:bob   --viewer--> workspace:productWorkspace
+team:platformTeam --member--> user:alice
+workspace:productWorkspace --viewer--> user:bob
 ```
 
 The label matters. A `viewer` edge does not mean the same thing as an `editor`
@@ -222,26 +226,27 @@ A path is a sequence of connected edges.
 Alice's edit path:
 
 ```text
-user:alice
-      │ member
-      ▼
-team:platformTeam
-      │ editor (team:platformTeam#member)
+document:roadmapDocument
+      │ workspace
       ▼
 workspace:productWorkspace
-      ▲ workspace
-      │
-document:roadmapDocument ──► can_edit ✓
+      │ editor
+      ▼
+team:platformTeam#member
+      │ member
+      ▼
+user:alice ✓
 ```
 
-Reading top to bottom:
+Reading the stored path top to bottom:
 
-- Alice is a member of the platform team.
-- Platform team members are editors of the product workspace.
 - The roadmap document declares it belongs to that workspace.
+- The workspace editor relation points to the platform team's member set.
+- The platform team's member relation reaches Alice.
 - Document editor access is inherited from the workspace, so `can_edit` is granted.
 
-The `workspace` arrow points upward because the tuple is stored on the document:
+The `workspace` arrow starts at the document because the tuple is stored on the
+document:
 
 ```text
 (document:roadmapDocument, workspace, workspace:productWorkspace)
@@ -259,10 +264,10 @@ Reachability asks:
 Can I get from node A to node B by following allowed edges?
 ```
 
-ReBAC check asks a reachability question:
+The evaluator asks a reachability question:
 
 ```text
-Can user:alice reach document:roadmapDocument#can_edit?
+Starting at document:roadmapDocument#can_edit, can the model reach user:alice?
 ```
 
 If yes:
@@ -381,20 +386,11 @@ If tuples are data, the model is logic.
 Here are the five connected objects in the seeded graph:
 
 ```text
-user:alice        user:bob
-       │                            │
-       │ member                     │ viewer
-       ▼                            │
-team:platformTeam                   │
-       │ editor                     │
-       │ (team:platformTeam#member) │
-       └────────────────┐           │
-                        ▼           ▼
-               workspace:productWorkspace
-                        ▲
-                        │ workspace
-                        │
-               document:roadmapDocument
+document:roadmapDocument
+  └─workspace─► workspace:productWorkspace
+                  ├─editor─► team:platformTeam#member
+                  │             └─member─► user:alice
+                  └─viewer─► user:bob
 ```
 
 Three things to notice:
@@ -434,11 +430,9 @@ any user reachable as a member of team:platformTeam is an editor of workspace:pr
 Diagram:
 
 ```text
-user:alice ──member──► team:platformTeam
-                              │
-                              │ team:platformTeam#member
-                              ▼
-                       workspace:productWorkspace editor
+workspace:productWorkspace
+  └─editor─► team:platformTeam#member
+                └─member─► user:alice
 ```
 
 Subject sets let one tuple represent many users.
@@ -480,7 +474,7 @@ denials in a graph where two branches converge.
 Relationship graphs can get deep:
 
 ```text
-user -> team -> workspace -> folder -> project -> document
+document -> project -> folder -> workspace -> team#member -> user
 ```
 
 Deep graphs are not automatically bad, but they are harder to debug.
@@ -513,13 +507,14 @@ If the explanation takes a paragraph, simplify the model.
 Every ReBAC check is this:
 
 ```text
-Is there a valid path from the user to the requested relation on the object?
+Can the requested relation on the object reach the user through valid model
+expansions and stored tuples?
 ```
 
 Example:
 
 ```text
-Is there a valid path from user:alice to document:roadmapDocument#can_edit?
+Can document:roadmapDocument#can_edit reach user:alice?
 ```
 
 Answer:
@@ -569,8 +564,8 @@ Explain ReBAC using graph words:
 
 ```text
 ReBAC stores authorization facts as labeled edges between nodes. A check asks
-whether the model can traverse a valid path from a user to a requested relation
-on an object.
+whether the model can traverse a valid path from a requested relation on an
+object to the user.
 ```
 
 If that sentence makes sense, you have enough graph theory to continue.

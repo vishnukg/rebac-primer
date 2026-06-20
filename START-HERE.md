@@ -12,14 +12,44 @@ That sentence is the entire system. ReBAC makes the computer prove it by walking
 a graph of relationships.
 
 ```text
-user:alice --member--> team:platformTeam --editor--> workspace:productWorkspace <--workspace-- document:roadmapDocument
+document:roadmapDocument
+  --workspace--> workspace:productWorkspace
+  --editor--> team:platformTeam#member
+  --member--> user:alice
 ```
+
+The arrows above use the repository's canonical tuple direction:
+`object --relation--> subject`. Product prose often reads the same relationship
+in reverse: "Alice is a member of the platform team."
+
+## Before You Begin
+
+Choose one toolchain:
+
+- Docker Desktop or another working Docker engine, then use the `make` commands
+  throughout the course.
+- Go 1.26.4 locally, then run the equivalent `go` commands directly.
+
+Check the Docker path with:
+
+```bash
+docker version
+make test
+```
+
+The optional OpenFGA exercises additionally require the `fga` CLI and `jq` on
+your host; the migration chapter lists the setup check.
 
 ## Choose Your Route
 
 You do not need the same route as every other reader.
+Do not read files in numeric order; the numbers group related topics, while the
+routes below define the learning order.
 
 ### Fast route: understand ReBAC
+
+If graphs and OpenFGA are completely new, the optional
+[graph and OpenFGA notes](notes-graphs-and-openfga.md) provide a short preview.
 
 1. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
 2. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
@@ -72,8 +102,8 @@ ReBAC algorithm.
 
 ```bash
 make test
-go test -v -run TestTrace ./internal/authz
-go test -v -run TestGraphEvaluator_TeamMemberCanEditDocument ./internal/authz
+make trace
+make test-permission
 ```
 
 `TestTrace` prints every step the evaluator took. For `alice / can_edit`, the

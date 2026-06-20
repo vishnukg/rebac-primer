@@ -11,18 +11,13 @@
 // For example, the tuple (team:platformTeam, member, user:alice) is a directed
 // edge: "there is a 'member' edge from team:platformTeam to user:alice."
 //
-// The four fixture tuples create this graph:
+// The four fixture tuples create this graph in stored tuple direction:
 //
-//	user:alice ──[member]──────────────► team:platformTeam
-//	                                             │
-//	                                       [editor via #member]
-//	                                             │
-//	                                             ▼
-//	user:bob ──[viewer]──────────► workspace:productWorkspace
-//	                                             ▲
-//	                                       [workspace]
-//	                                             │
-//	                               document:roadmapDocument
+//	document:roadmapDocument
+//	  └─[workspace]─► workspace:productWorkspace
+//	                    ├─[editor]─► team:platformTeam#member
+//	                    │              └─[member]─► user:alice
+//	                    └─[viewer]─► user:bob
 //
 // # What a permission check is
 //

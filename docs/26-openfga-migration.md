@@ -43,6 +43,18 @@ The contract tests keep those meanings aligned.
 
 ## Bootstrapping
 
+The local seed script runs on your host and requires:
+
+```bash
+docker version
+fga version
+jq --version
+```
+
+Install the OpenFGA CLI using the
+[official instructions](https://openfga.dev/docs/getting-started/cli) and
+install `jq` with your platform's package manager before continuing.
+
 ```bash
 make openfga/up
 make openfga/seed

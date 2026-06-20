@@ -7,12 +7,12 @@ COMPOSE_MENU ?= false
 export COMPOSE_MENU
 
 COMPOSE ?= docker compose -f deployments/docker-compose.yml
-GO_TOOLS := $(COMPOSE) --profile tools run --rm tools
+GO_TOOLS := $(COMPOSE) --profile tools run --rm --build tools
 APP      := $(COMPOSE) --profile app
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build test test-race vet lint modernize check shell server server-down server-openfga \
+.PHONY: help build test test-race trace test-permission vet lint modernize check shell server server-down server-openfga \
         openfga/up openfga/down openfga/seed compose/config clean
 
 help:
@@ -24,6 +24,8 @@ help:
 	@printf '%s\n' '  make build          Compile Go packages'
 	@printf '%s\n' '  make test           Run Go tests'
 	@printf '%s\n' '  make test-race      Run tests with the race detector'
+	@printf '%s\n' '  make trace          Print the Alice can_edit graph traversal'
+	@printf '%s\n' '  make test-permission Run one representative permission test'
 	@printf '%s\n' '  make vet            Run go vet'
 	@printf '%s\n' '  make lint           Run staticcheck (go tool)'
 	@printf '%s\n' '  make modernize      Report Go 1.26 modernization suggestions'
@@ -48,6 +50,12 @@ test:
 
 test-race:
 	$(GO_TOOLS) go test -race ./...
+
+trace:
+	$(GO_TOOLS) go test -v -run TestTrace ./internal/authz
+
+test-permission:
+	$(GO_TOOLS) go test -v -run TestGraphEvaluator_TeamMemberCanEditDocument ./internal/authz
 
 vet:
 	$(GO_TOOLS) go vet ./...

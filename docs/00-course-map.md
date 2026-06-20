@@ -38,6 +38,7 @@ decision?
 | 20 | Go language guide for this repository | representative files across `internal/` |
 | 06 | Architecture: ports and adapters | `internal/authz/authz.go`, `internal/documents/documents.go` |
 | 21 | Go ReBAC implementation walkthrough | `internal/authz/evaluator.go`, `internal/documents/service.go` |
+| 25 | Testing patterns and authorization test strategy | `internal/authz/evaluator_test.go` |
 | 28 | Request call flow | `cmd/server/main.go`, `internal/api/handler.go` |
 | 29 | Guided end-to-end feature lab | add document deletion through service, HTTP, authz, and tests |
 
@@ -60,7 +61,6 @@ teaching modules that use the same domain types:
 | 22 | Concurrency | `examples/concurrency/parallel.go` |
 | 23 | Generics | `examples/generics/result.go` |
 | 24 | Interfaces and embedding | `examples/middleware/middleware.go` |
-| 25 | Testing patterns | `internal/authz/evaluator_test.go` |
 
 ## Operations
 
@@ -79,8 +79,8 @@ For programmers new to Go:
 2. Read docs 02–05.
 3. Run `make test`.
 4. Read `internal/authz/evaluator.go` with doc 27 open beside it.
-5. Run `go test -v -run TestTrace ./internal/authz`.
-6. Complete docs 20–25 and 28.
+5. Run `make trace`.
+6. Complete docs 20, 21, 25, and 28. Docs 22–24 are optional Go lessons.
 7. Complete the guided feature lab in doc 29.
 8. Read docs 01, 26, 34, and 40 for production boundaries.
 

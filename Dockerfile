@@ -1,5 +1,7 @@
 FROM golang:1.26.4-alpine AS dev
 WORKDIR /workspace
+RUN apk add --no-cache build-base
+ENV CGO_ENABLED=1
 
 FROM dev AS build
 COPY go.mod go.sum ./

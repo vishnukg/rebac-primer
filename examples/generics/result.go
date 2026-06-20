@@ -38,7 +38,7 @@ func (r Result[T]) Value() (T, bool) { return r.value, r.ok }
 // Use only where a failure is truly a programming error, not a recoverable state.
 func (r Result[T]) Unwrap() T {
 	if !r.ok {
-		panic(fmt.Sprintf("graph.Result.Unwrap on a failure: %v", r.err))
+		panic(fmt.Sprintf("generics.Result.Unwrap on a failure: %v", r.err))
 	}
 	return r.value
 }

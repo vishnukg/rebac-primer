@@ -38,36 +38,28 @@ edge.
 ## The four fixture tuples as a graph
 
 The project seeds four tuples. The table stores them in this repository's
-`(object, relation, subject)` order, then paraphrases them from the user's point
-of view:
+`(object, relation, subject)` order, then paraphrases them in product language:
 
 ```
 Stored tuple                                             Human-readable relationship
 ───────────────────────────────────────────────────────────────────────────────
-(team:platformTeam,       member,    user:alice)         alice──[member]──►team
-(workspace:productWS,     editor,    team:platTeam#mbr)  team─[editor via #member]──►workspace
-(workspace:productWS,     viewer,    user:bob)           bob──[viewer]──►workspace
-(document:roadmapDoc,     workspace, workspace:productWS)  doc──[workspace]──►workspace
+(team:platformTeam,       member,    user:alice)         Alice is a team member
+(workspace:productWS,     editor,    team:platTeam#mbr)  team members edit the workspace
+(workspace:productWS,     viewer,    user:bob)           Bob views the workspace
+(document:roadmapDoc,     workspace, workspace:productWS)  document belongs to workspace
 ```
 
 Drawn as one picture:
 
-```
-
-The picture is for human explanation and draws Alice outward toward the resource.
-The evaluator itself starts at the requested object and follows stored
+The evaluator starts at the requested object and follows stored
 object-to-subject edges until it can prove the user is in the resulting set.
-Both views describe the same facts; do not mix up the storage order.
-user:alice ──[member]──────────────────────► team:platformTeam
-                                                     │
-                                    [editor] (via team:platformTeam#member)
-                                                     │
-                                                     ▼
-user:bob ──[viewer]────────────────► workspace:productWorkspace
-                                                     ▲
-                                              [workspace]
-                                                     │
-                                       document:roadmapDocument
+
+```text
+document:roadmapDocument
+  └─[workspace]─► workspace:productWorkspace
+                    ├─[editor]─► team:platformTeam#member
+                    │              └─[member]─► user:alice
+                    └─[viewer]─► user:bob
 ```
 
 The second edge is special.  Instead of pointing to a single user, it points to

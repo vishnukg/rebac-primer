@@ -138,6 +138,8 @@ Browser                  Your App                  IdP
    │                         │  code=AUTH_CODE       │
    │                         │  code_verifier=...    │
    │                         │  redirect_uri=...     │
+   │                         │  + client auth when   │
+   │                         │    confidential       │
    │                         │──────────────────────►│
    │                         │                       │ verify
    │                         │                       │ code_verifier
@@ -163,14 +165,20 @@ In plain English:
 5. Alice's browser follows that redirect to your callback route.
 6. Your app verifies the `state` matches what it stored (prevents CSRF), then
    makes a **server-to-server** POST to the IdP's token endpoint — never in the
-   browser URL — sending the `code` and the original `code_verifier`.
+   browser URL — sending the `code` and the original `code_verifier`. A
+   confidential server-side client also authenticates using its registered
+   method, such as `private_key_jwt`, mTLS, or a client secret. PKCE does not
+   replace client authentication. Public clients such as SPAs and native apps
+   cannot safely keep a client credential.
 7. The authorization server verifies the PKCE value and returns an access token
    plus an ID token for the OIDC request. The client validates the ID token,
    including issuer, audience, signature, expiry, and nonce.
 8. Your app creates a session cookie. Alice is logged in.
 
 Your app never sees Alice's password. The token exchange in step 6 is
-server-to-server only — nothing sensitive ever appears in a browser URL.
+server-to-server, so access and refresh tokens do not appear in the browser URL.
+The short-lived authorization code does appear in the callback URL and must
+still be protected against leakage and replay.
 
 ## What are these tokens?
 
@@ -185,7 +193,8 @@ Access token        →  carries delegated authority for a resource server
                         should be short-lived according to the threat model
 
 ID token            →  OIDC's contribution — proves "this person authenticated"
-                        contains the user's identity (name, stable ID, email)
+                        always contains a subject identifier; profile and email
+                        claims are optional and depend on scopes and provider
                         your app reads this to learn who just logged in
 
 Refresh token       →  optional long-lived token used to get new access tokens
@@ -218,27 +227,33 @@ OIDC adds the ID token — a JWT containing standard **claims** about the user:
   "email": "alice@example.com",
   "iss": "https://accounts.google.com",
   "aud": "your-app-client-id",
-  "exp": 1760000000
+  "exp": 1893456000
 }
 ```
 
 Common claims:
 
 ```text
-sub   subject — stable user identifier (this is the one you care about most)
+sub   subject — stable, locally unique identifier within the issuer
 iss   issuer  — who issued this token
 aud   audience — who this token is intended for (your app)
 exp   expiration timestamp
 ```
 
-The `sub` claim is the stable identifier to use as Alice's identity in your
-system. Use it — not the email — because emails change. Provider subject IDs do
-not.
+The identity key is the pair `(iss, sub)`: `sub` is locally unique and stable
+within an issuer, but is not globally unique by itself. Providers may also issue
+pairwise subject values that differ between clients. Map the trusted issuer and
+subject pair to an internal app user id. Use that mapping — not email — because
+emails change and may have separate verification semantics.
 
 In your app:
 
 ```text
-OAuth subject "github|12345"  →  app user id "user:github:12345"
+OIDC identity:
+  iss = "https://auth.example.com/"
+  sub = "github|12345"
+
+(trusted iss, sub)  →  internal app user id "user:01JABC..."
 ```
 
 ## PKCE: why the code alone isn't enough
@@ -437,8 +452,10 @@ that token profile, the API can validate them locally without calling the
 authorization server on every request. Other access tokens are intentionally
 opaque and must not be decoded as JWTs.
 
-The authorization server publishes its public keys through metadata/JWKS. Do
-not hard-code the example path below; discover the advertised `jwks_uri`:
+The authorization server publishes trusted metadata, including its endpoints,
+supported algorithms, issuer identifier, and `jwks_uri`. Configure the expected
+issuer, fetch its metadata using the appropriate discovery mechanism, and do not
+hard-code the example JWKS path below:
 
 ```text
 GET https://idp.example.com/.well-known/jwks.json
@@ -448,20 +465,26 @@ The API fetches and caches these keys, and refreshes them safely when keys
 rotate. When a request arrives:
 
 ```text
-1. Parse the JWT header   →  get algorithm + key ID (kid)
-2. Find the matching public key from the cached JWKS
-3. Enforce the expected algorithm and verify the signature
-4. Check claims:
+1. Require the authorization server's documented access-token profile
+2. Parse the JWT header   →  get token type, algorithm, and key ID (kid)
+3. Enforce the expected token type and permitted algorithms; reject alg=none
+4. Find the matching public key from the cached JWKS and verify the signature
+5. Check claims:
      exp  →  is the token still valid?
      nbf  →  if present, is the token active yet?
-     iss  →  is it from the expected IdP?
+     iss  →  does it exactly match the configured issuer?
      aud  →  is it intended for this API?
      scope → does it include the permission this endpoint requires?
-5. Extract sub  →  map to app user id  →  run ReBAC check
+6. Interpret sub, client_id, scopes, and other claims according to that profile
+7. Map the validated principal to an internal id  →  run the ReBAC check
 ```
 
 No per-request authorization-server call is needed, but key rotation still
 requires safe JWKS refresh and caching.
+
+For access tokens following RFC 9068, the API also requires a `typ` header of
+`at+jwt` or `application/at+jwt`. Explicit typing helps prevent an OIDC ID token
+from being accepted as an access token.
 
 For a user token (from Flow 1 or Flow 3), the JWT payload looks like this:
 
@@ -471,7 +494,7 @@ For a user token (from Flow 1 or Flow 3), the JWT payload looks like this:
   "iss": "https://auth.example.com/",
   "aud": "your-api",
   "scope": "documents.write",
-  "exp": 1760000000
+  "exp": 1893456000
 }
 ```
 
@@ -483,18 +506,22 @@ For a service token (from Flow 2 — Client Credentials), it looks like this:
   "iss": "https://auth.example.com/",
   "aud": "your-api",
   "scope": "documents.read",
-  "exp": 1760000000
+  "exp": 1893456000
 }
 ```
 
-The difference: in a user token `sub` is the user. In a service token `sub` is
-the service itself. Your API handles both identically — extract `sub`, map it to
-an identity, and run the authorization check downstream.
+The difference: in a user token `sub` commonly identifies the user, while a
+client-credentials token represents the client or workload according to the
+authorization server's documented profile. They can share validation
+infrastructure, but they are different principal types with different policy
+and audit semantics. Do not assume every provider places a client-credentials
+identity in `sub`; use the profile's defined claims and map users and services
+to distinct internal identities.
 
 ### Option 2: Token introspection (remote)
 
-If the access token is opaque (not a JWT), or you need to detect revocation
-immediately, the API calls the IdP's introspection endpoint (RFC 7662):
+If the access token is opaque (not a JWT), or you need centrally evaluated token
+status, the API calls the IdP's introspection endpoint (RFC 7662):
 
 ```text
 Your API                         Authorization Server
@@ -508,7 +535,7 @@ Your API                         Authorization Server
    │    "active": true,                   │
    │    "sub": "github|12345",            │
    │    "scope": "documents.write",       │
-   │    "exp": 1760000000                 │
+   │    "exp": 1893456000                 │
    │  }                                   │
    │◄─────────────────────────────────────┤
 ```
@@ -524,15 +551,16 @@ JWT validation (local)
   - revocation takes until token expiry to take effect
 
 Token introspection (remote)
-  + always current — catches revoked tokens immediately
-  - adds a network round-trip per request
+  + can provide fresher status and detect revocation before token expiry
+  - adds network calls unless responses are cached
   - the IdP becomes a bottleneck at scale
 ```
 
 In practice, choose short access-token lifetimes from your threat model rather
 than copying a universal number. JWT validation trades immediate revocation for
-local verification; introspection can provide fresher status at the cost of a
-network dependency.
+local verification. Introspection responses may be cached, so choose a cache
+lifetime that explicitly balances revocation freshness against latency and
+authorization-server load.
 
 ## When your API calls another service
 
@@ -629,7 +657,7 @@ Browser   Your API (Resource Server)        Authorization Server     Service B
    │  user token       │                              │                  │
    │──────────────────►│                              │                  │
    │                   │ 1. validate user token       │                  │
-   │                   │    extract sub: github|12345 │                  │
+   │                   │    map (iss, sub) to user id │                  │
    │                   │                              │                  │
    │                   │ 2. POST /token               │                  │
    │                   │  grant_type=                 │                  │
@@ -680,12 +708,12 @@ Token exchange (RFC 8693)
   + user identity preserved via act claim
   + works across trust boundaries and external services
   - requires IdP support for token exchange grant
-  - one extra IdP call per downstream service call
+  - requires token exchanges or safe reuse of cached exchanged tokens
 
 Client credentials + user identity forwarding
   + simpler — one token per service, user id passed in request
   + no IdP support needed beyond standard client credentials
-  - relies on network trust between services
+  - relies on authenticated workload identity and integrity-protected context
   - only appropriate for internal services you control
 ```
 
@@ -700,12 +728,12 @@ Both patterns give Service B what it needs to run a ReBAC check:
 
 ```text
 Token exchange:
-  Service B extracts sub → "github|12345" → user:github:12345
-  Check(user:github:12345, can_read, invoice:INV-001)
+  Service B validates the delegated identity → maps (iss, sub) → user:01JABC...
+  Check(user:01JABC..., can_read, invoice:INV-001)
 
 Client credentials + forwarding:
-  Service B reads authenticated internal user context → "user:github:12345"
-  Check(user:github:12345, can_read, invoice:INV-001)
+  Service B reads authenticated internal user context → "user:01JABC..."
+  Check(user:01JABC..., can_read, invoice:INV-001)
 ```
 
 The ReBAC check is identical. The difference is only in how Service B learns
@@ -723,12 +751,12 @@ HTTP request arrives
        ▼
 Auth middleware
   verify token
-  extract sub: "github|12345"
-  map to:      "user:github:12345"
+  extract: iss="https://auth.example.com/", sub="github|12345"
+  map pair to: "user:01JABC..."
        │
        ▼
 ReBAC check
-  Check(user:github:12345, can_edit, document:roadmapDocument)
+  Check(user:01JABC..., can_edit, document:roadmapDocument)
        │
        ▼
 allow or deny → handler runs business logic
@@ -738,7 +766,7 @@ Your document domain should receive an already-verified actor id. It should not
 parse JWTs or call the IdP.
 
 ```text
-Clean:  auth middleware -> "user:github:12345" -> documents.update()
+Clean:  auth middleware -> "user:01JABC..." -> documents.update()
 Messy:  document domain parses Authorization header, calls OpenFGA directly
 ```
 
@@ -788,11 +816,30 @@ CLI / device          Flow 3: Device Authorization        Or Auth Code with loca
 ```
 
 For this repo:
+
 - Future browser/server version: Flow 1 (Authorization Code + PKCE + OIDC)
 - Current terminal client: Flow 3 (Device Authorization) or Flow 1 with localhost callback
 - Tutorial mode (current): you paste a demo bearer token (`demo-token-alice`,
   `demo-token-bob`, or `demo-token-casey`) instead of a real OAuth login, to keep
   the focus on authorization
+
+## Refresh tokens and browser sessions
+
+Refresh tokens are credentials used only with the authorization server's token
+endpoint. Never send one to a resource API. Store refresh tokens as carefully as
+passwords and avoid exposing them to browser JavaScript where the architecture
+allows tokens to remain in a backend.
+
+For public clients, use refresh-token rotation with reuse detection or
+sender-constrained refresh tokens when supported. Apply absolute and inactivity
+expiry appropriate to the threat model, revoke tokens when compromise is
+suspected, and remember that ending an app session does not automatically end
+the IdP session or revoke every token.
+
+For a server web app, the browser should normally receive an application session
+cookie rather than OAuth tokens. Protect that cookie with `Secure`, `HttpOnly`,
+and an appropriate `SameSite` setting; rotate the session identifier after
+login; and add CSRF protection to authenticated state-changing requests.
 
 ## Two patterns to avoid
 
@@ -841,7 +888,7 @@ Better: JWT contains Alice's stable identity; authorization checks happen live
 
 ```text
 Bad:    user:alice@example.com   (emails change)
-Better: user:github:12345        (stable, tied to provider subject)
+Better: map (trusted issuer, subject) to an internal immutable user id
 ```
 
 **4. Treating OAuth scopes as object permissions**
@@ -871,7 +918,7 @@ This course teaches the modern posture:
 - Authorization Code flow with PKCE
 - OpenID Connect for authentication
 - Exact redirect URI matching
-- Refresh token rotation
+- Refresh token rotation or sender-constraining for public clients
 - No implicit flow for SPAs
 - No Resource Owner Password Credentials grant
 
@@ -891,5 +938,8 @@ Two separate questions:
 
 - [RFC 9700: OAuth 2.0 Security Best Current Practice](https://www.rfc-editor.org/rfc/rfc9700)
 - [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0-final.html)
+- [RFC 9068: JWT Profile for OAuth 2.0 Access Tokens](https://www.rfc-editor.org/rfc/rfc9068)
+- [RFC 7662: OAuth 2.0 Token Introspection](https://www.rfc-editor.org/rfc/rfc7662)
+- [RFC 8693: OAuth 2.0 Token Exchange](https://www.rfc-editor.org/rfc/rfc8693)
 - [OAuth 2.1 Internet-Draft](https://datatracker.ietf.org/doc/draft-ietf-oauth-v2-1/)
 - [RFC 9449: DPoP](https://www.rfc-editor.org/rfc/rfc9449) — sender-constrained tokens

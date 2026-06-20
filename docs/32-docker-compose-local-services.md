@@ -32,6 +32,8 @@ curl http://127.0.0.1:4001/health
 
 ## OpenFGA Backend
 
+The seed step requires the host `fga` CLI and `jq`; see chapter 26.
+
 ```bash
 make openfga/up
 make openfga/seed

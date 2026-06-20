@@ -26,7 +26,7 @@ import "rebac-primer/internal/rebac"
 //	rules["editor"] = ["owner"]      → editor is satisfied by owner
 //
 // Chained: owner satisfies editor (via the second rule) which satisfies viewer
-// (via the first rule), so owner ⊇ editor ⊇ viewer.
+// (via the first rule), so owner ⊆ editor ⊆ viewer as sets of users.
 //
 // # Why this is separate from tuples
 //
@@ -49,7 +49,7 @@ type impliedBy map[rebac.Relation][]rebac.Relation
 //	admin  — full control over the team
 //	member — read/participate access
 //
-// Hierarchy: admin ⊇ member
+// Hierarchy: admin ⊆ member as sets of users
 //
 //	(team, member, user:alice) satisfies "is alice a team member?" — direct.
 //	(team, admin,  user:alice) also satisfies "is alice a team member?" — via this rule.
@@ -73,7 +73,7 @@ var teamRules = impliedBy{
 //	editor — can create and edit content
 //	viewer — can read content
 //
-// Hierarchy: owner ⊇ editor ⊇ viewer
+// Hierarchy: owner ⊆ editor ⊆ viewer as sets of users
 //
 // In OpenFGA DSL:
 //
@@ -101,7 +101,7 @@ var workspaceRules = impliedBy{
 //	  stored in tuples:
 //	    can_read, can_comment, can_edit, can_delete
 //
-// Hierarchy of base relations: owner ⊇ editor ⊇ viewer
+// Hierarchy of base relations: owner ⊆ editor ⊆ viewer as sets of users
 //
 // Derived permissions:
 //

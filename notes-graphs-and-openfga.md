@@ -22,12 +22,13 @@ user:alice  ──────►  team:platformTeam
 
 ### 2. Edges have a direction and a label
 
-- **Directed**: the arrow points one way. "Alice → team" (Alice is in the team) does **not** automatically mean "team → Alice."
+- **Directed**: the arrow points one way. This repository draws the stored tuple
+  direction, from object to subject.
 - **Label** = the *kind* of connection. In ReBAC the label is the **relation**: `member`, `editor`, `viewer`, `workspace`.
 
 ```
-user:alice ──member──► team:platformTeam
-user:bob   ──viewer──► workspace:productWorkspace
+team:platformTeam ──member──► user:alice
+workspace:productWorkspace ──viewer──► user:bob
 ```
 
 A stored fact (a **tuple**) is exactly one labeled edge.
@@ -37,22 +38,20 @@ A stored fact (a **tuple**) is exactly one labeled edge.
 These are the four fixture tuples (`internal/fixtures/fixtures.go`):
 
 ```
-user:alice ─[member]─►  team:platformTeam
-team:platformTeam (its #member set) ─[editor]─► workspace:productWorkspace
-user:bob ─[viewer]─►   workspace:productWorkspace
+team:platformTeam ─[member]─► user:alice
+workspace:productWorkspace ─[editor]─► team:platformTeam#member
+workspace:productWorkspace ─[viewer]─► user:bob
 document:roadmapDocument ─[workspace]─► workspace:productWorkspace
 ```
 
 Drawn together:
 
 ```
-user:alice ──member──► team:platformTeam
-                              │ editor (via team:platformTeam#member)
-                              ▼
-user:bob ──viewer──► workspace:productWorkspace
-                              ▲ workspace
-                              │
-                     document:roadmapDocument
+document:roadmapDocument
+  └─workspace─► workspace:productWorkspace
+                  ├─editor─► team:platformTeam#member
+                  │             └─member─► user:alice
+                  └─viewer─► user:bob
 ```
 
 ### 4. A path is a chain of edges; reachability is "does a path exist?"
@@ -60,12 +59,13 @@ user:bob ──viewer──► workspace:productWorkspace
 A **path** is hops you can follow end to end:
 
 ```
-alice ─member─► team ─editor─► workspace ◄─workspace─ document
+document ─workspace─► workspace ─editor─► team#member ─member─► alice
 ```
 
 **Reachability** is the core question behind a ReBAC permission check:
 
-> Starting from the document, following allowed edges, can I reach the user?
+> Starting from the document and requested relation, following allowed edges,
+> can I reach the user?
 
 `Can alice edit the roadmap?` = `Is there a path from document:roadmapDocument
 (via edges that count as "can_edit") to user:alice?` Yes → allowed. No → denied.
@@ -180,7 +180,8 @@ type workspace
 ```
 - `[user, team#admin]` — two kinds of subject may be written directly: a literal
   `user:*`, **or** a subject set `team:*#admin` (all admins of some team).
-- `or owner` / `or editor` builds the hierarchy: **owner ⊇ editor ⊇ viewer**.
+- `or owner` / `or editor` builds the hierarchy:
+  **owner ⊆ editor ⊆ viewer** as sets of users.
   Owners can do anything editors can; editors anything viewers can.
 
 ```

@@ -39,9 +39,10 @@ not mean "free" — goroutines you start must finish.
 
 ## Channels: communication as coordination
 
-A channel is a typed pipe. One goroutine sends; another receives. The send
-blocks until a receiver is ready, and the receive blocks until a sender is ready.
-That blocking is not a bug — it is how goroutines synchronise.
+A channel is a typed pipe. One goroutine sends; another receives. On an
+unbuffered channel, a send blocks until a receiver is ready. On any channel, a
+receive blocks while no value is available and the channel remains open. That
+blocking is not a bug — it is how goroutines synchronise.
 
 A mental model: a channel is a conveyor belt between workers.
 
@@ -178,7 +179,7 @@ touch the same memory location — so no mutex is needed. This is safe.
 |---|---|---|
 | **Collects values** | Yes — receive from channel | No — goroutines write shared state |
 | **Order preserved** | No — first finished, first received | Yes — write by index |
-| **Signals first error** | Easy — close channel or sentinel value | Awkward — needs an extra channel |
+| **Signals first error** | Natural — send an error result and cancel remaining work | Awkward — needs shared state or an extra channel |
 | **Use when** | results are all the same shape and order does not matter | you need results in input order |
 
 `AllPermissions` uses channels because results come back unordered and we build

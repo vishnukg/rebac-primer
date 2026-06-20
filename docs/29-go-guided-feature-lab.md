@@ -4,7 +4,9 @@ This lab turns the reading path into an end-to-end Go change. You will add a
 document deletion operation through domain types, interfaces, service logic,
 HTTP handling, authorization, and tests.
 
-Do this after chapters 10–13, chapters 20–25, and the request-flow walkthrough.
+Do this after chapters 10–13, chapters 20, 21, and 25, and the request-flow
+walkthrough in chapter 28. Chapters 22–24 are optional language lessons and are
+not prerequisites for this lab.
 The repository should pass before you start:
 
 ```bash
