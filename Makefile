@@ -9,11 +9,12 @@ export COMPOSE_MENU
 COMPOSE ?= docker compose -f deployments/docker-compose.yml
 GO_TOOLS := $(COMPOSE) --profile tools run --rm --build tools
 APP      := $(COMPOSE) --profile app
+FGA_CLI  := docker run --rm -v "$(CURDIR):/workspace" -w /workspace openfga/cli:v0.7.16
 
 .DEFAULT_GOAL := help
 
 .PHONY: help build test test-race trace test-permission vet lint modernize check shell server server-down server-openfga \
-        openfga/up openfga/down openfga/seed compose/config clean
+        openfga/up openfga/down openfga/model-test openfga/seed compose/config clean
 
 help:
 	@printf '%s\n' 'ReBAC Primer — Go implementation'
@@ -36,6 +37,7 @@ help:
 	@printf '%s\n' 'OpenFGA:'
 	@printf '%s\n' '  make openfga/up     Start local OpenFGA'
 	@printf '%s\n' '  make openfga/down   Stop local OpenFGA'
+	@printf '%s\n' '  make openfga/model-test Test the model with the pinned fga CLI container'
 	@printf '%s\n' '  make openfga/seed   Create store, write model, seed tuples'
 	@printf '%s\n' '  make server-openfga Run app with AUTHZ_BACKEND=openfga'
 	@printf '%s\n' ''
@@ -90,6 +92,9 @@ openfga/up:
 
 openfga/down:
 	$(COMPOSE) down
+
+openfga/model-test:
+	$(FGA_CLI) model test --tests deployments/openfga/model.fga.yaml
 
 # Create the store, write the model, and seed policy tuples into the running
 # OpenFGA (needs the fga CLI + jq). Writes deployments/openfga/.ids.env.

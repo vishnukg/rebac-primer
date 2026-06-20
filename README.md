@@ -43,7 +43,8 @@ Minimal ReBAC path:
 2. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
 3. [ReBAC concepts](docs/04-rebac-concepts.md)
 4. [OpenFGA model](docs/05-openfga-model.md)
-5. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
+5. [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md)
+6. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
 
 Then choose the Go implementation or production path from the course map.
 Finish the Go path with the

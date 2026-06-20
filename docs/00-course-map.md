@@ -26,6 +26,7 @@ Read these in order:
 | 03 | Graph theory needed for ReBAC | conceptual |
 | 04 | ReBAC concepts: tuples, subject sets, checks | `internal/rebac/rebac.go` |
 | 05 | OpenFGA model DSL | `deployments/openfga/model.fga`, `internal/authz/model.go` |
+| 07 | Designing a ReBAC authz service and evaluating OpenFGA vs building | `deployments/openfga/model.fga.yaml` |
 | 27 | Graph evaluator walkthrough | `internal/authz/evaluator.go` |
 
 This path answers one question: how does a relationship become an allow/deny
@@ -47,7 +48,7 @@ decision?
 | Doc | Topic | Code to inspect |
 |---|---|---|
 | 01 | OAuth/OIDC and the identity handoff to ReBAC | `internal/documents/token.go`, `internal/api/handler.go` |
-| 26 | From-scratch ReBAC vs OpenFGA | `internal/openfga/openfga.go` |
+| 26 | Build-vs-OpenFGA decision and migration path | `internal/openfga/openfga.go` |
 | 34 | OpenFGA adapter walkthrough | `internal/openfga/openfga.go` |
 | 40 | Production readiness | boundaries and replacement checklist |
 
@@ -76,12 +77,12 @@ teaching modules that use the same domain types:
 For programmers new to Go:
 
 1. Complete docs 10–13 and their experiments.
-2. Read docs 02–05.
+2. Read docs 02–05 and 07.
 3. Run `make test`.
 4. Read `internal/authz/evaluator.go` with doc 27 open beside it.
 5. Run `make trace`.
 6. Complete docs 20, 21, 25, and 28. Docs 22–24 are optional Go lessons.
 7. Complete the guided feature lab in doc 29.
-8. Read docs 01, 26, 34, and 40 for production boundaries.
+8. Read docs 01, 26, 34, and 40 for the OpenFGA production path.
 
 For programmers who already use Go, begin at step 2.

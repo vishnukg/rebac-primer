@@ -55,7 +55,8 @@ If graphs and OpenFGA are completely new, the optional
 2. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
 3. [ReBAC concepts](docs/04-rebac-concepts.md)
 4. [OpenFGA model](docs/05-openfga-model.md)
-5. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
+5. [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md)
+6. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
 
 ### Go route: understand the implementation
 
@@ -80,7 +81,8 @@ language guide.
 
 ### Production route: understand the boundaries
 
-Read [OAuth and OIDC](docs/01-oauth-authentication.md), then
+Read [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md),
+then [OAuth and OIDC](docs/01-oauth-authentication.md),
 [migration](docs/26-openfga-migration.md),
 [the OpenFGA adapter](docs/34-openfga-adapter-walkthrough.md), and
 [production readiness](docs/40-production-readiness.md). The OAuth chapter is

@@ -1,7 +1,8 @@
 # How the graph evaluator works
 
 This document explains, step by step, how the in-process graph evaluator
-answers a permission check.  No prior graph theory knowledge required.
+answers a permission check. Chapter 07 explains how this teaching implementation
+fits into a production ReBAC service and an OpenFGA adoption decision.
 
 The relevant source files are:
 
@@ -94,6 +95,10 @@ document:roadmapDocument
 ```
 
 The evaluator finds this path by traversing the graph.
+
+More precisely, it evaluates whether Alice belongs to
+`document:roadmapDocument#can_edit`. It does not perform unrestricted graph
+reachability: every recursive branch comes from the requested relation's model.
 
 ---
 

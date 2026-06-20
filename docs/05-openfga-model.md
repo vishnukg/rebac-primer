@@ -23,6 +23,9 @@ internal/authz/model.go
 Read the model as a type system plus set algebra. Type restrictions say what may
 be written directly; relation expressions say what may be derived.
 
+Each `object#relation` can be understood as a set of subjects. A Check asks
+whether one subject belongs to the effective set for the requested relation.
+
 ## Types
 
 The model contains:
@@ -89,6 +92,25 @@ The model stores rules once. Tuples store facts many times.
 You do not write a `can_read` tuple for every viewer. The model says viewers can
 read, so the evaluator can derive `can_read` from `viewer`.
 
+This is the central schema/data split:
+
+```text
+relationship tuples  → changing product facts
+authorization model  → reusable rules for deriving effective relationships
+```
+
+The DSL constructs used here are:
+
+```text
+[user]                 direct assignment with a type restriction
+can_edit: editor       computed relation on the same object
+editor from workspace  inheritance through a related object
+or                     union of subject sets
+```
+
+OpenFGA also supports intersections, exclusions, conditions, contextual tuples,
+and query APIs that the teaching evaluator does not implement.
+
 ## Try It
 
 Add a new computed permission:
@@ -116,5 +138,6 @@ Why is `can_edit` not stored as a tuple? Because it is a computed permission:
 the model derives it from `editor`, while tuples store changing relationship
 facts.
 
-Next: [Graph evaluator walkthrough](27-graph-evaluator-walkthrough.md) follows
-one real check through every recursive branch.
+Next: [Designing a ReBAC authorization service](07-rebac-authorization-service-design.md)
+turns this model into a production design and compares adopting OpenFGA with
+building the engine yourself.

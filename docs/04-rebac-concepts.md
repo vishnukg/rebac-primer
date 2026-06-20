@@ -61,6 +61,11 @@ Examples:
 (document:roadmapDocument, workspace, workspace:productWorkspace)
 ```
 
+A tuple is a stored fact, not the complete effective policy. The model can
+derive implied relationships from several tuples. Alice has an implied
+`can_edit` relationship to the roadmap document even though no `can_edit` tuple
+is stored.
+
 ## Subject Sets
 
 `team:platformTeam#member` means:
@@ -77,7 +82,7 @@ One tuple can grant access to a whole team:
 
 ## Checks
 
-A check asks whether a path exists through the graph:
+A check asks whether a subject belongs to the effective set for a permission:
 
 ```go
 rebac.CheckRequest{
@@ -87,7 +92,13 @@ rebac.CheckRequest{
 }
 ```
 
-The evaluator tries to prove that request by following tuples and model rules.
+The evaluator tries to prove that request by following only the tuples and
+model rules admitted by `can_edit`. An arbitrary graph connection is not
+enough.
+
+In OpenFGA API terminology, the subject field is named `user`, but it can
+represent a human, workload, another object, userset, or typed wildcard when the
+model permits it.
 
 ## The Demo Story
 

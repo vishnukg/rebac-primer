@@ -68,6 +68,36 @@ The method supports consumers such as the authz HTTP example. Production
 applications should prefer purpose-built OpenFGA query APIs for authorization
 questions and avoid treating tuple reads as a general listing/search API.
 
+`Read` returns stored tuples. It does not enumerate implied access produced by
+the authorization model. OpenFGA separates effective-access queries:
+
+```text
+Check        one subject, relation, and object
+ListObjects  objects of a type related to one subject
+ListUsers    subjects of a selected type related to one object
+Expand       userset expression tree for one relation and object
+```
+
+This adapter intentionally exposes only Check and tuple administration. Adding
+listing requires product-specific pagination, result limits, latency budgets,
+and search integration.
+
+## OpenFGA Features Outside This Adapter
+
+OpenFGA also supports:
+
+- BatchCheck
+- contextual tuples
+- conditional relationships
+- query consistency preferences
+- intersections and exclusions in the model
+- ListObjects, ListUsers, and Expand
+
+The consumer-owned interface does not expose them because the current document
+use cases do not require them. When evaluating OpenFGA for work, test the
+features your real workflows need instead of judging it only through this
+narrow adapter.
+
 ## Run
 
 ```bash

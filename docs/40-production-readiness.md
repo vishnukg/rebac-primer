@@ -24,9 +24,11 @@ For production:
 3. deploy model changes through a controlled pipeline
 4. write relationship tuples from domain events
 5. test models and expected allow/deny behavior before deployment
-6. choose and document the required consistency behavior per operation
-7. authenticate and authorize access to OpenFGA itself
-8. page tuple reads; do not treat `Read` as a bulk export API
+6. pin the intended immutable authorization model ID on queries and writes
+7. choose and document the required consistency behavior per operation
+8. authenticate and authorize access to OpenFGA itself
+9. page tuple reads; do not treat `Read` as effective-access enumeration
+10. bound and monitor Check, ListObjects, and ListUsers resolution
 
 The Compose file pins OpenFGA for reproducible learning. Upgrade deliberately,
 read migration notes, and avoid `latest` in deployed environments.
@@ -42,6 +44,9 @@ which document IDs exist.
 
 Relationship tuples are sensitive data because they reveal organization
 structure. Treat tuple reads and logs accordingly.
+
+Use opaque identifiers in tuples. Do not store email addresses, names, or other
+personal and regulated data in relationship keys.
 
 Document creation spans a document store and an authorization store. The primer
 uses compensating cleanup. Production systems normally use an outbox/domain
@@ -71,9 +76,18 @@ go test -race ./...
 
 Also run `govulncheck ./...` in CI using the official Go vulnerability tool.
 
+Test the OpenFGA model itself:
+
+```bash
+make openfga/model-test
+```
+
 ## Current References
 
 - [OAuth 2.0 Security Best Current Practice (RFC 9700)](https://www.rfc-editor.org/rfc/rfc9700)
 - [OpenFGA: testing authorization models](https://openfga.dev/docs/modeling/testing)
+- [OpenFGA: relationship query APIs](https://openfga.dev/docs/interacting/relationship-queries)
+- [OpenFGA: query consistency](https://openfga.dev/docs/interacting/consistency)
 - [OpenFGA: running in production](https://openfga.dev/docs/best-practices/running-in-production)
+- [Zanzibar paper](https://www.usenix.org/conference/atc19/presentation/pang)
 - [Go vulnerability management](https://go.dev/doc/security/vuln/)

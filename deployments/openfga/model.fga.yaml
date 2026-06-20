@@ -1,0 +1,64 @@
+name: ReBAC Primer Model Contract
+model_file: ./model.fga
+
+tuples:
+  - user: user:alice
+    relation: member
+    object: team:platformTeam
+  - user: team:platformTeam#member
+    relation: editor
+    object: workspace:productWorkspace
+  - user: user:bob
+    relation: viewer
+    object: workspace:productWorkspace
+  - user: workspace:productWorkspace
+    relation: workspace
+    object: document:roadmapDocument
+  - user: user:alice
+    relation: owner
+    object: document:roadmapDocument
+
+tests:
+  - name: document permission matrix
+    check:
+      - user: user:alice
+        object: document:roadmapDocument
+        assertions:
+          can_read: true
+          can_comment: true
+          can_edit: true
+          can_delete: true
+      - user: user:bob
+        object: document:roadmapDocument
+        assertions:
+          can_read: true
+          can_comment: true
+          can_edit: false
+          can_delete: false
+      - user: user:casey
+        object: document:roadmapDocument
+        assertions:
+          can_read: false
+          can_comment: false
+          can_edit: false
+          can_delete: false
+
+  - name: team and workspace inheritance
+    check:
+      - user: user:alice
+        object: team:platformTeam
+        assertions:
+          member: true
+          admin: false
+      - user: user:alice
+        object: workspace:productWorkspace
+        assertions:
+          owner: false
+          editor: true
+          viewer: true
+      - user: user:bob
+        object: workspace:productWorkspace
+        assertions:
+          owner: false
+          editor: false
+          viewer: true
