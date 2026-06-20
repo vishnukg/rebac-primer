@@ -29,13 +29,24 @@ You do not need the same route as every other reader.
 
 ### Go route: understand the implementation
 
-Read the fast route, then:
+If Go is new to you, start with the self-contained language foundation:
 
-1. [Go language guide](docs/20-go-language-guide.md)
+1. [Toolchain and core syntax](docs/10-go-toolchain-and-syntax.md)
+2. [Values, pointers, collections, and methods](docs/11-go-values-pointers-and-methods.md)
+3. [Errors, interfaces, packages, and testing](docs/12-go-errors-interfaces-and-testing.md)
+4. [HTTP, JSON, context, and application lifecycle](docs/13-go-http-json-and-context.md)
+
+Then read the fast ReBAC route and continue with:
+
+1. [Go language guide for this repository](docs/20-go-language-guide.md)
 2. [Architecture](docs/06-architecture.md)
 3. [Go ReBAC implementation](docs/21-go-rebac-implementation.md)
 4. [Go authz call flow](docs/28-go-authz-call-flow.md)
 5. [Go testing](docs/25-go-testing.md)
+6. [Guided feature lab](docs/29-go-guided-feature-lab.md)
+
+If you already write Go, skip chapters 10–13 and begin at the repository
+language guide.
 
 ### Production route: understand the boundaries
 

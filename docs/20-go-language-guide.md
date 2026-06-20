@@ -1,7 +1,17 @@
 # Go Language Guide for This Repository
 
-This chapter is the shortest path from basic Go syntax to reading the ReBAC
-implementation. It deliberately teaches only concepts used by this repository.
+This chapter is the shortest path from Go fundamentals to reading the ReBAC
+implementation. It deliberately focuses on concepts used by this repository.
+
+If Go is new to you, first complete:
+
+1. [Toolchain and core syntax](10-go-toolchain-and-syntax.md)
+2. [Values, pointers, collections, and methods](11-go-values-pointers-and-methods.md)
+3. [Errors, interfaces, packages, and testing](12-go-errors-interfaces-and-testing.md)
+4. [HTTP, JSON, context, and application lifecycle](13-go-http-json-and-context.md)
+
+Those chapters make this course self-contained. This guide then maps the
+language concepts onto the repository's concrete packages.
 
 ## Start With the Package Shape
 
@@ -144,6 +154,8 @@ check. Optimize only after measuring with a benchmark or profile.
 8. `cmd/server/main.go` — dependency wiring and graceful shutdown
 
 ## Official Go References
+
+These are optional references, not course prerequisites:
 
 - [A Tour of Go](https://go.dev/tour/)
 - [Go User Manual](https://go.dev/doc/)

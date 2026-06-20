@@ -1,8 +1,20 @@
 # Course Map
 
-This is a Go-first ReBAC course. The goal is to understand relationship-based
-authorization, read the implementation, run it, and know how the OpenFGA backend
-fits.
+This is a self-contained Go-first ReBAC course. The goal is to learn enough Go
+to change a real service, understand relationship-based authorization, read and
+run the implementation, and know how the OpenFGA backend fits.
+
+## Go Foundations
+
+If you are new to Go, read these first. Experienced Go programmers can start at
+the core ReBAC path.
+
+| Doc | Topic | Practice |
+|---|---|---|
+| 10 | Toolchain, modules, packages, syntax, control flow, structs, `defer` | inspect and run `internal/rebac` |
+| 11 | Values, pointers, methods, slices, maps, strings, nil | inspect document copying and token slices |
+| 12 | Errors, interfaces, package design, table tests, test doubles | extend a parser or validation test |
+| 13 | `net/http`, JSON, context, mutexes, lifecycle, `httptest` | trace and run the HTTP service |
 
 ## Core ReBAC Path
 
@@ -27,6 +39,7 @@ decision?
 | 06 | Architecture: ports and adapters | `internal/authz/authz.go`, `internal/documents/documents.go` |
 | 21 | Go ReBAC implementation walkthrough | `internal/authz/evaluator.go`, `internal/documents/service.go` |
 | 28 | Request call flow | `cmd/server/main.go`, `internal/api/handler.go` |
+| 29 | Guided end-to-end feature lab | add document deletion through service, HTTP, authz, and tests |
 
 ## Authentication and Production Path
 
@@ -60,9 +73,15 @@ teaching modules that use the same domain types:
 
 ## Suggested Pace
 
-1. Read docs 02-05.
-2. Run `make test`.
-3. Read `internal/authz/evaluator.go` with doc 27 open beside it.
-4. Run `go test -v -run TestTrace ./internal/authz`.
-5. Follow the Go path if you want to understand the implementation.
-6. Read docs 01, 26, 34, and 40 when you want the production boundaries.
+For programmers new to Go:
+
+1. Complete docs 10–13 and their experiments.
+2. Read docs 02–05.
+3. Run `make test`.
+4. Read `internal/authz/evaluator.go` with doc 27 open beside it.
+5. Run `go test -v -run TestTrace ./internal/authz`.
+6. Complete docs 20–25 and 28.
+7. Complete the guided feature lab in doc 29.
+8. Read docs 01, 26, 34, and 40 for production boundaries.
+
+For programmers who already use Go, begin at step 2.

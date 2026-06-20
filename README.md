@@ -1,7 +1,9 @@
 # ReBAC Primer: Go
 
-This repository teaches relationship-based access control (ReBAC) with a Go
-implementation and an optional OpenFGA backend.
+This repository is a self-contained practical Go course built around a
+relationship-based access control (ReBAC) service, with an optional OpenFGA
+backend. Programmers who are new to Go can begin with the language foundation;
+experienced Go programmers can skip directly to the ReBAC implementation.
 
 The project domain is a collaborative document workspace. Workspaces contain
 documents, teams get workspace access, and users inherit permissions through a
@@ -28,6 +30,13 @@ docs/                      Tutorial chapters
 Read [START-HERE.md](START-HERE.md), then follow
 [docs/00-course-map.md](docs/00-course-map.md).
 
+New to Go:
+
+1. [Toolchain and core syntax](docs/10-go-toolchain-and-syntax.md)
+2. [Values, pointers, collections, and methods](docs/11-go-values-pointers-and-methods.md)
+3. [Errors, interfaces, packages, and testing](docs/12-go-errors-interfaces-and-testing.md)
+4. [HTTP, JSON, context, and application lifecycle](docs/13-go-http-json-and-context.md)
+
 Minimal ReBAC path:
 
 1. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
@@ -37,6 +46,9 @@ Minimal ReBAC path:
 5. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
 
 Then choose the Go implementation or production path from the course map.
+Finish the Go path with the
+[guided feature lab](docs/29-go-guided-feature-lab.md), which adds an operation
+through the domain, HTTP, authorization, and testing layers.
 
 ## Commands
 
