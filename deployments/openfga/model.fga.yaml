@@ -2,6 +2,11 @@ name: ReBAC Primer Model Contract
 model_file: ./model.fga
 
 tuples:
+  # ── The demo story — identical to internal/fixtures/fixtures.go ──────────────
+  # Alice reaches the document only as an inherited editor (team member → workspace
+  # editor → document editor), never as an owner. Bob is a workspace viewer. Casey
+  # has no path. Keep these four in lockstep with the Go fixtures so both backends
+  # teach the same story.
   - user: user:alice
     relation: member
     object: team:platformTeam
@@ -14,14 +19,30 @@ tuples:
   - user: workspace:productWorkspace
     relation: workspace
     object: document:roadmapDocument
-  - user: user:alice
+  # ── Contract-only coverage ──────────────────────────────────────────────────
+  # The demo story has no document owner, so on its own it never exercises the
+  # `define can_delete: owner` path. Dana is a direct owner that exists ONLY in
+  # this model test (not in fixtures.go) purely to validate the owner → can_delete
+  # rule. Keeping it off Alice is deliberate: it leaves the demo cast consistent
+  # across both backends.
+  - user: user:dana
     relation: owner
     object: document:roadmapDocument
 
 tests:
   - name: document permission matrix
     check:
+      # Alice is an inherited editor, not an owner — so she cannot delete.
+      # This now matches what the Go evaluator returns for the same fixtures.
       - user: user:alice
+        object: document:roadmapDocument
+        assertions:
+          can_read: true
+          can_comment: true
+          can_edit: true
+          can_delete: false
+      # Dana is a direct owner (contract-only) — exercises the owner → can_delete path.
+      - user: user:dana
         object: document:roadmapDocument
         assertions:
           can_read: true

@@ -55,6 +55,70 @@ team:platformTeam#member
                   └─workspace of─► document:roadmapDocument
 ```
 
+### The one edge that trips everyone: `workspace`
+
+Three of the four edges point the way your gut expects — the subject is the arrow's source:
+
+```
+user:alice ─[member]─► team:platformTeam          "alice → the team she's in"
+user:bob   ─[viewer]─► workspace:productWorkspace  "bob → the workspace he sees"
+```
+
+The fourth edge feels backwards:
+
+```
+workspace:productWorkspace ─[workspace]─► document:roadmapDocument
+```
+
+Your gut says *"the document belongs to the workspace, so surely it's document →
+workspace."* That gut is reading the arrow as **containment** ("is inside").
+**The arrows are not containment.** Every arrow in these notes is the same one
+thing: the **subject → object** of a single tuple. Nothing more.
+
+So stop picturing a box-inside-a-box and just decode the tuple
+(`internal/fixtures/fixtures.go`):
+
+```
+object   = document:roadmapDocument      ← the `workspace` relation is defined ON the document type
+relation = workspace
+subject  = workspace:productWorkspace     ← the value that pointer holds
+```
+
+Read it **object-first** (the Go struct / Zanzibar order) and it says exactly
+what your intuition wanted all along:
+
+```
+document:roadmapDocument's  workspace  is  workspace:productWorkspace
+```
+
+"The roadmap document's workspace is the product workspace." The document *does*
+belong to the workspace — that fact is just stored with the **document as the
+object** and the **workspace as the subject**.
+
+**Why the workspace has to be the subject, not the object.** Look at the rule
+that actually uses this edge (from `model.fga`):
+
+```
+define editor: [user] or editor from workspace or owner
+```
+
+`editor from workspace` means: *start at the document, follow its `workspace`
+edge to whatever it points at, then check `editor` over there.* The thing you
+follow **to** — the parent you inherit from — is the **subject** of the tuple.
+That subject slot is the only field `from` can land on. Put the workspace in the
+object slot instead and inheritance has nothing to follow to; the traversal
+breaks.
+
+So the direction isn't a style choice — **it's forced by inheritance.**
+Permission flows parent → child, and for that to work the parent (workspace) must
+sit in the subject position of the document's `workspace` tuple.
+
+One line to memorize:
+
+> The arrows are tuple **subject → object**, never "contains." The
+> `member`/`viewer` edges happen to match a containment reading; the `workspace`
+> edge doesn't — and that mismatch is the entire reason it feels tricky.
+
 ### 4. A path is a chain of edges; reachability is "does a path exist?"
 
 A **path** is hops you can follow end to end:
@@ -202,7 +266,10 @@ type document
 Three new things here:
 
 - `define workspace: [workspace]` — a document points at its parent workspace.
-  This is the structural edge that enables inheritance.
+  This is the structural edge that enables inheritance. Note the direction the
+  tuple is stored: the **document is the object**, the **workspace is the
+  subject** — see *"The one edge that trips everyone"* in Part 1 if that ordering
+  surprises you.
 - **`X from Y`** (the key construct, "tuple-to-userset") —
   `editor from workspace` means: *follow this document's `workspace` edge to the
   workspace object, then check `editor` there.* This is how permission flows from
