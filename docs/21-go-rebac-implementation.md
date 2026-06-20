@@ -34,7 +34,29 @@ type TupleKey struct {
 }
 ```
 
-Read a tuple as: object has relation to user.
+The fields read as: object has relation to subject.
+
+At the OpenFGA boundary, the same relationship is conventionally presented as:
+
+```text
+subject  relation  object
+```
+
+For example, the internal value:
+
+```go
+rebac.TupleKey{
+    Object:   rebac.Team("platformTeam"),
+    Relation: rebac.RelationTeamMember,
+    User:     rebac.Subject(rebac.User("alice")),
+}
+```
+
+maps to the OpenFGA tuple:
+
+```text
+user:alice  member  team:platformTeam
+```
 
 ## Authz Service
 

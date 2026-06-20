@@ -50,16 +50,58 @@ can_edit
 A tuple is one relationship fact:
 
 ```text
-(object, relation, user)
+subject + relation + object
 ```
 
-Examples:
+OpenFGA API/CLI examples:
 
 ```text
-(team:platformTeam, member, user:alice)
-(workspace:productWorkspace, editor, team:platformTeam#member)
-(document:roadmapDocument, workspace, workspace:productWorkspace)
+user:alice                  member     team:platformTeam
+team:platformTeam#member    editor     workspace:productWorkspace
+workspace:productWorkspace  workspace  document:roadmapDocument
 ```
+
+Read them as:
+
+```text
+Alice is a member of Platform Team.
+Platform Team members are editors of Product Workspace.
+Product Workspace is the workspace of Roadmap Document.
+```
+
+This repository's Go type deliberately lists the same three values in a
+different field order:
+
+```go
+type TupleKey struct {
+    Object   Object
+    Relation Relation
+    User     Subject
+}
+```
+
+Therefore the second OpenFGA tuple becomes:
+
+```go
+rebac.TupleKey{
+    Object:   rebac.Workspace("productWorkspace"),
+    Relation: rebac.RelationWorkspaceEditor,
+    User:     rebac.SubjectSet(
+        rebac.Team("platformTeam"),
+        rebac.RelationTeamMember,
+    ),
+}
+```
+
+Remember:
+
+```text
+OpenFGA representation: subject, relation, object
+Go TupleKey fields:      Object, Relation, User
+```
+
+They encode the same relationship. Always read the field names rather than
+inferring meaning from position.
 
 A tuple is a stored fact, not the complete effective policy. The model can
 derive implied relationships from several tuples. Alice has an implied
@@ -77,7 +119,7 @@ everyone who has member on team:platformTeam
 One tuple can grant access to a whole team:
 
 ```text
-(workspace:productWorkspace, editor, team:platformTeam#member)
+team:platformTeam#member  editor  workspace:productWorkspace
 ```
 
 ## Checks

@@ -24,57 +24,60 @@ That is the whole definition.  In our system:
 A tuple like:
 
 ```
-(team:platformTeam, member, user:alice)
+user:alice  member  team:platformTeam
 ```
 
-is a directed edge that reads: "there is a `member` edge pointing from
-`team:platformTeam` to `user:alice`."
+reads: "`user:alice` is a `member` of `team:platformTeam`."
 
-The arrow has a direction — it points *from* the object (`team:platformTeam`)
-*to* the subject (`user:alice`).  The relation (`member`) is the label on the
-edge.
+Learner-facing diagrams use OpenFGA's `(subject, relation, object)` convention:
+
+```text
+user:alice --member of--> team:platformTeam
+```
+
+The evaluator implementation searches from the requested object toward matching
+subjects. That reverse lookup direction is an algorithm detail, not a second
+tuple convention.
 
 ---
 
 ## The four fixture tuples as a graph
 
-The project seeds four tuples. The table stores them in this repository's
-`(object, relation, subject)` order, then paraphrases them in product language:
+The project seeds four tuples. Written in OpenFGA's
+`(subject, relation, object)` order:
 
 ```
-Stored tuple                                             Human-readable relationship
-───────────────────────────────────────────────────────────────────────────────
-(team:platformTeam,       member,    user:alice)         Alice is a team member
-(workspace:productWS,     editor,    team:platTeam#mbr)  team members edit the workspace
-(workspace:productWS,     viewer,    user:bob)           Bob views the workspace
-(document:roadmapDoc,     workspace, workspace:productWS)  document belongs to workspace
+Subject                       Relation   Object
+─────────────────────────────────────────────────────────────────────
+user:alice                    member     team:platformTeam
+team:platformTeam#member      editor     workspace:productWorkspace
+user:bob                      viewer     workspace:productWorkspace
+workspace:productWorkspace    workspace  document:roadmapDocument
 ```
 
 Drawn as one picture:
 
-The evaluator starts at the requested object and follows stored
-object-to-subject edges until it can prove the user is in the resulting set.
-
 ```text
-document:roadmapDocument
-  └─[workspace]─► workspace:productWorkspace
-                    ├─[editor]─► team:platformTeam#member
-                    │              └─[member]─► user:alice
-                    └─[viewer]─► user:bob
+user:alice ──member of──► team:platformTeam
+
+team:platformTeam#member
+  └─editor of─► workspace:productWorkspace ◄─viewer of── user:bob
+                  │
+                  └─workspace of─► document:roadmapDocument
 ```
 
-The second edge is special.  Instead of pointing to a single user, it points to
-`team:platformTeam#member` — a **subject set**.  That means "everyone who has
-the `member` relation on `team:platformTeam`".  Right now, that is just alice.
-If you added carol to the team, she would automatically get workspace editor
-access without any new workspace tuple.
+The second tuple is special. Its subject is
+`team:platformTeam#member`—a **subject set**—instead of one concrete user. It
+means "everyone who has the `member` relation on `team:platformTeam`". Right
+now, that is just Alice. If you added Carol to the team, she would automatically
+get workspace editor access without any new workspace tuple.
 
 ---
 
 ## What a permission check is asking
 
-A check question is: **"starting at `<object>`, can I reach `<user>` by
-following edges that satisfy `<relation>`?"**
+A check question is: **"does `<user>` belong to the effective userset
+`<object>#<relation>`?"**
 
 Concretely:
 
@@ -82,19 +85,22 @@ Concretely:
 Does user:alice have can_edit on document:roadmapDocument?
 ```
 
-Means: is there a path from `document:roadmapDocument` through the graph that
-eventually touches `user:alice`, via relations that together satisfy `can_edit`?
+It means: do the stored relationships and model rules place `user:alice` in
+`document:roadmapDocument#can_edit`?
 
 The answer is yes.  The path is:
 
 ```
-document:roadmapDocument
-  ──[workspace]──► workspace:productWorkspace
-  ──[editor via team:platformTeam#member]──► team:platformTeam
-  ──[member]──► user:alice
+user:alice
+  ──[member of]──► team:platformTeam
+
+team:platformTeam#member
+  ──[editor of]──► workspace:productWorkspace
+  ──[workspace of]──► document:roadmapDocument
 ```
 
-The evaluator finds this path by traversing the graph.
+The evaluator proves this relationship chain by searching in reverse from the
+requested document relation toward candidate subjects.
 
 More precisely, it evaluates whether Alice belongs to
 `document:roadmapDocument#can_edit`. It does not perform unrestricted graph
@@ -116,6 +122,9 @@ For each `(object, relation)` pair it visits, it tries four things:
 | 3 | Rule expansion | Does the permission model say this relation is implied by a stronger one? Recurse. |
 | 4 | Workspace inherit | (documents only) Follow the `workspace` pointer to the parent and check there. |
 
+The table above describes the internal lookup algorithm. Stored relationships
+remain externally represented as `(subject, relation, object)`.
+
 If any step returns `true`, the whole branch is `true`.  If all four are
 exhausted, backtrack and try a different branch.  If every branch is exhausted,
 the check is denied.
@@ -132,7 +141,8 @@ Let's trace every step the evaluator takes.
 hasRelation(alice, document:roadmapDocument, can_edit)
 ```
 
-**Step 1 — direct lookup:** Is there a tuple `(document:roadmapDocument, can_edit, user:alice)` in the store?
+**Step 1 — direct lookup:** Does the internal store contain
+`TupleKey{Object: document:roadmapDocument, Relation: can_edit, User: user:alice}`?
 No.  The four fixture tuples don't include that.
 
 **Step 3 — rule expansion:** Consult `documentRules`:
@@ -177,8 +187,8 @@ nothing to expand.
 inheritable base relations (`owner`, `editor`, `viewer`).  Follow the
 `workspace` tuple on `document:roadmapDocument`:
 
-```
-(document:roadmapDocument, workspace, workspace:productWorkspace)
+```text
+workspace:productWorkspace  workspace  document:roadmapDocument
 ```
 
 Now check: does alice have `owner` on `workspace:productWorkspace`?
@@ -209,8 +219,8 @@ No direct alice tuple.
 
 **Step 2 — subject-set:** Scan all tuples for `(workspace:productWorkspace, editor, *)`:
 
-```
-(workspace:productWorkspace, editor, team:platformTeam#member)
+```text
+team:platformTeam#member  editor  workspace:productWorkspace
 ```
 
 Found one.  The subject is `team:platformTeam#member` — that is a subject set
@@ -222,10 +232,10 @@ subjectSetContains(alice, team:platformTeam#member)
   → hasRelation(alice, team:platformTeam, member)
 ```
 
-**Step 1 — direct:** Is there a tuple `(team:platformTeam, member, user:alice)`?
+**Step 1 — direct:** Is this OpenFGA tuple present?
 
-```
-YES — (team:platformTeam, member, user:alice)  ✓
+```text
+YES — user:alice  member  team:platformTeam  ✓
 ```
 
 Return `true` all the way back up the call stack.
@@ -234,8 +244,8 @@ Return `true` all the way back up the call stack.
 
 ### How the result propagates back
 
-```
-(team:platformTeam, member, user:alice)            → true ✓
+```text
+user:alice member team:platformTeam                → true ✓
   subjectSetContains → true ✓
     hasTuple on workspace:productWorkspace/editor  → true ✓
       hasRelation on workspace:productWorkspace/editor → true ✓
@@ -251,7 +261,8 @@ Return `true` all the way back up the call stack.
 
 ## The trace output
 
-The evaluator records every step it takes in a `Trace` slice.  For the alice /
+The evaluator records every step it takes in a `Trace` slice. Its trace prints
+the repository's internal `(object, relation, user)` field order. For the Alice /
 `can_edit` / `roadmapDocument` check, the trace looks like this:
 
 ```
@@ -317,11 +328,11 @@ The last trace line is: `Result: denied`.
 
 ## Subject sets explained
 
-A **subject set** is a tuple whose "user" field is `object#relation` instead of
+A **subject set** is a tuple whose subject is `object#relation` instead of
 `user:someone`.  Example:
 
-```
-(workspace:productWorkspace, editor, team:platformTeam#member)
+```text
+team:platformTeam#member  editor  workspace:productWorkspace
 ```
 
 It means: "the `editor` relation on `productWorkspace` is held by *all members*

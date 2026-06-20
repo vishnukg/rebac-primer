@@ -64,9 +64,13 @@ const (
 // ("team:platform#member"). IsSubjectSet distinguishes them.
 type Subject string
 
-// TupleKey is one edge in the relationship graph:
+// TupleKey stores one relationship tuple using this package's internal field
+// order:
 //
 //	(object, relation, user)  →  "team:platform has member user:alice"
+//
+// OpenFGA APIs conventionally present the same relationship as
+// (user, relation, object). The field order differs; the relationship does not.
 //
 // The JSON tags are the wire format used by the HTTP layer.
 type TupleKey struct {

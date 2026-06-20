@@ -6,35 +6,31 @@
 // A graph is a set of nodes connected by edges.  In this system:
 //
 //   - Nodes  = entities  (a user, a team, a workspace, a document)
-//   - Edges  = relationship tuples  (object, relation, user)
+//   - Edges  = relationship tuples
 //
-// For example, the tuple (team:platformTeam, member, user:alice) is a directed
-// edge: "there is a 'member' edge from team:platformTeam to user:alice."
+// OpenFGA presents a tuple as (subject, relation, object). For example:
 //
-// The four fixture tuples create this graph in stored tuple direction:
+//	(user:alice, member, team:platformTeam)
 //
-//	document:roadmapDocument
-//	  └─[workspace]─► workspace:productWorkspace
-//	                    ├─[editor]─► team:platformTeam#member
-//	                    │              └─[member]─► user:alice
-//	                    └─[viewer]─► user:bob
+// reads "user:alice is a member of team:platformTeam". This package stores the
+// same values in TupleKey fields ordered as Object, Relation, User.
 //
 // # What a permission check is
 //
-// A check answers: "starting at <object>, can I find a path through the tuple
-// graph that eventually reaches <user> by following relations that imply
-// <relation>?"
+// A check answers: "does <user> belong to the effective userset for
+// <object>#<relation>?"
 //
 // For example, "does user:alice have can_edit on document:roadmapDocument?"
-// becomes: "is there a path from document:roadmapDocument to user:alice through
-// edges that satisfy the can_edit permission?"
+// asks whether user:alice belongs to document:roadmapDocument#can_edit.
 //
-// The answer, for the fixture tuples, is yes — through this chain:
+// The learner-facing relationship chain is:
 //
-//	document:roadmapDocument
-//	  --[workspace]--> workspace:productWorkspace
-//	  --[editor via team:platformTeam#member]--> team:platformTeam
-//	  --[member]--> user:alice
+//	user:alice --member of--> team:platformTeam
+//	team:platformTeam#member --editor of--> workspace:productWorkspace
+//	workspace:productWorkspace --workspace of--> document:roadmapDocument
+//
+// The implementation resolves that chain in reverse, beginning with the
+// requested object and relation and searching for the subject.
 //
 // # The traversal algorithm (depth-first search)
 //

@@ -22,13 +22,13 @@ user:alice  ──────►  team:platformTeam
 
 ### 2. Edges have a direction and a label
 
-- **Directed**: the arrow points one way. This repository draws the stored tuple
-  direction, from object to subject.
+- **Directed**: the arrow points one way. These notes use OpenFGA's
+  subject-to-object tuple direction.
 - **Label** = the *kind* of connection. In ReBAC the label is the **relation**: `member`, `editor`, `viewer`, `workspace`.
 
 ```
-team:platformTeam ──member──► user:alice
-workspace:productWorkspace ──viewer──► user:bob
+user:alice ──member of──► team:platformTeam
+user:bob ──viewer of──► workspace:productWorkspace
 ```
 
 A stored fact (a **tuple**) is exactly one labeled edge.
@@ -38,20 +38,21 @@ A stored fact (a **tuple**) is exactly one labeled edge.
 These are the four fixture tuples (`internal/fixtures/fixtures.go`):
 
 ```
-team:platformTeam ─[member]─► user:alice
-workspace:productWorkspace ─[editor]─► team:platformTeam#member
-workspace:productWorkspace ─[viewer]─► user:bob
-document:roadmapDocument ─[workspace]─► workspace:productWorkspace
+user:alice ─[member]─► team:platformTeam
+team:platformTeam#member ─[editor]─► workspace:productWorkspace
+user:bob ─[viewer]─► workspace:productWorkspace
+workspace:productWorkspace ─[workspace]─► document:roadmapDocument
 ```
 
 Drawn together:
 
 ```
-document:roadmapDocument
-  └─workspace─► workspace:productWorkspace
-                  ├─editor─► team:platformTeam#member
-                  │             └─member─► user:alice
-                  └─viewer─► user:bob
+user:alice ──member of──► team:platformTeam
+
+team:platformTeam#member
+  └─editor of─► workspace:productWorkspace ◄─viewer of── user:bob
+                  │
+                  └─workspace of─► document:roadmapDocument
 ```
 
 ### 4. A path is a chain of edges; reachability is "does a path exist?"
@@ -59,16 +60,17 @@ document:roadmapDocument
 A **path** is hops you can follow end to end:
 
 ```
-document ─workspace─► workspace ─editor─► team#member ─member─► alice
+alice ─member of─► team
+team#member ─editor of─► workspace ─workspace of─► document
 ```
 
 **Reachability** is the core question behind a ReBAC permission check:
 
-> Starting from the document and requested relation, following allowed edges,
-> can I reach the user?
+> Does the user belong to the requested relation on the document through an
+> allowed relationship chain?
 
-`Can alice edit the roadmap?` = `Is there a path from document:roadmapDocument
-(via edges that count as "can_edit") to user:alice?` Yes → allowed. No → denied.
+`Can alice edit the roadmap?` = `Does user:alice belong to
+document:roadmapDocument#can_edit?` Yes → allowed. No → denied.
 **That is the entire mental model.**
 
 ### 5. Traversal = walking the graph to find a path (DFS)
@@ -135,12 +137,13 @@ OpenFGA commonly displays tuple keys as `(user, relation, object)`:
 ```
 user:alice              member   team:platformTeam
 team:platformTeam#member editor   workspace:productWorkspace
-document:roadmapDocument workspace workspace:productWorkspace
+workspace:productWorkspace workspace document:roadmapDocument
 ```
 
 This repository's Go `TupleKey` struct orders the fields as
 `(object, relation, user)`. The values mean the same thing; only the display
-order differs. Always read the field names rather than relying on position.
+order differs. This is an internal struct layout, not another tuple convention.
+Always read the field names rather than relying on position.
 
 The `team:platformTeam#member` form is a **subject set**: "everyone who has
 `member` on `team:platformTeam`," not one person. One tuple grants a whole group —

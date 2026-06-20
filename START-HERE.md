@@ -12,15 +12,24 @@ That sentence is the entire system. ReBAC makes the computer prove it by walking
 a graph of relationships.
 
 ```text
-document:roadmapDocument
-  --workspace--> workspace:productWorkspace
-  --editor--> team:platformTeam#member
-  --member--> user:alice
+user:alice
+  --member of--> team:platformTeam
+
+team:platformTeam#member
+  --editor of--> workspace:productWorkspace
+
+workspace:productWorkspace
+  --workspace of--> document:roadmapDocument
 ```
 
-The arrows above use the repository's canonical tuple direction:
-`object --relation--> subject`. Product prose often reads the same relationship
-in reverse: "Alice is a member of the platform team."
+The arrows use the OpenFGA tuple convention:
+
+```text
+subject --relation--> object
+```
+
+The Go `TupleKey` struct lists its fields as `Object`, `Relation`, `User`, but
+that is an internal field order—not a different relationship.
 
 ## Before You Begin
 
@@ -112,7 +121,7 @@ make test-permission
 successful path is:
 
 ```text
-document -> workspace -> team#member -> user:alice
+user:alice -> team membership -> workspace editor -> document
 ```
 
 ## How To Study

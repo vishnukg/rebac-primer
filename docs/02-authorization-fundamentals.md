@@ -294,12 +294,13 @@ inside policy expressions.
 ReBAC decides from relationships.
 
 ```text
-team:platformTeam member user:alice
-workspace:productWorkspace editor team:platformTeam#member
-document:roadmapDocument workspace workspace:productWorkspace
+user:alice                  member     team:platformTeam
+team:platformTeam#member    editor     workspace:productWorkspace
+workspace:productWorkspace  workspace  document:roadmapDocument
 ```
 
-Each line is one tuple, written as `object relation user`. The middle line uses
+Each line is one tuple in OpenFGA's `subject relation object` order. The middle
+line uses
 the subject set `team:platformTeam#member` so editor access flows from team
 membership rather than being attached to the team object itself. Subject sets
 are introduced in detail in `04-rebac-concepts.md`; for now read the line as
@@ -308,14 +309,17 @@ are introduced in detail in `04-rebac-concepts.md`; for now read the line as
 Diagram:
 
 ```text
-document:roadmapDocument
-  --workspace--> workspace:productWorkspace
-  --editor--> team:platformTeam#member
-  --member--> user:alice
+user:alice
+  --member of--> team:platformTeam
+
+team:platformTeam#member
+  --editor of--> workspace:productWorkspace
+
+workspace:productWorkspace
+  --workspace of--> document:roadmapDocument
 ```
 
-This uses the tuple direction `object --relation--> subject`. In product prose,
-you can read the final edge in reverse as "Alice is a member of the team."
+This uses the OpenFGA tuple direction `subject --relation--> object`.
 
 ReBAC is strong when your product is naturally relational:
 
@@ -367,9 +371,9 @@ remember to update role when team changes
 ReBAC version:
 
 ```text
-team:platformTeam member user:alice
-workspace:productWorkspace editor team:platformTeam#member
-document:roadmapDocument workspace workspace:productWorkspace
+user:alice                  member     team:platformTeam
+team:platformTeam#member    editor     workspace:productWorkspace
+workspace:productWorkspace  workspace  document:roadmapDocument
 ```
 
 Now team membership is the source of truth.
@@ -394,7 +398,7 @@ Now team membership is the source of truth.
        │ relationship graph
        ▼
 ┌──────────────┐
-│ Tuple Store  │ facts: object relation user
+│ Tuple Store  │ facts: subject relation object
 └──────────────┘
 ```
 
@@ -534,10 +538,10 @@ Only if both are allowed:
 ReBAC can model these relationships too:
 
 ```text
-team:platformTeam member user:alice
-workspace:productWorkspace editor team:platformTeam#member
-document:roadmapDocument workspace workspace:productWorkspace
-tool:update_document can_use agent:docAssistant
+user:alice                  member     team:platformTeam
+team:platformTeam#member    editor     workspace:productWorkspace
+workspace:productWorkspace  workspace  document:roadmapDocument
+agent:docAssistant          can_use    tool:update_document
 ```
 
 The important production habit is the same as normal web apps:

@@ -110,9 +110,11 @@ Default mode uses `internal/authz/evaluator.go`.
 For Bob reading the roadmap document, the successful path is:
 
 ```text
-document:roadmapDocument
-  --workspace--> workspace:productWorkspace
-  --viewer--> user:bob
+user:bob
+  --viewer of--> workspace:productWorkspace
+
+workspace:productWorkspace
+  --workspace of--> document:roadmapDocument
 ```
 
 The document model says:

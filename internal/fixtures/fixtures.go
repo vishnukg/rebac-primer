@@ -2,10 +2,10 @@
 //
 // The tuples model this access scenario:
 //
-//	Alice → member of platformTeam
-//	platformTeam#member → editor of productWorkspace
-//	Bob → viewer of productWorkspace
-//	roadmapDocument → lives in productWorkspace
+//	user:alice → member of team:platformTeam
+//	team:platformTeam#member → editor of workspace:productWorkspace
+//	user:bob → viewer of workspace:productWorkspace
+//	workspace:productWorkspace → workspace of document:roadmapDocument
 //
 // From these four tuples, the graph evaluator can derive:
 //

@@ -121,16 +121,16 @@ in the OpenFGA tuple store.
 Bootstrap tuples:
 
 ```text
-(team:platformTeam, member, user:alice)
-(workspace:productWorkspace, editor, team:platformTeam#member)
-(workspace:productWorkspace, viewer, user:bob)
+user:alice                  member  team:platformTeam
+team:platformTeam#member    editor  workspace:productWorkspace
+user:bob                    viewer  workspace:productWorkspace
 ```
 
 Runtime document tuples:
 
 ```text
-(document:roadmapDocument, workspace, workspace:productWorkspace)
-(document:roadmapDocument, owner, user:alice)
+workspace:productWorkspace  workspace  document:roadmapDocument
+user:alice                  owner      document:roadmapDocument
 ```
 
 The local OpenFGA container uses an in-memory datastore, so restart means reseed.

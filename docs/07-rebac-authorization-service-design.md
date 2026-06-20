@@ -155,10 +155,14 @@ nesting.
 It is useful to draw ReBAC as a graph:
 
 ```text
-document:roadmap
-  └─workspace─► workspace:product
-                  └─editor─► team:platform#member
-                                  └─member─► user:alice
+user:alice
+  └─member of─► team:platform
+
+team:platform#member
+  └─editor of─► workspace:product
+
+workspace:product
+  └─workspace of─► document:roadmap
 ```
 
 But authorization is not arbitrary reachability. A random graph path must not
@@ -262,10 +266,15 @@ For example:
 user:alice  member  team:platform
 ```
 
-This repository stores the fields in `(object, relation, subject)` order.
-OpenFGA APIs usually display `(user, relation, object)`. Pick one canonical
-representation in your service API and documentation so teams do not transpose
-fields.
+For this course, the canonical external representation is OpenFGA's:
+
+```text
+subject + relation + object
+```
+
+This repository's Go `TupleKey` lists fields as `Object`, `Relation`, `User`.
+That internal struct layout does not reverse or change the relationship. Read
+field names and convert explicitly at adapter boundaries.
 
 ### Direct and implied relationships
 
@@ -693,7 +702,7 @@ Model clarity is a performance and security feature. Prefer a short,
 explainable path:
 
 ```text
-document → workspace → team membership → user
+user → team membership → workspace permission → document inheritance
 ```
 
 over a deeply indirect policy that no reviewer can reason about.
