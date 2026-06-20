@@ -1,9 +1,9 @@
 # OAuth and OIDC: who is this person?
 
 Before your app can ask "can Alice edit this document?" it must know the request
-actually came from Alice. That is the login problem. OAuth and OIDC are the
-modern standards for solving it — without your app ever handling Alice's password
-directly.
+actually came from Alice. That is the login problem. **OIDC** is the standard
+used for that login identity. It reuses **OAuth 2.0**, whose separate purpose is
+granting a client limited access to an API.
 
 ## How to read this chapter
 
@@ -18,19 +18,75 @@ Return later for client credentials, device authorization, token validation,
 token exchange, and service-to-service identity. Those sections are important,
 but they are not prerequisites for understanding the graph evaluator.
 
-## Two acronyms, one sentence each
+## OAuth 2.0 and OIDC solve different problems
 
-**OAuth 2.0** — a framework for delegated access: a user authorizes your app to
-call APIs on their behalf without giving your app their password.
+The shortest accurate distinction is:
 
-**OpenID Connect (OIDC)** — an identity layer built on top of OAuth: it adds a
-standard way for your app to learn *who* the user is, not just *that* they
-authenticated.
+```text
+OAuth 2.0  → authorize a client to access an API
+OIDC       → authenticate a user to a client
+ReBAC      → authorize that user on a specific application object
+```
 
-Many "log in with ..." integrations use both:
+### OAuth 2.0: delegated API access
 
-- OAuth provides delegated authorization and token delivery.
-- OIDC adds the interoperable authentication and identity layer.
+OAuth answers a question such as:
+
+```text
+May calendar-app call the calendar API with calendars.read authority?
+```
+
+Its primary result is an **access token** intended for a resource server—the
+API. The client presents that token to the API. OAuth standardizes how the
+client obtains delegated authority without receiving the user's password.
+
+OAuth does not, by itself, give the client a standard login result. An access
+token might be opaque, might represent a workload rather than a user, and is
+issued for an API rather than for the client to treat as proof of identity.
+
+### OIDC: user authentication
+
+OIDC answers a different question:
+
+```text
+Which user authenticated, which provider authenticated them, and was this
+authentication response issued for my client?
+```
+
+OIDC is a protocol built on OAuth 2.0. An authorization request becomes an OIDC
+request by including the `openid` scope. OIDC then adds:
+
+- an **ID token** intended for the client
+- standard identity claims such as `iss` and `sub`
+- authentication-specific validation rules, discovery metadata, and optional
+  user-information retrieval
+
+The ID token tells the client about the authentication event. It is not the
+credential used to call an API.
+
+### Side-by-side
+
+| Question | OAuth 2.0 | OIDC |
+|---|---|---|
+| Main purpose | Delegated API authorization | User authentication |
+| Main consumer | Resource server/API | Client application |
+| Main token | Access token | ID token |
+| Token audience | Protected API | OIDC client |
+| Standard identity result? | No | Yes: issuer plus subject and authentication claims |
+| Can run without a user? | Yes, for example client credentials | No user login means no OIDC authentication |
+
+Many “Sign in with …” integrations use both protocols in one authorization-code
+flow:
+
+```text
+OIDC ID token       → client establishes Alice's login
+OAuth access token  → client calls a protected API, if it needs to
+ReBAC check         → app decides whether Alice may edit this document
+```
+
+OAuth can be used without OIDC: for example, a background service obtaining an
+access token with Client Credentials. OIDC uses OAuth's endpoints and flow
+mechanics, but adds the missing authentication contract.
 
 ## Authentication vs. authorization
 
@@ -39,23 +95,26 @@ Authentication  →  Who are you?
 Authorization   →  What can you do?
 ```
 
-OIDC handles user authentication. OAuth access tokens authorize API access.
-Your ReBAC system handles application-specific, object-level authorization.
-They hand off to each other:
+OIDC handles user authentication to the client. OAuth access tokens carry
+authority to a resource server. Your ReBAC system handles application-specific,
+object-level authorization. They hand off to each other:
 
 ```text
-OIDC/token validation establishes: "This request is from user:alice"
-                            │
-                            ▼
-ReBAC decides:       "Can user:alice edit document:roadmapDocument?"
-                            │
-                            ▼
-                     allow or deny
+OIDC client:
+  validates ID token          → establishes Alice's login
+
+Resource server/API:
+  validates OAuth access token → accepts the token for this API
+  maps validated identity      → user:alice
+  asks ReBAC                   → can user:alice edit document:roadmapDocument?
+  result                       → allow or deny
 ```
 
 Keep these questions separate. OAuth scopes do not decide document permissions,
-and OAuth by itself is not an authentication protocol. OIDC supplies the login
-identity; the resource server validates the access token presented to its API.
+and OAuth by itself is not an authentication protocol. The OIDC client validates
+the ID token to establish the login. Separately, a resource server validates an
+access token presented to its API. The application then maps the validated
+identity to an internal user and performs its ReBAC check.
 
 ## The four players
 
@@ -820,8 +879,8 @@ For this repo:
 - Future browser/server version: Flow 1 (Authorization Code + PKCE + OIDC)
 - Current terminal client: Flow 3 (Device Authorization) or Flow 1 with localhost callback
 - Tutorial mode (current): you paste a demo bearer token (`demo-token-alice`,
-  `demo-token-bob`, or `demo-token-casey`) instead of a real OAuth login, to keep
-  the focus on authorization
+  `demo-token-bob`, or `demo-token-casey`) instead of a real OIDC login and OAuth
+  access token, to keep the focus on authorization
 
 ## Refresh tokens and browser sessions
 
@@ -930,9 +989,12 @@ OIDC establishes the login identity, and the resource server validates the
 access token used for the API request. ReBAC then uses the resulting stable
 subject identity to decide what it may do on a specific object.
 
-Two separate questions:
-- OIDC/token validation establishes: **who is calling, and may this token call this API?**
-- ReBAC answers: **what may they do with this?**
+Three separate questions:
+
+- OIDC ID-token validation tells the client: **which user authenticated?**
+- OAuth access-token validation tells the API: **is this token valid for me and
+  what authority does it carry?**
+- ReBAC answers: **what may this user do with this specific object?**
 
 ## Further reading
 
