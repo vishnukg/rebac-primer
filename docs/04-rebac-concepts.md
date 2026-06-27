@@ -15,6 +15,37 @@ does user:alice have can_edit on document:roadmapDocument?
 This chapter gives names to the pieces you already saw in the graph chapter.
 It is deliberately compact: learn the vocabulary, then use it immediately.
 
+## The Core Thought Process
+
+ReBAC modeling starts with a product fact, not with code:
+
+```text
+Alice is a member of the platform team.
+Platform team members are editors of the product workspace.
+The roadmap document lives in the product workspace.
+Editors can edit documents in that workspace.
+```
+
+The first three sentences are facts that can change at runtime. They become
+tuples. The last sentence is a rule about how facts imply permission. It belongs
+in the model.
+
+That split is the main design move:
+
+```text
+tuple  -> a durable product fact
+model  -> a reusable rule for deriving access from facts
+check  -> one authorization question at request time
+```
+
+When you model another domain, ask this first:
+
+- Is this a business relationship that can be created or removed? Store a tuple.
+- Is this an action the application wants to allow or deny? Define a permission.
+- Is this a rule that should apply to many objects? Put it in the model.
+- Is this true only for one request, such as time or device state? Treat it as
+  context, not as a long-lived tuple.
+
 ## Objects
 
 Objects are typed IDs:
@@ -107,6 +138,38 @@ A tuple is a stored fact, not the complete effective policy. The model can
 derive implied relationships from several tuples. Alice has an implied
 `can_edit` relationship to the roadmap document even though no `can_edit` tuple
 is stored.
+
+## Why Tuples
+
+Tuples work well for ReBAC because they are small, independent facts. One tuple
+can be added, removed, replicated, audited, or replayed without rewriting the
+authorization model.
+
+| Product change | Tuple change | Model change |
+|---|---|---|
+| Alice joins a team | write `user:alice member team:platformTeam` | none |
+| Bob loses workspace access | delete `user:bob viewer workspace:productWorkspace` | none |
+| a document moves workspace | replace its `workspace` tuple | none |
+| editors gain a new permission | none | update the model rule |
+
+This is why the repo does not store `can_edit` or `can_read` tuples. Those are
+derived permissions. Storing derived permissions would duplicate the model's
+work and make revocation harder: removing Alice from the team would also require
+finding and deleting every materialized permission she inherited from that team.
+
+Good tuple candidates usually answer one of these questions:
+
+- Who belongs to this group?
+- Which group has a relation to this resource?
+- Who directly owns or shares this resource?
+- Which parent object does this object inherit from?
+
+Poor tuple candidates are usually computed outcomes:
+
+- `user:alice can_edit document:roadmapDocument`
+- `user:bob can_read document:roadmapDocument`
+
+Those are answers to checks, not source-of-truth facts.
 
 ## Subject Sets
 

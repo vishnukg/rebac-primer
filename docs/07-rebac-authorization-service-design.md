@@ -127,6 +127,29 @@ Turn each requirement into examples:
 This permission matrix is the policy contract. Model syntax and code are
 implementations of it.
 
+## From Requirements to Policy
+
+After writing product sentences, classify each sentence before touching the DSL:
+
+| Product sentence | Classification | Where it goes |
+|---|---|---|
+| Alice is in platformTeam | durable relationship fact | tuple |
+| platformTeam members edit productWorkspace | durable relationship fact using a subject set | tuple |
+| roadmapDocument lives in productWorkspace | durable structural fact | tuple |
+| workspace editors can edit workspace documents | reusable derivation rule | model |
+| document owners can delete documents | application permission rule | model |
+| user has `documents:write` OAuth scope | request/token attribute | checked outside ReBAC |
+
+This classification prevents two common mistakes:
+
+- storing derived permissions as tuples, which creates duplicated authorization
+  state and hard revocation
+- putting changing product facts into the model, which makes ordinary workflow
+  changes require policy deployment
+
+The model should be boring and reusable. The tuples should carry the changing
+product state.
+
 Ask these questions before modeling:
 
 - What are the protected resource types?
@@ -149,6 +172,36 @@ Specific types make the policy easier to review, support type-specific
 permissions and listing, and usually produce shallower evaluation paths. Use
 recursive generic hierarchies only when the product genuinely permits arbitrary
 nesting.
+
+## Why Policy Has Shape
+
+A good ReBAC policy usually has three layers:
+
+```text
+base relations       owner, editor, viewer, member
+structural relations workspace, parent, organization
+computed permissions can_read, can_edit, can_delete
+```
+
+Base relations are usually product concepts people understand. Structural
+relations connect objects so access can inherit. Computed permissions are the
+operations application code checks.
+
+This repo's policy follows that shape:
+
+| Layer | Example | Why it exists |
+|---|---|---|
+| base relation | `workspace#editor` | a workspace-scoped role-like fact |
+| subject set | `team#member` | grant access to a dynamic group |
+| structural relation | `document#workspace` | connect child document to parent workspace |
+| hierarchy rule | `viewer includes editor` | avoid duplicating weaker-role tuples |
+| inheritance rule | `editor from workspace` | reuse workspace access for documents |
+| computed permission | `can_edit: editor` | let application code check an action |
+
+When extending the model, place a new concept in the right layer. For example,
+`folder` would probably be a new object type plus a structural relation;
+`can_share` would probably be a computed permission; "Alice is a reviewer"
+would probably be a tuple.
 
 ## The Graph Has Semantics
 

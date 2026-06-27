@@ -13,8 +13,10 @@ documents.Service -> documents.AuthorizationService port -> authz.Service
                                                        or -> openfga.Service
                   -> documents.DocumentRepository port   -> document store
 
-authz.Service -> authz.Evaluator port       -> graph evaluator
-              -> authz.TupleRepository port -> tuple store
+authz.Service -> authz.Evaluator port              -> graph evaluator
+              -> authz.TupleWriter/TupleLister     -> tuple store
+
+GraphEvaluator -> authz.TupleReader port           -> tuple store
 
 cmd/server/main.go wires the concrete implementations.
 ```

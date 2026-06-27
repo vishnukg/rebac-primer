@@ -5,8 +5,8 @@
 // surface is small:
 //
 //	Service          — the in-process authorization implementation.
-//	New              — builds a *Service from a TupleRepository and an Evaluator.
-//	NewInMemoryStore — a TupleRepository backed by a map (the default store).
+//	New              — builds a *Service from tuple write/list ports and an Evaluator.
+//	NewInMemoryStore — tuple read/write/list ports backed by a map.
 //	NewGraphEvaluator — an Evaluator that walks the tuple graph (the default strategy).
 //	ValidateTuple    — validates tuple shape before writes reach a backend.
 //
@@ -21,30 +21,47 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// TupleRepository stores relationship tuples. The evaluator reads from it; the
-// service's write operations mutate it.
+// TupleReader is the read side of relationship tuple storage used by
+// GraphEvaluator during graph traversal.
 //
 // Every method takes a context.Context and returns an error. The in-memory store
 // never actually fails, but a real backend (Postgres, a network store) can time
 // out, drop its connection, or be cancelled mid-query — so the contract carries
 // ctx and error from the start, and swapping backends stays a wiring change
 // rather than an interface change.
-type TupleRepository interface {
+type TupleReader interface {
 	// Has reports whether the exact (object, relation, user) tuple exists.
 	Has(ctx context.Context, object rebac.Object, relation rebac.Relation, user rebac.Subject) (bool, error)
 
 	// FindByObjectRelation returns all tuples matching (object, relation).
 	// Used during graph traversal.
 	FindByObjectRelation(ctx context.Context, object rebac.Object, relation rebac.Relation) ([]rebac.TupleKey, error)
+}
 
+// TupleLister is the tuple enumeration capability used by administrative
+// surfaces such as ListTuples. It returns stored facts, not effective access.
+type TupleLister interface {
 	// FindAll returns all stored tuples, optionally filtered.
 	FindAll(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error)
+}
 
+// TupleWriter is the mutation side of relationship tuple storage used by
+// Service.WriteTuples and Service.DeleteTuples.
+type TupleWriter interface {
 	// Write adds a tuple (idempotent).
 	Write(ctx context.Context, tuple rebac.TupleKey) error
 
 	// Delete removes a tuple. No-op if it does not exist.
 	Delete(ctx context.Context, tuple rebac.TupleKey) error
+}
+
+// TupleRepository is the complete tuple-store capability used by the in-process
+// authorization service. Narrower collaborators should usually accept
+// TupleReader, TupleWriter, or TupleLister instead.
+type TupleRepository interface {
+	TupleReader
+	TupleLister
+	TupleWriter
 }
 
 // TupleFilter narrows FindAll results. Zero-value fields mean "match any".

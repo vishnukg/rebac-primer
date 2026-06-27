@@ -10,8 +10,8 @@ import (
 )
 
 // This file unit-tests the *authz.Service returned by [authz.New] in
-// isolation from any real adapter. The Service is a thin orchestrator over two
-// driven ports — TupleRepository and Evaluator — which makes it the right place
+// isolation from any real adapter. The Service is a thin orchestrator over tuple
+// storage ports and an Evaluator, which makes it the right place
 // to demonstrate the difference between stubs and mocks:
 //
 //   - A STUB stands in for a collaborator and returns canned answers. It is used

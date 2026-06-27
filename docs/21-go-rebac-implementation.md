@@ -66,16 +66,18 @@ Open `internal/authz/authz.go` and `internal/authz/service.go`.
 
 ```go
 type Service struct {
-    repository TupleRepository
-    evaluator  Evaluator
+    writer    TupleWriter
+    lister    TupleLister
+    evaluator Evaluator
 }
 ```
 
 Consumers declare narrow interfaces that `*authz.Service` satisfies implicitly.
 The service delegates checks to an `Evaluator` and writes to a
-`TupleRepository`. Check requests and tuple writes are validated against the
-known model before they reach a backend. This avoids turning caller mistakes
-into silent denials or storing facts that can never match.
+`TupleWriter`. Listing uses `TupleLister`, while the graph evaluator depends
+only on `TupleReader`. Check requests and tuple writes are validated against
+the known model before they reach a backend. This avoids turning caller
+mistakes into silent denials or storing facts that can never match.
 
 ## Graph Evaluator
 

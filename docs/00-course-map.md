@@ -24,9 +24,9 @@ Read these in order:
 |---|---|---|
 | 02 | Authorization fundamentals: RBAC, ABAC, ReBAC | conceptual |
 | 03 | Graph theory needed for ReBAC | conceptual |
-| 04 | ReBAC concepts: tuples, subject sets, checks | `internal/rebac/rebac.go` |
-| 05 | OpenFGA model DSL | `deployments/openfga/model.fga`, `internal/authz/model.go` |
-| 07 | Designing a ReBAC authz service and evaluating OpenFGA vs building | `deployments/openfga/model.fga.yaml` |
+| 04 | ReBAC concepts: why tuples, subject sets, checks | `internal/rebac/rebac.go` |
+| 05 | OpenFGA model DSL: why this policy is structured this way | `deployments/openfga/model.fga`, `internal/authz/model.go` |
+| 07 | Designing a ReBAC authz service: product sentences to policy | `deployments/openfga/model.fga.yaml` |
 | 27 | Graph evaluator walkthrough | `internal/authz/evaluator.go` |
 
 This path answers one question: how does a relationship become an allow/deny

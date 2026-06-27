@@ -77,7 +77,7 @@ const defaultMaxDepth = 100
 // GraphEvaluator traverses the tuple graph to answer Check requests.
 // Construct with [NewGraphEvaluator]; do not use the zero value directly.
 type GraphEvaluator struct {
-	store    TupleRepository
+	store    TupleReader
 	maxDepth int
 }
 
@@ -86,8 +86,8 @@ type relationVisit struct {
 	relation rebac.Relation
 }
 
-// NewGraphEvaluator creates a GraphEvaluator backed by the given TupleRepository.
-func NewGraphEvaluator(store TupleRepository) *GraphEvaluator {
+// NewGraphEvaluator creates a GraphEvaluator backed by the given TupleReader.
+func NewGraphEvaluator(store TupleReader) *GraphEvaluator {
 	return &GraphEvaluator{store: store, maxDepth: defaultMaxDepth}
 }
 

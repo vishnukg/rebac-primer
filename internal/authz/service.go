@@ -14,13 +14,14 @@ import (
 // should not be copied. Consumers normally accept *Service through a narrow
 // interface declared in the consuming package.
 type Service struct {
-	repository TupleRepository
-	evaluator  Evaluator
+	writer    TupleWriter
+	lister    TupleLister
+	evaluator Evaluator
 }
 
 // New creates a Service from a TupleRepository and an Evaluator.
 func New(repository TupleRepository, evaluator Evaluator) *Service {
-	return &Service{repository: repository, evaluator: evaluator}
+	return &Service{writer: repository, lister: repository, evaluator: evaluator}
 }
 
 // Check delegates permission evaluation to the [Evaluator] port.
@@ -47,7 +48,7 @@ func (d *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) erro
 		}
 	}
 	for _, t := range tuples {
-		if err := d.repository.Write(ctx, t); err != nil {
+		if err := d.writer.Write(ctx, t); err != nil {
 			return fmt.Errorf("write tuple (%s, %s, %s): %w", t.Object, t.Relation, t.User, err)
 		}
 	}
@@ -61,7 +62,7 @@ func (d *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) erro
 // make it harder to clean up bad data that somehow got in.
 func (d *Service) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
 	for _, t := range tuples {
-		if err := d.repository.Delete(ctx, t); err != nil {
+		if err := d.writer.Delete(ctx, t); err != nil {
 			return fmt.Errorf("delete tuple (%s, %s, %s): %w", t.Object, t.Relation, t.User, err)
 		}
 	}
@@ -70,5 +71,5 @@ func (d *Service) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) err
 
 // ListTuples returns stored tuples, optionally filtered.
 func (d *Service) ListTuples(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error) {
-	return d.repository.FindAll(ctx, filter...)
+	return d.lister.FindAll(ctx, filter...)
 }

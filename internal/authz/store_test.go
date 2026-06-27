@@ -9,7 +9,7 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// These tests cover the in-memory TupleRepository adapter. The store is a
+// These tests cover the in-memory tuple-store adapter. The store is a
 // self-contained stateful unit with no collaborators, so no test doubles are
 // needed: each test arranges real tuples, acts on the store, and asserts on its
 // observable state.

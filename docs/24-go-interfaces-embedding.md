@@ -44,10 +44,11 @@ implementation.
 `ReadOnlyStore` demonstrates interface embedding. Embedding promotes methods
 from the embedded interface onto the wrapper type.
 
-Important: embedding `authz.TupleRepository` also promotes `Write` and `Delete`.
-The name `ReadOnlyStore` communicates intent, but the compiler does not enforce
-read-only access. A real type-level boundary would embed a narrower interface
-containing only read methods.
+It embeds `authz.TupleReader`, not the full tuple repository. That means the
+compiler exposes only read methods through `ReadOnlyStore`; `Write` and
+`Delete` are not available on that value. This is the useful abstraction lesson:
+choose the smallest interface that represents the capability the caller should
+have.
 
 ## Try It
 
@@ -55,9 +56,9 @@ containing only read methods.
 go test -v ./examples/middleware
 ```
 
-Then call `Write` on `ReadOnlyStore`. It compiles. Replace the embedded
-`TupleRepository` with a small reader interface and observe that the write no
-longer compiles.
+Then try to call `Write` on `ReadOnlyStore`. It does not compile, because the
+wrapper embeds only the reader capability. Change the embedded interface to
+`authz.TupleRepository` and observe that write methods become available.
 
 This is a language lesson only. The production ReBAC path is under
 `internal/`.

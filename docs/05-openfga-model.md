@@ -26,6 +26,41 @@ be written directly; relation expressions say what may be derived.
 Each `object#relation` can be understood as a set of subjects. A Check asks
 whether one subject belongs to the effective set for the requested relation.
 
+## Modeling Thought Process
+
+The model is structured to answer the demo product requirements with the
+fewest durable facts:
+
+```text
+Team admins are also team members.
+Workspace owners are also editors and viewers.
+Teams can receive workspace access as a group.
+Documents inherit owner/editor/viewer from their workspace.
+Application code asks for can_read/can_comment/can_edit/can_delete.
+```
+
+The design process is:
+
+1. Choose object types that exist in the product: `user`, `team`, `workspace`,
+   `document`.
+2. Identify durable facts to store as tuples: team membership, team access to a
+   workspace, direct workspace/document ownership, and a document's parent
+   workspace.
+3. Identify derived relationships: admin implies member, owner implies editor,
+   editor implies viewer, document access can come from the parent workspace.
+4. Identify application permissions: read, comment, edit, delete.
+5. Keep action permissions as computed relations so callers ask for intent
+   (`can_edit`) rather than implementation detail (`editor from workspace`).
+6. Write contract tests before trusting the model.
+
+That gives this rule of thumb:
+
+```text
+Facts that product workflows mutate go in tuples.
+Rules that explain what facts mean go in the model.
+Operations that code enforces become can_* permissions.
+```
+
 ## Types
 
 The model contains:
@@ -48,6 +83,11 @@ type team
 
 An admin is also a member.
 
+Why: team membership is a group fact, and `admin` is a stronger team relation.
+If someone administers a team, they should also satisfy checks that only require
+team membership. The model captures that once with `member: [user] or admin`
+instead of writing both `admin` and `member` tuples for every admin.
+
 ## Workspace
 
 ```text
@@ -60,6 +100,18 @@ type workspace
 
 An owner is also an editor. An editor is also a viewer. A team subject set can
 grant workspace access to everyone in that team relation.
+
+Why: workspace permissions are role-like, but scoped to one workspace. Direct
+users can be owners/editors/viewers, and teams can be granted access through
+subject sets:
+
+```text
+team:platformTeam#member editor workspace:productWorkspace
+```
+
+That single tuple means current and future platform-team members are workspace
+editors. Adding a user to the team updates inherited workspace access without
+rewriting workspace tuples.
 
 ## Document
 
@@ -90,6 +142,30 @@ writes `document#workspace` tuples so inheritance can work, but user-facing
 permission checks ask for relations such as `can_read`, `can_edit`, `owner`,
 `editor`, or `viewer`.
 
+Why: documents are children of workspaces. The document's `workspace` tuple is
+the bridge that lets a workspace relationship affect a document:
+
+```text
+workspace:productWorkspace workspace document:roadmapDocument
+```
+
+Then `editor from workspace` says: "a document editor includes anyone who is an
+editor of the workspace this document points to." The parent object must be in
+the tuple's subject/user field because `from workspace` follows the document's
+`workspace` relation to that subject.
+
+The `can_*` relations are action permissions. They are not writable facts:
+
+```text
+can_read    = viewer
+can_comment = viewer
+can_edit    = editor
+can_delete  = owner
+```
+
+This lets application code ask stable business questions while the model remains
+free to change how those permissions are derived.
+
 ## Why It Matters
 
 The model stores rules once. Tuples store facts many times.
@@ -111,6 +187,14 @@ The DSL constructs used here are:
 can_edit: editor       computed relation on the same object
 editor from workspace  inheritance through a related object
 or                     union of subject sets
+```
+
+Read each line of `model.fga` as answering one of three questions:
+
+```text
+What can be written directly?       [user], [workspace], [team#member]
+What is derived on the same object? viewer includes editor, can_edit is editor
+What is inherited from a parent?    editor from workspace
 ```
 
 OpenFGA also supports intersections, exclusions, conditions, contextual tuples,

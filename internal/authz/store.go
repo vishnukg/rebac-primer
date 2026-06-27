@@ -8,8 +8,8 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// InMemoryStore is a thread-safe, map-backed [TupleRepository]. Tuples are keyed
-// by their "object|relation|user" triple, so writing the same tuple twice is a
+// InMemoryStore is a thread-safe, map-backed tuple store. Tuples are keyed by
+// their "object|relation|user" triple, so writing the same tuple twice is a
 // harmless overwrite.
 type InMemoryStore struct {
 	mu     sync.RWMutex
@@ -30,7 +30,12 @@ func NewInMemoryStore(seed ...rebac.TupleKey) *InMemoryStore {
 }
 
 // Compile-time assertion: *InMemoryStore must satisfy TupleRepository.
-var _ TupleRepository = (*InMemoryStore)(nil)
+var (
+	_ TupleReader     = (*InMemoryStore)(nil)
+	_ TupleWriter     = (*InMemoryStore)(nil)
+	_ TupleLister     = (*InMemoryStore)(nil)
+	_ TupleRepository = (*InMemoryStore)(nil)
+)
 
 // The context argument is unused here — an in-memory map never blocks — but it is
 // part of the port so a real backend can honour cancellation and deadlines. The

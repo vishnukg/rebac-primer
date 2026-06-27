@@ -10,7 +10,7 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// erroringStore is a TupleRepository whose reads always fail. It proves the
+// erroringStore is a TupleReader whose reads always fail. It proves the
 // evaluator surfaces a backend failure as an error instead of silently denying
 // access — a silent deny would look identical to "no permission", hiding outages.
 type erroringStore struct{ err error }
@@ -21,12 +21,6 @@ func (e erroringStore) Has(context.Context, rebac.Object, rebac.Relation, rebac.
 func (e erroringStore) FindByObjectRelation(context.Context, rebac.Object, rebac.Relation) ([]rebac.TupleKey, error) {
 	return nil, e.err
 }
-func (e erroringStore) FindAll(context.Context, ...authz.TupleFilter) ([]rebac.TupleKey, error) {
-	return nil, e.err
-}
-func (e erroringStore) Write(context.Context, rebac.TupleKey) error  { return e.err }
-func (e erroringStore) Delete(context.Context, rebac.TupleKey) error { return e.err }
-
 func TestGraphEvaluator_PropagatesStoreError(t *testing.T) {
 	sentinel := errors.New("tuple store unavailable")
 	ev := authz.NewGraphEvaluator(erroringStore{err: sentinel})

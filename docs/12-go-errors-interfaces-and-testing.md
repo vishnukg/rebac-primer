@@ -127,7 +127,7 @@ Struct embedding promotes fields and methods:
 
 ```go
 type AuditedStore struct {
-    TupleRepository
+    TupleReader
     Logger *log.Logger
 }
 ```

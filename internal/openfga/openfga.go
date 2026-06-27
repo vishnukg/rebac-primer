@@ -3,11 +3,9 @@
 // wiring change in cmd/server/main.go (selected by AUTHZ_BACKEND=openfga).
 //
 // Why this implements the whole application-facing capability (not Evaluator):
-// The graph build swaps the Evaluator port (Evaluate has ctx + error — a good
-// network seam) and keeps the in-memory TupleRepository for writes. But
-// TupleRepository.Write is sync and has no ctx/error, which does not fit a
-// network backend. The public operations here all carry ctx + error, so checks
-// and tuple writes can both go to OpenFGA and remain consistent.
+// The graph build swaps the Evaluator port, but writes still go through the
+// in-process tuple store. The public operations here all carry ctx + error, so
+// checks and tuple writes can both go to OpenFGA and remain consistent.
 //
 // The model and the workspace/team policy tuples are seeded into the store out
 // of band (deployments/openfga/seed.sh). Document-level tuples are still written
