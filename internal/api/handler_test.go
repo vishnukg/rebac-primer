@@ -146,6 +146,32 @@ func TestHandler_CreateDocument_Returns409ForExistingID(t *testing.T) {
 	}
 }
 
+func TestHandler_CreateDocument_Returns400ForBlankFields(t *testing.T) {
+	cases := map[string]map[string]string{
+		"id":          {"id": " ", "title": "Test", "body": "Body", "workspaceId": "productWorkspace"},
+		"title":       {"id": "testDoc", "title": "\t", "body": "Body", "workspaceId": "productWorkspace"},
+		"body":        {"id": "testDoc", "title": "Test", "body": "\n", "workspaceId": "productWorkspace"},
+		"workspaceId": {"id": "testDoc", "title": "Test", "body": "Body", "workspaceId": " "},
+	}
+
+	for name, payload := range cases {
+		t.Run(name, func(t *testing.T) {
+			handler := newTestHandler(t)
+			body, _ := json.Marshal(payload)
+			req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer demo-token-alice")
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected 400, got %d — body: %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestHandler_CreateDocument_Returns401WhenTokenMissing(t *testing.T) {
 	handler := newTestHandler(t)
 	payload := map[string]string{
@@ -211,6 +237,20 @@ func TestHandler_CreateDocument_Returns413ForOversizedBody(t *testing.T) {
 func TestHandler_PatchDocument_Returns400ForMultipleJSONValues(t *testing.T) {
 	handler := newTestHandler(t)
 	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader([]byte(`{"body":"updated"} {}`)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer demo-token-alice")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d — body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandler_PatchDocument_Returns400ForBlankBody(t *testing.T) {
+	handler := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader([]byte(`{"body":" "}`)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()

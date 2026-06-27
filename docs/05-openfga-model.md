@@ -85,6 +85,11 @@ editor from workspace
 That means: follow the document's `workspace` relation to a workspace object,
 then check whether the user is an editor there.
 
+`workspace` is a structural relation, not a user permission. The application
+writes `document#workspace` tuples so inheritance can work, but user-facing
+permission checks ask for relations such as `can_read`, `can_edit`, `owner`,
+`editor`, or `viewer`.
+
 ## Why It Matters
 
 The model stores rules once. Tuples store facts many times.

@@ -246,7 +246,8 @@ Keeping permissions separate from structural relations gives the model room to
 evolve:
 
 ```text
-can_edit = editor or owner
+can_edit = editor
+editor includes owner
 ```
 
 Callers ask for `can_edit`; they do not need to know how that permission is
@@ -317,7 +318,7 @@ Most ReBAC models combine a small number of ideas.
 ### Direct grant
 
 ```text
-document viewer user:alice
+user:alice viewer document:roadmap
 ```
 
 Use for explicit sharing or ownership.
@@ -338,13 +339,13 @@ owner ⊆ editor ⊆ viewer
 ### Group inheritance
 
 ```text
-workspace editor team:platform#member
+team:platform#member editor workspace:product
 ```
 
 ### Parent-child inheritance
 
 ```text
-document workspace workspace:product
+workspace:product workspace document:roadmap
 document editor includes editor from workspace
 ```
 

@@ -2,7 +2,7 @@ name: ReBAC Primer Model Contract
 model_file: ./model.fga
 
 tuples:
-  # ── The demo story — identical to internal/fixtures/fixtures.go ──────────────
+  # ── The demo story — identical to fixtures.SeedRelationshipTuples ───────────
   # Alice reaches the document only as an inherited editor (team member → workspace
   # editor → document editor), never as an owner. Bob is a workspace viewer. Casey
   # has no path. Keep these four in lockstep with the Go fixtures so both backends
@@ -21,13 +21,20 @@ tuples:
     object: document:roadmapDocument
   # ── Contract-only coverage ──────────────────────────────────────────────────
   # The demo story has no document owner, so on its own it never exercises the
-  # `define can_delete: owner` path. Dana is a direct owner that exists ONLY in
-  # this model test (not in fixtures.go) purely to validate the owner → can_delete
-  # rule. Keeping it off Alice is deliberate: it leaves the demo cast consistent
-  # across both backends.
+  # `define can_delete: owner` path. Dana is a direct owner that exists only in
+  # the contract-only tuples, not in SeedRelationshipTuples. Keeping it off Alice
+  # is deliberate: it leaves the demo cast consistent across both backends.
   - user: user:dana
     relation: owner
     object: document:roadmapDocument
+  # Erin is a team admin, and the team's admin userset owns the workspace. This
+  # exercises both admin → member and workspace owner → document owner.
+  - user: user:erin
+    relation: admin
+    object: team:platformTeam
+  - user: team:platformTeam#admin
+    relation: owner
+    object: workspace:productWorkspace
 
 tests:
   - name: document permission matrix
@@ -43,6 +50,14 @@ tests:
           can_delete: false
       # Dana is a direct owner (contract-only) — exercises the owner → can_delete path.
       - user: user:dana
+        object: document:roadmapDocument
+        assertions:
+          can_read: true
+          can_comment: true
+          can_edit: true
+          can_delete: true
+      # Erin owns the workspace through team#admin, so she inherits document owner.
+      - user: user:erin
         object: document:roadmapDocument
         assertions:
           can_read: true
@@ -71,10 +86,21 @@ tests:
         assertions:
           member: true
           admin: false
+      - user: user:erin
+        object: team:platformTeam
+        assertions:
+          member: true
+          admin: true
       - user: user:alice
         object: workspace:productWorkspace
         assertions:
           owner: false
+          editor: true
+          viewer: true
+      - user: user:erin
+        object: workspace:productWorkspace
+        assertions:
+          owner: true
           editor: true
           viewer: true
       - user: user:bob

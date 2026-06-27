@@ -28,7 +28,7 @@ help:
 	@printf '%s\n' '  make trace          Print the Alice can_edit graph traversal'
 	@printf '%s\n' '  make test-permission Run one representative permission test'
 	@printf '%s\n' '  make vet            Run go vet'
-	@printf '%s\n' '  make lint           Run staticcheck (go tool)'
+	@printf '%s\n' '  make lint           Run staticcheck'
 	@printf '%s\n' '  make modernize      Report Go 1.26 modernization suggestions'
 	@printf '%s\n' '  make check          Vet, staticcheck, tests, and race tests'
 	@printf '%s\n' '  make shell          Open shell in the Go tools container'
@@ -62,16 +62,16 @@ test-permission:
 vet:
 	$(GO_TOOLS) go vet ./...
 
-# staticcheck is pinned as a module tool dependency (the `tool` directive in
-# go.mod), so `go tool staticcheck` builds it from the module — no global install.
+# staticcheck is pinned in go.mod; go run uses that module version without a
+# global install.
 lint:
-	$(GO_TOOLS) go tool staticcheck ./...
+	$(GO_TOOLS) go run honnef.co/go/tools/cmd/staticcheck ./...
 
 modernize:
 	$(GO_TOOLS) go fix -diff ./...
 
 check:
-	$(GO_TOOLS) sh -c 'go vet ./... && go tool staticcheck ./... && go test ./... && go test -race ./...'
+	$(GO_TOOLS) sh -c 'go vet ./... && go run honnef.co/go/tools/cmd/staticcheck ./... && go test ./... && go test -race ./...'
 
 shell:
 	$(GO_TOOLS) sh

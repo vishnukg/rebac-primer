@@ -86,7 +86,7 @@ The model test runs through a pinned OpenFGA CLI container. The local seed
 script runs on your host and additionally requires:
 
 ```bash
-docker version
+fga version
 jq --version
 ```
 

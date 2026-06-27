@@ -100,9 +100,9 @@ Is user:alice in document:roadmapDocument#can_edit?
 The model is the transit rulebook. It says which lines count for which trip.
 
 ```text
-viewer line -> can_read
-editor line -> can_edit and can_read
-owner line  -> can_delete, can_edit, and can_read
+viewer line -> can_read and can_comment
+editor line -> can_edit, can_read, and can_comment
+owner line  -> can_delete, can_edit, can_read, and can_comment
 ```
 
 Tuples are the current map data. If a tuple is removed, a route may disappear.

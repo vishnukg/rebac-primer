@@ -328,21 +328,34 @@ func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAnd
 }
 
 func TestService_GivenInvalidCheck_WhenCheck_ThenRejectsBeforeEvaluator(t *testing.T) {
-	evaluator := &mockEvaluator{}
-	svc := authz.New(stubRepository{}, evaluator)
-
-	_, err := svc.Check(context.Background(), rebac.CheckRequest{
-		User:     rebac.Team("platformTeam"),
-		Relation: rebac.RelationDocumentCanEdit,
-		Object:   rebac.Document("d1"),
-	})
-
-	var validationErr *authz.TupleValidationError
-	if !errors.As(err, &validationErr) {
-		t.Fatalf("expected *TupleValidationError, got %v", err)
+	cases := map[string]rebac.CheckRequest{
+		"subject must be user": {
+			User:     rebac.Team("platformTeam"),
+			Relation: rebac.RelationDocumentCanEdit,
+			Object:   rebac.Document("d1"),
+		},
+		"structural relation cannot be checked for user": {
+			User:     rebac.User("alice"),
+			Relation: rebac.RelationDocumentWorkspace,
+			Object:   rebac.Document("d1"),
+		},
 	}
-	if len(evaluator.calls) != 0 {
-		t.Errorf("evaluator called %d times, want 0", len(evaluator.calls))
+
+	for name, req := range cases {
+		t.Run(name, func(t *testing.T) {
+			evaluator := &mockEvaluator{}
+			svc := authz.New(stubRepository{}, evaluator)
+
+			_, err := svc.Check(context.Background(), req)
+
+			var validationErr *authz.TupleValidationError
+			if !errors.As(err, &validationErr) {
+				t.Fatalf("expected *TupleValidationError, got %v", err)
+			}
+			if len(evaluator.calls) != 0 {
+				t.Errorf("evaluator called %d times, want 0", len(evaluator.calls))
+			}
+		})
 	}
 }
 

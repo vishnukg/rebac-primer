@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
 	"rebac-primer/internal/documents"
 	"rebac-primer/internal/rebac"
@@ -59,7 +60,7 @@ func (h *handler) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
 		writeJSONReadError(w, err)
 		return
 	}
-	if body.ID == "" || body.Title == "" || body.Body == "" || body.WorkspaceID == "" {
+	if isBlank(body.ID) || isBlank(body.Title) || isBlank(body.Body) || isBlank(body.WorkspaceID) {
 		writeJSON(w, http.StatusBadRequest, errorBody("id, title, body, and workspaceId are required"))
 		return
 	}
@@ -121,7 +122,7 @@ func (h *handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 		writeJSONReadError(w, err)
 		return
 	}
-	if body.Body == "" {
+	if isBlank(body.Body) {
 		writeJSON(w, http.StatusBadRequest, errorBody("body is required"))
 		return
 	}
@@ -149,6 +150,10 @@ func requireScope(user documents.AuthenticatedUser, scope string) error {
 		return nil
 	}
 	return &documents.InsufficientScopeError{Required: scope}
+}
+
+func isBlank(s string) bool {
+	return strings.TrimSpace(s) == ""
 }
 
 // writeError maps a domain error to an HTTP status code.

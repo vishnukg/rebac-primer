@@ -76,6 +76,9 @@ func ValidateCheckRequest(req rebac.CheckRequest) error {
 	if !relationDefinedFor(objectType, req.Relation) {
 		return &TupleValidationError{Message: fmt.Sprintf("relation %q is not defined for %s objects", req.Relation, objectType)}
 	}
+	if !relationCheckableForUser(objectType, req.Relation) {
+		return &TupleValidationError{Message: fmt.Sprintf("relation %q on %s objects cannot be checked for a user", req.Relation, objectType)}
+	}
 	return nil
 }
 
@@ -115,6 +118,13 @@ func isComputedRelation(objectType rebac.ObjectType, relation rebac.Relation) bo
 		return true
 	}
 	return false
+}
+
+func relationCheckableForUser(objectType rebac.ObjectType, relation rebac.Relation) bool {
+	if objectType == rebac.ObjectTypeDocument && relation == rebac.RelationDocumentWorkspace {
+		return false
+	}
+	return true
 }
 
 func subjectAllowed(

@@ -38,15 +38,17 @@ func TestContract_OpenFGA(t *testing.T) {
 		t.Fatalf("new openfga service: %v", err)
 	}
 
-	// seed.sh writes only the workspace/team policy tuples. The document→workspace
-	// tuple the contract needs is normally written by the server at startup; write
-	// it here so the test is self-contained. WriteTuples is idempotent, so
-	// re-running the test against the same store is safe.
-	err = svc.WriteTuples(context.Background(), []rebac.TupleKey{
+	// seed.sh writes only the demo workspace/team policy tuples. The
+	// document→workspace tuple and contract-only owner/admin tuples are normally
+	// outside that bootstrap path; write them here so the test is self-contained.
+	// WriteTuples is idempotent, so re-running the test against the same store is safe.
+	tuples := []rebac.TupleKey{
 		rebac.Tuple(fixtures.RoadmapDocument, rebac.RelationDocumentWorkspace, rebac.Subject(fixtures.ProductWorkspace)),
-	})
+	}
+	tuples = append(tuples, contract.ExtraTuples()...)
+	err = svc.WriteTuples(context.Background(), tuples)
 	if err != nil {
-		t.Fatalf("seed document workspace tuple: %v", err)
+		t.Fatalf("seed contract tuples: %v", err)
 	}
 
 	contract.Run(t, svc.Check)

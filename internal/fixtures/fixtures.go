@@ -24,6 +24,8 @@ var (
 	Alice = rebac.User("alice")
 	Bob   = rebac.User("bob")
 	Casey = rebac.User("casey")
+	Dana  = rebac.User("dana")
+	Erin  = rebac.User("erin")
 
 	PlatformTeam     = rebac.Team("platformTeam")
 	ProductWorkspace = rebac.Workspace("productWorkspace")

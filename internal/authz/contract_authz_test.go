@@ -13,8 +13,9 @@ import (
 // exact (user, relation, object) that changed.
 //
 // newEvaluator (defined in evaluator_test.go) seeds the store with
-// fixtures.SeedRelationshipTuples(), which is the scenario the contract describes.
+// fixtures.SeedRelationshipTuples(); contract.ExtraTuples adds the
+// contract-only owner/admin cases.
 func TestContract_FromScratchEvaluator(t *testing.T) {
-	ev := newEvaluator()
+	ev := newEvaluator(contract.ExtraTuples()...)
 	contract.Run(t, ev.Evaluate)
 }
