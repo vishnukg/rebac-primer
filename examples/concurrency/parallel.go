@@ -82,12 +82,10 @@ func BulkCheck(ctx context.Context, auth Checker, reqs []rebac.CheckRequest) []B
 	var wg sync.WaitGroup
 
 	for i, req := range reqs {
-		wg.Add(1)
-		go func(i int, req rebac.CheckRequest) {
-			defer wg.Done()
+		wg.Go(func() {
 			result, err := auth.Evaluate(ctx, req)
 			results[i] = BulkResult{Request: req, Result: result, Err: err}
-		}(i, req)
+		})
 	}
 
 	wg.Wait()

@@ -1,10 +1,10 @@
-# Go concurrency: goroutines, channels, and WaitGroups
+# Go Concurrency: Goroutines, Channels, and WaitGroups
 
 Go's concurrency model is famously simple to write and famously easy to get wrong.
 This chapter grounds every concept in `examples/concurrency/parallel.go`, which you
 can run right now.
 
-## The problem concurrency solves here
+## The Problem Concurrency Solves Here
 
 When a UI renders a permissions panel it needs to know all four computed
 permissions for a document at once: can_read, can_comment, can_edit, can_delete.
@@ -22,7 +22,7 @@ be parallelized. Measure before choosing concurrency.
 Go concurrency primitives. Read both, because each one teaches something the
 other does not.
 
-## Goroutines are not threads
+## Goroutines Are Not Threads
 
 A goroutine is a function running concurrently with the caller. Start one with
 `go`:
@@ -37,7 +37,7 @@ The Go runtime schedules goroutines across OS threads, so they are cheap: you
 can start thousands without worrying about the OS thread limit. But "cheap" does
 not mean "free" — goroutines you start must finish.
 
-## Channels: communication as coordination
+## Channels: Communication As Coordination
 
 A channel is a typed pipe. One goroutine sends; another receives. On an
 unbuffered channel, a send blocks until a receiver is ready. On any channel, a
@@ -123,7 +123,7 @@ blocking forever on a receiver that has gone away. That is the subtle reason the
 buffer matters: once a worker returns, its final send cannot leak merely because
 the collector stopped receiving.
 
-## Why the goroutine passes `rel` as an argument
+## Why The Goroutine Passes `rel` As An Argument
 
 Look at this pattern:
 
@@ -140,7 +140,22 @@ so closing over `rel` is safe in this example. Passing it explicitly is still a
 reasonable teaching style because the goroutine's inputs are visible at the call
 site. It is clarity, not a correctness requirement for this module's Go version.
 
-## WaitGroups: wait without collecting
+`BulkCheck` leans on the modern rule directly:
+
+```go
+for i, req := range reqs {
+    wg.Go(func() {
+        result, err := auth.Evaluate(ctx, req)
+        results[i] = BulkResult{Request: req, Result: result, Err: err}
+    })
+}
+```
+
+Because this module's `go.mod` declares Go 1.25 and the toolchain is Go 1.26.4,
+each iteration gets its own `i` and `req`. In older pre-1.22 code, you will see
+the values passed as parameters to avoid the old loop-capture trap.
+
+## WaitGroups: Wait Without Collecting
 
 `BulkCheck` uses `sync.WaitGroup` instead of a channel:
 
@@ -151,12 +166,10 @@ func BulkCheck(ctx context.Context, auth Checker, reqs []rebac.CheckRequest) []B
     var wg sync.WaitGroup
 
     for i, req := range reqs {
-        wg.Add(1)
-        go func(i int, req rebac.CheckRequest) {
-            defer wg.Done()
+        wg.Go(func() {
             result, err := auth.Evaluate(ctx, req)
             results[i] = BulkResult{Request: req, Result: result, Err: err}
-        }(i, req)
+        })
     }
 
     wg.Wait()
@@ -164,23 +177,38 @@ func BulkCheck(ctx context.Context, auth Checker, reqs []rebac.CheckRequest) []B
 }
 ```
 
-`WaitGroup` is a counter:
+`WaitGroup` is a counter. In current Go, `wg.Go` is the easiest shape for "start
+one goroutine and wait for it later":
 
-- `wg.Add(1)` increments it before each goroutine starts.
-- `defer wg.Done()` decrements it when the goroutine returns.
+- `wg.Go(fn)` increments the counter, starts `fn` in a goroutine, and decrements
+  the counter when `fn` returns.
 - `wg.Wait()` blocks until the counter reaches zero.
 
 Because each goroutine writes to a unique index (`results[i]`), no two goroutines
 touch the same memory location — so no mutex is needed. This is safe.
 
-## Channel vs WaitGroup: when to use which
+You will still see the older explicit form in existing Go code:
+
+```go
+wg.Add(1)
+go func() {
+    defer wg.Done()
+    work()
+}()
+```
+
+That is also valid. The important rule is the same: add the work before waiting,
+and make sure every started goroutine eventually marks itself done. This module
+uses Go 1.26.4, so the example uses `WaitGroup.Go`.
+
+## Channel Vs WaitGroup: When To Use Which
 
 | | Channel | WaitGroup |
 |---|---|---|
 | **Collects values** | Yes — receive from channel | No — goroutines write shared state |
 | **Order preserved** | No — first finished, first received | Yes — write by index |
 | **Signals first error** | Natural — send an error result and cancel remaining work | Awkward — needs shared state or an extra channel |
-| **Use when** | results are all the same shape and order does not matter | you need results in input order |
+| **Use when** | results are all the same shape and order does not matter | you need to wait for known work, often with results written by index |
 
 `AllPermissions` uses channels because results come back unordered and we build
 a map.
@@ -192,7 +220,7 @@ It also starts one goroutine per request. That is fine for a small teaching
 slice, but a production bulk API should bound concurrency with a worker pool or
 semaphore so a huge request cannot create an unbounded number of goroutines.
 
-## Context cancellation: letting callers abort
+## Context Cancellation: Letting Callers Abort
 
 Both functions accept a `context.Context` as their first parameter. A context
 carries a cancellation signal: the caller can cancel it (or set a timeout/
@@ -220,7 +248,7 @@ result, err := ev.Evaluate(context.Background(), req)
 `AllPermissions` acts on the context at its own level too — it stops collecting
 and returns as soon as the caller cancels. It does that with `select`.
 
-## `select`: waiting on multiple channels
+## `select`: Waiting On Multiple Channels
 
 `select` is Go's channel-aware switch. It blocks until one of its cases can
 proceed; if several are ready at once it picks one at random. This is how a
@@ -256,7 +284,7 @@ honors the canceled context. A backend that ignores context and hangs forever
 can still leak its worker. Buffering solves the abandoned-send problem, not an
 uncooperative dependency.
 
-## Race detector
+## Race Detector
 
 Go ships a built-in race detector. Run your tests with `-race` to catch unsafe
 concurrent access:
@@ -269,7 +297,7 @@ A race condition occurs when two goroutines access the same memory location and
 at least one is a write. The race detector instruments memory access at runtime
 and reports violations immediately. Run it on every PR.
 
-## Try it
+## Try It
 
 **Measure instead of guessing:**
 

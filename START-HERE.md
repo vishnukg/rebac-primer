@@ -71,22 +71,28 @@ If graphs and OpenFGA are completely new, the optional
 
 If Go is new to you, start with the self-contained language foundation:
 
-1. [Toolchain and core syntax](docs/10-go-toolchain-and-syntax.md)
-2. [Values, pointers, collections, and methods](docs/11-go-values-pointers-and-methods.md)
-3. [Errors, interfaces, packages, and testing](docs/12-go-errors-interfaces-and-testing.md)
-4. [HTTP, JSON, context, and application lifecycle](docs/13-go-http-json-and-context.md)
+1. [Go learning path and practice plan](docs/09-go-learning-path.md)
+2. [Toolchain and core syntax](docs/10-go-toolchain-and-syntax.md)
+3. [Values, pointers, collections, and methods](docs/11-go-values-pointers-and-methods.md)
+4. [Errors, interfaces, packages, and testing](docs/12-go-errors-interfaces-and-testing.md)
+5. [HTTP, JSON, context, and application lifecycle](docs/13-go-http-json-and-context.md)
+6. [Go idioms and patterns](docs/14-go-idioms-and-patterns.md)
 
 Then read the fast ReBAC route and continue with:
 
 1. [Go language guide for this repository](docs/20-go-language-guide.md)
 2. [Architecture](docs/06-architecture.md)
 3. [Go ReBAC implementation](docs/21-go-rebac-implementation.md)
-4. [Go authz call flow](docs/28-go-authz-call-flow.md)
-5. [Go testing](docs/25-go-testing.md)
-6. [Guided feature lab](docs/29-go-guided-feature-lab.md)
+4. [Go concurrency](docs/22-go-concurrency.md)
+5. [Go generics](docs/23-go-generics.md)
+6. [Go interfaces and embedding](docs/24-go-interfaces-embedding.md)
+7. [Go testing](docs/25-go-testing.md)
+8. [Go authz call flow](docs/28-go-authz-call-flow.md)
+9. [Guided feature lab](docs/29-go-guided-feature-lab.md)
 
 If you already write Go, skip chapters 10–13 and begin at the repository
-language guide.
+language guide. If your goal is specifically to learn Go idioms, still read
+chapters 09, 14, and 22-25.
 
 ### Production route: understand the boundaries
 

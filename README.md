@@ -32,10 +32,16 @@ Read [START-HERE.md](START-HERE.md), then follow
 
 New to Go:
 
-1. [Toolchain and core syntax](docs/10-go-toolchain-and-syntax.md)
-2. [Values, pointers, collections, and methods](docs/11-go-values-pointers-and-methods.md)
-3. [Errors, interfaces, packages, and testing](docs/12-go-errors-interfaces-and-testing.md)
-4. [HTTP, JSON, context, and application lifecycle](docs/13-go-http-json-and-context.md)
+1. [Go learning path and practice plan](docs/09-go-learning-path.md)
+2. [Toolchain and core syntax](docs/10-go-toolchain-and-syntax.md)
+3. [Values, pointers, collections, and methods](docs/11-go-values-pointers-and-methods.md)
+4. [Errors, interfaces, packages, and testing](docs/12-go-errors-interfaces-and-testing.md)
+5. [HTTP, JSON, context, and application lifecycle](docs/13-go-http-json-and-context.md)
+6. [Go idioms and patterns](docs/14-go-idioms-and-patterns.md)
+7. [Concurrency](docs/22-go-concurrency.md),
+   [generics](docs/23-go-generics.md),
+   [interfaces and embedding](docs/24-go-interfaces-embedding.md), and
+   [testing](docs/25-go-testing.md)
 
 Minimal ReBAC path:
 
@@ -50,6 +56,10 @@ Then choose the Go implementation or production path from the course map.
 Finish the Go path with the
 [guided feature lab](docs/29-go-guided-feature-lab.md), which adds an operation
 through the domain, HTTP, authorization, and testing layers.
+
+If your main goal is learning Go, do not skip the example packages under
+`examples/`. They are executable language lessons wired to the same domain:
+concurrency, generics, middleware-style interfaces, and HTTP seams.
 
 ## Commands
 

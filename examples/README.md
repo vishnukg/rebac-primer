@@ -16,7 +16,7 @@ Keep this split in your head:
 | Package | Teaches | Paired doc |
 |---------|---------|------------|
 | `generics/` | Generic type parameters (`Result[T]`, `Map`, `Collect`) | `docs/23-go-generics.md` |
-| `concurrency/` | Goroutines, channels, `WaitGroup` (`AllPermissions`, `BulkCheck`) | `docs/22-go-concurrency.md` |
+| `concurrency/` | Goroutines, channels, `WaitGroup.Go` (`AllPermissions`, `BulkCheck`) | `docs/22-go-concurrency.md` |
 | `middleware/` | Decorator pattern + interface embedding (`AuditEvaluator`, `ReadOnlyStore`) | `docs/24-go-interfaces-embedding.md` |
 | `authzhttp/` | Exposing the authz service over HTTP (the client/server seam) | `docs/33-client-server-rebac.md` |
 
@@ -38,4 +38,6 @@ go test ./examples/...
 ```
 
 The examples are executable lessons: read the paired doc, predict a test result,
-then change one small thing and rerun it.
+then change one small thing and rerun it. Pair them with
+`docs/25-go-testing.md` when you want to practice benchmarks, fuzzing, race
+tests, and test helpers against small packages before touching the main service.

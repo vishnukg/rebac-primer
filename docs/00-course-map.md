@@ -11,10 +11,12 @@ the core ReBAC path.
 
 | Doc | Topic | Practice |
 |---|---|---|
+| 09 | Go learning path, coverage map, practice loop | choose the route and drills |
 | 10 | Toolchain, modules, packages, syntax, control flow, structs, `defer` | inspect and run `internal/rebac` |
 | 11 | Values, pointers, methods, slices, maps, strings, nil | inspect document copying and token slices |
 | 12 | Errors, interfaces, package design, table tests, test doubles | extend a parser or validation test |
 | 13 | `net/http`, JSON, context, mutexes, lifecycle, `httptest` | trace and run the HTTP service |
+| 14 | Go idioms and patterns: package shape, constructors, interfaces, errors, concurrency taste | review one package boundary and explain why it is shaped that way |
 
 ## Core ReBAC Path
 
@@ -52,16 +54,18 @@ decision?
 | 34 | OpenFGA adapter walkthrough | `internal/openfga/openfga.go` |
 | 40 | Production readiness | boundaries and replacement checklist |
 
-## Optional Go Language Examples
+## Advanced Go Language Practice
 
 These examples are not part of the running authorization path. They are small
-teaching modules that use the same domain types:
+teaching modules that use the same domain types. If your main goal is learning
+Go, do them; they are optional only for understanding ReBAC.
 
 | Doc | Topic | Code |
 |---|---|---|
 | 22 | Concurrency | `examples/concurrency/parallel.go` |
 | 23 | Generics | `examples/generics/result.go` |
 | 24 | Interfaces and embedding | `examples/middleware/middleware.go` |
+| 25 | Testing, fuzzing, benchmarks, race detector, contract tests | `internal/*_test.go`, `examples/*_test.go` |
 
 ## Operations
 
@@ -76,12 +80,12 @@ teaching modules that use the same domain types:
 
 For programmers new to Go:
 
-1. Complete docs 10–13 and their experiments.
+1. Read doc 09, then complete docs 10–14 and their experiments.
 2. Read docs 02–05 and 07.
 3. Run `make test`.
 4. Read `internal/authz/evaluator.go` with doc 27 open beside it.
 5. Run `make trace`.
-6. Complete docs 20, 21, 25, and 28. Docs 22–24 are optional Go lessons.
+6. Complete docs 20, 21, 22, 23, 24, 25, and 28.
 7. Complete the guided feature lab in doc 29.
 8. Read docs 01, 26, 34, and 40 for the OpenFGA production path.
 

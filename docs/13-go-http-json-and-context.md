@@ -275,4 +275,4 @@ You are ready to continue when you can explain:
 - why response headers must be set before the status
 - why configuration and shutdown belong in `cmd/server`
 
-Next: [Go language guide for this repository](20-go-language-guide.md).
+Next: [Go idioms and patterns](14-go-idioms-and-patterns.md).
