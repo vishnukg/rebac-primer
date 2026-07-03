@@ -64,6 +64,12 @@ OpenFGA's Read API is paginated. `ListTuples` follows continuation tokens until
 all matching pages are collected. Missing this loop would silently return a
 partial tuple set and could break duplicate detection or cleanup.
 
+One filter shape is rejected up front: relation without object. The OpenFGA
+Read API requires at least an object type alongside a relation, so the adapter
+returns a clear error instead of forwarding a request the server would refuse.
+The in-memory store does support relation-only filtering — a small reminder
+that two backends satisfying the same interface can still differ at the edges.
+
 The method supports consumers such as the authz HTTP example. Production
 applications should prefer purpose-built OpenFGA query APIs for authorization
 questions and avoid treating tuple reads as a general listing/search API.

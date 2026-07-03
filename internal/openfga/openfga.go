@@ -148,9 +148,17 @@ func (s *Service) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) err
 
 // ListTuples reads tuples back from the OpenFGA store, optionally filtered by
 // object and/or relation.
+//
+// A relation-only filter is rejected up front: the OpenFGA Read API requires at
+// least an object type alongside a relation, so forwarding that filter would
+// fail server-side with a less helpful error. The in-memory store supports it;
+// this is one of the small capability differences between the two backends.
 func (s *Service) ListTuples(ctx context.Context, filter ...authz.TupleFilter) ([]rebac.TupleKey, error) {
 	body := openfga.ClientReadRequest{}
 	if len(filter) > 0 {
+		if filter[0].Object == "" && filter[0].Relation != "" {
+			return nil, fmt.Errorf("openfga: list tuples: the OpenFGA Read API cannot filter by relation alone; set Object too or drop the Relation filter")
+		}
 		if filter[0].Object != "" {
 			object := string(filter[0].Object)
 			body.Object = &object

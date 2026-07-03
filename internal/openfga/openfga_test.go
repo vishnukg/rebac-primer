@@ -34,6 +34,21 @@ func TestNew_GivenMissingConfig_WhenCalled_ThenReturnsError(t *testing.T) {
 	}
 }
 
+func TestListTuples_GivenRelationOnlyFilter_WhenCalled_ThenReturnsError(t *testing.T) {
+	// The guard rejects the filter before any network call, so no client is needed.
+	svc := &openfga.Service{}
+	_, err := svc.ListTuples(context.Background(), authz.TupleFilter{
+		Relation: rebac.RelationWorkspaceEditor,
+	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "relation alone") {
+		t.Errorf("error = %q, want it to mention filtering by relation alone", err)
+	}
+}
+
 func TestWriteTuples_GivenInvalidTuple_WhenCalled_ThenReturnsValidationError(t *testing.T) {
 	svc := &openfga.Service{}
 	err := svc.WriteTuples(context.Background(), []rebac.TupleKey{{

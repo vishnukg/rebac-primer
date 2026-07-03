@@ -13,7 +13,7 @@ FGA_CLI  := docker run --rm -v "$(CURDIR):/workspace" -w /workspace openfga/cli:
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build test test-race trace test-permission vet lint modernize check shell server server-down server-openfga \
+.PHONY: help build test test-race trace test-permission vet lint vulncheck modernize check shell server server-down server-openfga \
         openfga/up openfga/down openfga/model-test openfga/seed compose/config clean
 
 help:
@@ -29,8 +29,9 @@ help:
 	@printf '%s\n' '  make test-permission Run one representative permission test'
 	@printf '%s\n' '  make vet            Run go vet'
 	@printf '%s\n' '  make lint           Run staticcheck'
+	@printf '%s\n' '  make vulncheck      Scan dependencies with govulncheck'
 	@printf '%s\n' '  make modernize      Report Go 1.26 modernization suggestions'
-	@printf '%s\n' '  make check          Vet, staticcheck, tests, and race tests'
+	@printf '%s\n' '  make check          Gofmt check, vet, staticcheck, tests, and race tests'
 	@printf '%s\n' '  make shell          Open shell in the Go tools container'
 	@printf '%s\n' '  make server         Run the Go app on http://127.0.0.1:4001'
 	@printf '%s\n' ''
@@ -62,16 +63,19 @@ test-permission:
 vet:
 	$(GO_TOOLS) go vet ./...
 
-# staticcheck is pinned in go.mod; go run uses that module version without a
-# global install.
+# staticcheck and govulncheck are pinned in go.mod; go run uses those module
+# versions without a global install.
 lint:
 	$(GO_TOOLS) go run honnef.co/go/tools/cmd/staticcheck ./...
+
+vulncheck:
+	$(GO_TOOLS) go run golang.org/x/vuln/cmd/govulncheck ./...
 
 modernize:
 	$(GO_TOOLS) go fix -diff ./...
 
 check:
-	$(GO_TOOLS) sh -c 'go vet ./... && go run honnef.co/go/tools/cmd/staticcheck ./... && go test ./... && go test -race ./...'
+	$(GO_TOOLS) sh -c 'test -z "$$(gofmt -l .)" || { echo "These files need gofmt:"; gofmt -l .; exit 1; }; go vet ./... && go run honnef.co/go/tools/cmd/staticcheck ./... && go test ./... && go test -race ./...'
 
 shell:
 	$(GO_TOOLS) sh
