@@ -29,6 +29,7 @@ Read these in order:
 | 04 | ReBAC concepts: why tuples, subject sets, checks | `internal/rebac/rebac.go` |
 | 05 | OpenFGA model DSL: why this policy is structured this way | `deployments/openfga/model.fga`, `internal/authz/model.go` |
 | 07 | Designing a ReBAC authz service: product sentences to policy | `deployments/openfga/model.fga.yaml` |
+| 08 | Policy-based authorization: engines, PEP/PDP, OPA/Cedar, where ReBAC fits | `internal/authz/model.go`, `internal/authz/evaluator.go` |
 | 27 | Graph evaluator walkthrough | `internal/authz/evaluator.go` |
 
 This path answers one question: how does a relationship become an allow/deny
@@ -81,7 +82,7 @@ Go, do them; they are optional only for understanding ReBAC.
 For programmers new to Go:
 
 1. Read doc 09, then complete docs 10–14 and their experiments.
-2. Read docs 02–05 and 07.
+2. Read docs 02–05, 07, and 08.
 3. Run `make test`.
 4. Read `internal/authz/evaluator.go` with doc 27 open beside it.
 5. Run `make trace`.

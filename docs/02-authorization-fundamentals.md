@@ -289,6 +289,11 @@ Diagram:
 ABAC is powerful for contextual policies, but it can hide product relationships
 inside policy expressions.
 
+The "policy engine" box in that diagram is a real architectural pattern with
+its own vocabulary and products (OPA, Cedar). Doc
+[08-policy-based-authorization.md](08-policy-based-authorization.md) covers how
+those engines work and how ReBAC relates to them; read it after doc 07.
+
 ## ReBAC: relationship-based access control
 
 ReBAC decides from relationships.

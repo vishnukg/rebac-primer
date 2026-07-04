@@ -65,7 +65,8 @@ If graphs and OpenFGA are completely new, the optional
 3. [ReBAC concepts](docs/04-rebac-concepts.md)
 4. [OpenFGA model](docs/05-openfga-model.md)
 5. [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md)
-6. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
+6. [Policy-based authorization](docs/08-policy-based-authorization.md)
+7. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
 
 ### Go route: understand the implementation
 

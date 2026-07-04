@@ -464,6 +464,13 @@ authz/OpenFGA        → evaluates the authorization question
 The domain service is the important enforcement point because it knows the
 business operation. A UI hiding a button is not enforcement.
 
+These roles (plus the Policy Administration Point) come from the XACML
+standard and apply to every policy-based system, not only ReBAC. Doc
+[08-policy-based-authorization.md](08-policy-based-authorization.md) develops
+them fully, shows how general policy engines such as OPA and Cedar evaluate
+decisions, and explains why relationship-heavy policy pushes toward an engine
+that stores the relationship data itself.
+
 ## Decision API Design
 
 Start with a small API:
