@@ -2,6 +2,12 @@
 
 Read this with `internal/openfga/openfga.go` open.
 
+This chapter explains the code seam, not the whole production migration. The
+adapter proves that application use cases can keep a stable interface while the
+backend changes. Backfill, relationship ownership, shadow decisions, canary
+cutover, and operations are separate stages in
+[doc 26](26-openfga-migration.md).
+
 ## What Changes
 
 Default graph backend:
@@ -54,15 +60,17 @@ OpenFGA Write API.
 That is why a later `can_delete` check can see that Alice owns the document.
 
 The adapter pins an authorization model ID. That avoids silently changing check
-semantics when a newer model is deployed. Its read-before-write duplicate check
-is intentionally simple and not atomic; production event consumers should use
-idempotency and retry policy at the workflow level.
+semantics when a newer model is deployed. It also asks OpenFGA to ignore an
+already-existing write, making the adapter's idempotent write contract atomic
+without a read-before-write race. Deletes similarly ignore missing tuples.
+Production event consumers still need retry and idempotency policy for the
+larger business workflow.
 
 ## Read and Pagination
 
 OpenFGA's Read API is paginated. `ListTuples` follows continuation tokens until
 all matching pages are collected. Missing this loop would silently return a
-partial tuple set and could break duplicate detection or cleanup.
+partial tuple set to administrative consumers.
 
 One filter shape is rejected up front: relation without object. The OpenFGA
 Read API requires at least an object type alongside a relation, so the adapter

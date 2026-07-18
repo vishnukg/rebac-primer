@@ -113,12 +113,14 @@ reachability: every recursive branch comes from the requested relation's model.
 The evaluator uses **depth-first search (DFS)**: it picks one branch and follows
 it all the way to the end before trying another.
 
-For each `(object, relation)` pair it visits, it tries four things:
+For each writable `(object, relation)` pair it visits, it tries four things.
+Computed `can_*` permissions cannot be stored, so they skip tuple lookup and
+start at rule expansion:
 
 | Step | Name | What it does |
 |---|---|---|
-| 1 | Direct lookup | Is there a tuple `(object, relation, user)` in the store? |
-| 2 | Subject-set | Is there a tuple `(object, relation, group#rel)` where user is a member of that group? |
+| 1 | Direct lookup | For a writable relation, is there a tuple `(object, relation, user)` in the store? |
+| 2 | Subject-set | For a writable relation, is there a tuple `(object, relation, group#rel)` where user is a member of that group? |
 | 3 | Rule expansion | Does the permission model say this relation is implied by a stronger one? Recurse. |
 | 4 | Workspace inherit | (documents only) Follow the `workspace` pointer to the parent and check there. |
 
@@ -141,9 +143,9 @@ Let's trace every step the evaluator takes.
 hasRelation(alice, document:roadmapDocument, can_edit)
 ```
 
-**Step 1 — direct lookup:** Does the internal store contain
-`TupleKey{Object: document:roadmapDocument, Relation: can_edit, User: user:alice}`?
-No.  The four fixture tuples don't include that.
+**Steps 1 and 2 — skipped:** `can_edit` is a computed permission. The model does
+not permit direct or subject-set `can_edit` tuples, so the evaluator must derive
+it from writable relations instead of consulting the tuple store.
 
 **Step 3 — rule expansion:** Consult `documentRules`:
 
@@ -303,7 +305,7 @@ Casey has no tuples.  The evaluator exhausts every branch and finds nothing.
 
 ```
 hasRelation(casey, document:roadmapDocument, can_read)
-  step 1: no direct tuple
+  steps 1–2: skipped because can_read is computed
   step 3: can_read → viewer (documentRules)
     hasRelation(casey, document:roadmapDocument, viewer)
       step 1: no direct tuple
@@ -353,19 +355,22 @@ workspace tuple needed.
 What happens if the graph has a loop?  For example:
 
 ```
-(document:cyclicDoc, workspace, document:cyclicDoc)   ← points to itself
+(team:a, member, team:b#member)
+(team:b, member, team:a#member)   ← points back to the first userset
 ```
 
-That tuple is intentionally malformed and would be rejected by
-`ValidateTuple`; the cycle test inserts it directly into the low-level store to
-prove the traversal remains safe even if corrupted data bypasses normal writes.
+Those tuples are intentionally invalid for this repository's model—team
+membership accepts users, not nested team usersets—and `ValidateTuple` would
+reject them. The cycle test inserts them directly into the low-level store to
+prove the traversal remains safe even if corrupted data bypasses normal writes
+or a future model introduces recursion.
 
 Without a guard, `hasRelation` would recurse forever:
 
 ```
-hasRelation(bob, document:cyclicDoc, can_read)
-  → workspace inherit → hasRelation(bob, document:cyclicDoc, viewer)
-      → workspace inherit → hasRelation(bob, document:cyclicDoc, viewer)
+hasRelation(casey, team:a, member)
+  → resolve team:b#member → hasRelation(casey, team:b, member)
+      → resolve team:a#member → hasRelation(casey, team:a, member)
           → ... forever
 ```
 
@@ -383,11 +388,10 @@ r.visiting[visitKey] = true
 defer delete(r.visiting, visitKey)
 ```
 
-The second time `hasRelation(bob, document:cyclicDoc, viewer)` is called, the
-pair is already active, so it returns `false` immediately instead of recursing
-again. When a call returns, `defer delete` removes its pair. That allows a
-different branch to revisit the same graph node without being incorrectly
-denied.
+The second `hasRelation(casey, team:a, member)` call finds the pair already
+active, so it returns `false` immediately instead of recursing again. When a
+call returns, `defer delete` removes its pair. That allows a different branch to
+revisit the same graph node without being incorrectly denied.
 
 ---
 
@@ -427,6 +431,7 @@ Check "viewer" on workspace:productWorkspace for alice:
 |---|---|
 | Entry point for a check | `GraphEvaluator.Evaluate()` (builds a per-request `resolution`) |
 | The recursive traversal | `resolution.hasRelation()` |
+| Writable-relation gate | `hasRelation()` — skips `hasTuple()` for computed permissions |
 | Step 1: direct lookup | `hasTuple()` — first `if` block |
 | Step 2: subject-set | `hasTuple()` — the `for` loop |
 | Subject-set recursion | `subjectSetContains()` |
@@ -479,25 +484,33 @@ func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
         rebac.RelationDocumentOwner,
         rebac.Subject(fixtures.Alice),
     )
-    ev := newEvaluator(extra)
-    ctx := context.Background()
+    tuples := append(fixtures.SeedRelationshipTuples(), extra)
+    store := authz.NewInMemoryStore(tuples...)
+    ev := authz.NewGraphEvaluator(store)
+    ctx := t.Context()
 
     // alice (owner) can share
-    got, _ := ev.Evaluate(ctx, rebac.CheckRequest{
+    got, err := ev.Evaluate(ctx, rebac.CheckRequest{
         User:     fixtures.Alice,
         Relation: rebac.RelationDocumentCanShare,
         Object:   fixtures.RoadmapDocument,
     })
+    if err != nil {
+        t.Fatalf("owner check: %v", err)
+    }
     if !got.Allowed {
         t.Error("expected owner can_share=true")
     }
 
     // bob (viewer) cannot share
-    got, _ = ev.Evaluate(ctx, rebac.CheckRequest{
+    got, err = ev.Evaluate(ctx, rebac.CheckRequest{
         User:     fixtures.Bob,
         Relation: rebac.RelationDocumentCanShare,
         Object:   fixtures.RoadmapDocument,
     })
+    if err != nil {
+        t.Fatalf("viewer check: %v", err)
+    }
     if got.Allowed {
         t.Error("expected viewer can_share=false")
     }
@@ -509,5 +522,5 @@ extra model and validation edits are important because this repository keeps a
 teaching evaluator and an OpenFGA model intentionally aligned.
 
 Next: choose `20-go-language-guide.md` and `21-go-rebac-implementation.md` to
-study the Go design, or docs 26 and 34 to replace the teaching evaluator with
-OpenFGA.
+study the Go design, or read docs 26 and 34 for the staged path from this
+teaching evaluator to OpenFGA.

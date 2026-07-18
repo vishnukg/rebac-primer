@@ -22,30 +22,38 @@ func (e erroringStore) FindByObjectRelation(context.Context, rebac.Object, rebac
 	return nil, e.err
 }
 func TestGraphEvaluator_PropagatesStoreError(t *testing.T) {
+	// Arrange
 	sentinel := errors.New("tuple store unavailable")
 	ev := authz.NewGraphEvaluator(erroringStore{err: sentinel})
 
-	_, err := ev.Evaluate(context.Background(), rebac.CheckRequest{
+	// Act
+	_, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
 		User:     fixtures.Alice,
 		Relation: rebac.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	})
+
+	// Assert
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("expected store error to propagate, got %v", err)
 	}
 }
 
 func TestGraphEvaluator_CancelledContextReturnsError(t *testing.T) {
+	// Arrange
 	ev := authz.NewGraphEvaluator(authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // already cancelled before the check starts
 
+	// Act
 	_, err := ev.Evaluate(ctx, rebac.CheckRequest{
 		User:     fixtures.Alice,
 		Relation: rebac.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	})
+
+	// Assert
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got %v", err)
 	}

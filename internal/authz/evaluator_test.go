@@ -1,7 +1,6 @@
 package authz_test
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -10,23 +9,12 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// seedStore builds a tuple store from the standard fixture tuples.
-// Optional extra tuples can be appended for specific test cases.
-func seedStore(extra ...rebac.TupleKey) *authz.InMemoryStore {
-	all := append(fixtures.SeedRelationshipTuples(), extra...)
-	return authz.NewInMemoryStore(all...)
-}
-
-// newEvaluator is a helper that wraps seedStore + NewGraphEvaluator.
-func newEvaluator(extra ...rebac.TupleKey) *authz.GraphEvaluator {
-	return authz.NewGraphEvaluator(seedStore(extra...))
-}
-
 func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
 	// Arrange: alice is a member of platformTeam, which is an editor of
 	// productWorkspace. roadmapDocument lives in productWorkspace. The graph
 	// traversal should resolve this chain and grant can_edit.
-	ev := newEvaluator()
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
 		User:     fixtures.Alice,
 		Relation: rebac.RelationDocumentCanEdit,
@@ -34,7 +22,7 @@ func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
 	}
 
 	// Act
-	result, err := ev.Evaluate(context.Background(), req)
+	result, err := ev.Evaluate(t.Context(), req)
 
 	// Assert
 	if err != nil {
@@ -58,10 +46,12 @@ func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
 }
 
 func TestGraphEvaluator_BobCanReadButNotEdit(t *testing.T) {
-	ev := newEvaluator()
-	ctx := context.Background()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
+	ctx := t.Context()
 
-	// can_read
+	// Act: check both permissions.
 	readResult, err := ev.Evaluate(ctx, rebac.CheckRequest{
 		User:     fixtures.Bob,
 		Relation: rebac.RelationDocumentCanRead,
@@ -77,7 +67,6 @@ func TestGraphEvaluator_BobCanReadButNotEdit(t *testing.T) {
 		}
 	}
 
-	// can_edit
 	editResult, err := ev.Evaluate(ctx, rebac.CheckRequest{
 		User:     fixtures.Bob,
 		Relation: rebac.RelationDocumentCanEdit,
@@ -86,20 +75,27 @@ func TestGraphEvaluator_BobCanReadButNotEdit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error on edit check: %v", err)
 	}
+
+	// Assert
 	if editResult.Allowed {
 		t.Error("expected bob can_edit=false but got true")
 	}
 }
 
 func TestGraphEvaluator_CaseyIsDenied(t *testing.T) {
-	ev := newEvaluator()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
 		User:     fixtures.Casey,
 		Relation: rebac.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	}
 
-	result, err := ev.Evaluate(context.Background(), req)
+	// Act
+	result, err := ev.Evaluate(t.Context(), req)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -112,42 +108,85 @@ func TestGraphEvaluator_CaseyIsDenied(t *testing.T) {
 }
 
 func TestGraphEvaluator_CycleDetectionDoesNotHang(t *testing.T) {
-	// A document whose workspace pointer points back to itself creates a cycle.
-	// The active-path cycle guard must prevent infinite recursion.
-	cyclicDoc := rebac.Document("cyclicDoc")
+	// Arrange
+	// These malformed low-level tuples make two team usersets refer to each
+	// other. Service.WriteTuples would reject them, but the evaluator must still
+	// terminate if corrupt data bypasses that boundary.
+	teamA := rebac.Team("a")
+	teamB := rebac.Team("b")
 	store := authz.NewInMemoryStore(
-		rebac.Tuple(cyclicDoc, rebac.RelationDocumentWorkspace, rebac.Subject(cyclicDoc)),
-		rebac.Tuple(cyclicDoc, rebac.RelationDocumentViewer, rebac.Subject(fixtures.Bob)),
+		rebac.Tuple(teamA, rebac.RelationTeamMember, rebac.SubjectSet(teamB, rebac.RelationTeamMember)),
+		rebac.Tuple(teamB, rebac.RelationTeamMember, rebac.SubjectSet(teamA, rebac.RelationTeamMember)),
 	)
 	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
-		User:     fixtures.Bob,
-		Relation: rebac.RelationDocumentCanRead,
-		Object:   cyclicDoc,
+		User:     fixtures.Casey,
+		Relation: rebac.RelationTeamMember,
+		Object:   teamA,
 	}
 
-	result, err := ev.Evaluate(context.Background(), req)
+	// Act
+	result, err := ev.Evaluate(t.Context(), req)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Allowed {
-		t.Error("expected can_read=true even with cyclic workspace pointer")
+	if result.Allowed {
+		t.Error("expected a cycle with no direct user tuple to be denied")
+	}
+	if !slices.Contains(result.Trace, "Cycle detected at team:a#member; stop this branch") {
+		t.Errorf("expected trace to report the cycle, got:")
 		for _, line := range result.Trace {
-			t.Logf("  trace: %s", line)
+			t.Logf("  %s", line)
 		}
 	}
 }
 
+func TestGraphEvaluator_IgnoresStoredComputedPermission(t *testing.T) {
+	// Arrange
+	// can_edit is computed from editor; the model does not permit a can_edit
+	// tuple. Seed the low-level store directly to prove corrupted data cannot
+	// bypass the model and over-grant access.
+	store := authz.NewInMemoryStore(rebac.Tuple(
+		fixtures.RoadmapDocument,
+		rebac.RelationDocumentCanEdit,
+		rebac.Subject(fixtures.Casey),
+	))
+	ev := authz.NewGraphEvaluator(store)
+
+	// Act
+	result, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
+		User:     fixtures.Casey,
+		Relation: rebac.RelationDocumentCanEdit,
+		Object:   fixtures.RoadmapDocument,
+	})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Allowed {
+		t.Error("computed can_edit tuple granted access; want model-derived denial")
+	}
+}
+
 func TestGraphEvaluator_TeamAdminIsAlsoMember(t *testing.T) {
+	// Arrange
 	extra := rebac.Tuple(fixtures.PlatformTeam, rebac.RelationTeamAdmin, rebac.Subject(fixtures.Casey))
-	ev := newEvaluator(extra)
+	tuples := append(fixtures.SeedRelationshipTuples(), extra)
+	store := authz.NewInMemoryStore(tuples...)
+	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
 		User:     fixtures.Casey,
 		Relation: rebac.RelationTeamMember,
 		Object:   fixtures.PlatformTeam,
 	}
 
-	result, err := ev.Evaluate(context.Background(), req)
+	// Act
+	result, err := ev.Evaluate(t.Context(), req)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -166,8 +205,7 @@ func TestGraphEvaluator_TeamAdminIsAlsoMember(t *testing.T) {
 // TestGraphEvaluator_PermissionMatrix uses a table-driven test to verify the
 // full permission matrix for the three fixture users against the roadmap document.
 func TestGraphEvaluator_PermissionMatrix(t *testing.T) {
-	ev := newEvaluator()
-
+	// Arrange
 	rows := []struct {
 		name     string
 		user     rebac.Object
@@ -193,11 +231,18 @@ func TestGraphEvaluator_PermissionMatrix(t *testing.T) {
 
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
-			result, err := ev.Evaluate(context.Background(), rebac.CheckRequest{
+			// Arrange: every subtest owns its evaluator and store.
+			store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+			ev := authz.NewGraphEvaluator(store)
+
+			// Act
+			result, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
 				User:     row.user,
 				Relation: row.relation,
 				Object:   fixtures.RoadmapDocument,
 			})
+
+			// Assert
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -214,54 +259,19 @@ func TestGraphEvaluator_PermissionMatrix(t *testing.T) {
 // BenchmarkGraphEvaluator_Evaluate measures a single graph traversal.
 // Run with: go test -bench=. -benchtime=5s ./internal/authz
 func BenchmarkGraphEvaluator_Evaluate(b *testing.B) {
-	ev := newEvaluator()
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
 		User:     fixtures.Alice,
 		Relation: rebac.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	}
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for range b.N {
-		ev.Evaluate(ctx, req) //nolint:errcheck
+		if _, err := ev.Evaluate(ctx, req); err != nil {
+			b.Fatal(err)
+		}
 	}
-}
-
-// FuzzParseObject exercises ParseObject with arbitrary byte sequences.
-// Run with: go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/authz
-func FuzzParseObject(f *testing.F) {
-	f.Add("user:alice")
-	f.Add("team:platformTeam")
-	f.Add("workspace:productWorkspace")
-	f.Add("document:roadmapDocument")
-	f.Add("")
-	f.Add(":")
-	f.Add("user:")
-	f.Add("workspace: ")
-	f.Add(":alice")
-	f.Add("unknown:something")
-
-	f.Fuzz(func(t *testing.T, s string) {
-		typ, id, err := rebac.ParseObject(s)
-		if err != nil {
-			return
-		}
-		var obj rebac.Object
-		switch typ {
-		case rebac.ObjectTypeUser:
-			obj = rebac.User(id)
-		case rebac.ObjectTypeTeam:
-			obj = rebac.Team(id)
-		case rebac.ObjectTypeWorkspace:
-			obj = rebac.Workspace(id)
-		case rebac.ObjectTypeDocument:
-			obj = rebac.Document(id)
-		default:
-			t.Fatalf("ParseObject returned unrecognised type %q", typ)
-		}
-		if string(obj) != s {
-			t.Errorf("round-trip failed: ParseObject(%q) -> type=%s id=%s -> Object=%q", s, typ, id, obj)
-		}
-	})
 }

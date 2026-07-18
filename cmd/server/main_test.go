@@ -5,10 +5,13 @@ import (
 )
 
 func TestReadPort_UsesDefaultPort(t *testing.T) {
+	// Arrange
 	t.Setenv("PORT", "")
 
+	// Act
 	port, err := readPort()
 
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -18,10 +21,13 @@ func TestReadPort_UsesDefaultPort(t *testing.T) {
 }
 
 func TestReadPort_UsesConfiguredPort(t *testing.T) {
+	// Arrange
 	t.Setenv("PORT", "4999")
 
+	// Act
 	port, err := readPort()
 
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -31,10 +37,13 @@ func TestReadPort_UsesConfiguredPort(t *testing.T) {
 }
 
 func TestReadPort_RejectsInvalidPort(t *testing.T) {
+	// Arrange
 	t.Setenv("PORT", "not-a-port")
 
+	// Act
 	_, err := readPort()
 
+	// Assert
 	if err == nil {
 		t.Fatal("expected error")
 	}

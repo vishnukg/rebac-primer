@@ -71,7 +71,7 @@ go test -run TestGraphEvaluator_TeamMemberCanEditDocument ./internal/authz
 Run one subtest:
 
 ```bash
-go test -run 'TestGraphEvaluator_PermissionMatrix/alice_can_edit' ./internal/authz
+go test -run 'TestGraphEvaluator_PermissionMatrix/editor_can_edit' ./internal/authz
 ```
 
 Add `-v` when test logs or subtest names matter:
@@ -111,19 +111,39 @@ with twenty vague rows is worse than five rows with names that explain the rule.
 
 ## Helpers
 
-Move noisy setup into helpers when it makes the behavior clearer:
+This repository keeps each unit test's setup inside that test. The small amount
+of repetition is deliberate: a reader can see the complete precondition without
+jumping to `newTestService`, and changing one test cannot silently change the
+arrangement of many others.
 
 ```go
-func newEvaluator(t *testing.T, tuples ...rebac.TupleKey) *authz.GraphEvaluator {
-    t.Helper()
-    store := authz.NewInMemoryStore(tuples...)
-    return authz.NewGraphEvaluator(store)
+func TestGraphEvaluator_AllowsTeamEditor(t *testing.T) {
+    // Arrange
+    store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+    evaluator := authz.NewGraphEvaluator(store)
+    request := rebac.CheckRequest{/* ... */}
+
+    // Act
+    result, err := evaluator.Evaluate(t.Context(), request)
+
+    // Assert
+    if err != nil {
+        t.Fatalf("Evaluate returned error: %v", err)
+    }
+    if !result.Allowed {
+        t.Error("Allowed = false, want true")
+    }
 }
 ```
 
-`t.Helper()` tells the test runner to report failures at the call site, not
-inside the helper. Use helpers for setup and repeated assertions. Do not hide
-the essential behavior of the test behind a helper name.
+Use Arrange / Act / Assert explicitly. Keep the Act small—ideally the single
+behavior named by the test. A test may use canonical product data such as
+`fixtures.SeedRelationshipTuples()`, which returns a fresh slice, but it still
+constructs its own store and evaluator.
+
+`t.Helper()` remains useful for narrowly focused assertion or decoding helpers:
+it tells the runner to report a failure at the caller. Do not use it here to
+hide shared setup or the behavior that the test is meant to teach.
 
 Useful helpers from `testing.T`:
 
@@ -239,8 +259,10 @@ A benchmark function starts with `Benchmark` and uses `b.N`:
 
 ```go
 func BenchmarkGraphEvaluator_Evaluate(b *testing.B) {
-    for i := 0; i < b.N; i++ {
-        _, _ = evaluator.Evaluate(context.Background(), request)
+    for range b.N {
+        if _, err := evaluator.Evaluate(b.Context(), request); err != nil {
+            b.Fatal(err)
+        }
     }
 }
 ```
@@ -294,7 +316,7 @@ The repository-level loop is:
 gofmt -w .
 go test ./...
 go vet ./...
-go run honnef.co/go/tools/cmd/staticcheck ./...
+go tool staticcheck ./...
 go test -race ./...
 ```
 
@@ -319,7 +341,7 @@ go test -race ./...
 Do these in order:
 
 1. Add a table row to a parser or validator test.
-2. Add `t.Helper()` to a noisy setup helper and observe failure locations.
+2. Add `t.Helper()` to a temporary assertion helper and observe failure locations.
 3. Run `TestTrace` with `-v` and explain the graph walk.
 4. Add a denied authorization case that would catch over-granting.
 5. Run the parser fuzz target for 30 seconds.
@@ -332,7 +354,7 @@ You are ready to continue when you can explain:
 
 - when to use `Fatal` versus `Error`
 - why table rows need meaningful names
-- why `t.Helper()` changes failure reporting
+- why `t.Helper()` changes failure reporting without justifying hidden setup
 - why contract tests are useful for OpenFGA parity
 - why allow-only authorization tests are insufficient
 - what fuzzing and benchmarks prove, and what they do not prove

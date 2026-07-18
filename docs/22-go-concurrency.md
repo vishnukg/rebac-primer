@@ -151,7 +151,7 @@ for i, req := range reqs {
 }
 ```
 
-Because this module's `go.mod` declares Go 1.25 and the toolchain is Go 1.26.4,
+Because this module's `go.mod` declares Go 1.25 and the toolchain is Go 1.26.5,
 each iteration gets its own `i` and `req`. In older pre-1.22 code, you will see
 the values passed as parameters to avoid the old loop-capture trap.
 
@@ -199,7 +199,7 @@ go func() {
 
 That is also valid. The important rule is the same: add the work before waiting,
 and make sure every started goroutine eventually marks itself done. This module
-uses Go 1.26.4, so the example uses `WaitGroup.Go`.
+uses Go 1.26.5, so the example uses `WaitGroup.Go`.
 
 ## Channel Vs WaitGroup: When To Use Which
 
@@ -241,8 +241,8 @@ evaluator like the OpenFGA adapter additionally passes `ctx` to its HTTP
 client, which aborts the request in flight.
 
 ```go
-// context.Background() in tests means "never cancel"
-result, err := ev.Evaluate(context.Background(), req)
+// t.Context() is cancelled as the test finishes.
+result, err := ev.Evaluate(t.Context(), req)
 ```
 
 `AllPermissions` acts on the context at its own level too — it stops collecting

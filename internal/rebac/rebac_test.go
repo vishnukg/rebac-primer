@@ -184,3 +184,41 @@ func TestTuple_GivenParts_WhenBuilt_ThenPopulatesAllFields(t *testing.T) {
 		t.Errorf("Tuple() = %+v, want %+v", got, want)
 	}
 }
+
+// FuzzParseObject exercises the parser in the package that owns it.
+// Run with: go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/rebac
+func FuzzParseObject(f *testing.F) {
+	f.Add("user:alice")
+	f.Add("team:platformTeam")
+	f.Add("workspace:productWorkspace")
+	f.Add("document:roadmapDocument")
+	f.Add("")
+	f.Add(":")
+	f.Add("user:")
+	f.Add("workspace: ")
+	f.Add(":alice")
+	f.Add("unknown:something")
+
+	f.Fuzz(func(t *testing.T, s string) {
+		typ, id, err := rebac.ParseObject(s)
+		if err != nil {
+			return
+		}
+		var obj rebac.Object
+		switch typ {
+		case rebac.ObjectTypeUser:
+			obj = rebac.User(id)
+		case rebac.ObjectTypeTeam:
+			obj = rebac.Team(id)
+		case rebac.ObjectTypeWorkspace:
+			obj = rebac.Workspace(id)
+		case rebac.ObjectTypeDocument:
+			obj = rebac.Document(id)
+		default:
+			t.Fatalf("ParseObject returned unrecognised type %q", typ)
+		}
+		if string(obj) != s {
+			t.Errorf("round-trip failed: ParseObject(%q) -> type=%s id=%s -> Object=%q", s, typ, id, obj)
+		}
+	})
+}

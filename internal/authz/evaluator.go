@@ -35,12 +35,12 @@
 // # The traversal algorithm (depth-first search)
 //
 // The evaluator performs depth-first search (DFS): it picks a branch and
-// follows it all the way down before trying another.  For each (object,
-// relation) it visits, it tries four things in order:
+// follows it all the way down before trying another. For a writable relation it
+// tries four things in order; a computed permission starts at rule expansion:
 //
 //  1. Direct lookup      — is there a tuple (object, relation, user) in the store?
 //  2. Subject-set        — is there a tuple (object, relation, group#rel) where
-//     user is a member of that group?
+//     user is a member of that group? Computed can_* permissions skip steps 1–2.
 //  3. Rule expansion     — does the permission model say this relation is implied
 //     by a stronger relation? If so, recurse with that relation.
 //  4. Workspace inherit  — (documents only) follow the "workspace" pointer to the
@@ -51,12 +51,13 @@
 //
 // # Cycle detection
 //
-// Some graphs can have cycles (e.g. a document whose workspace pointer points to
-// itself). Without a guard, the traversal would recurse forever. The active-path
-// set records every (object#relation) pair on the current recursion path. If we
-// encounter the same pair before unwinding, we found a cycle and stop that
-// branch. Removing entries as calls return still allows a shared node to be
-// evaluated through a different, independent path.
+// Malformed relationship data can contain cycles (for example, team:a#member can
+// contain team:b#member while team:b#member contains team:a#member). Without a
+// guard, the traversal would recurse forever. The active-path set records every
+// (object#relation) pair on the current recursion path. If we encounter the same
+// pair before unwinding, we found a cycle and stop that branch. Removing entries
+// as calls return still allows a shared node to be evaluated through a different,
+// independent path.
 
 package authz
 
@@ -223,24 +224,31 @@ func (r *resolution) hasRelation(
 	// Look in the tuple store.  This covers both:
 	//   1. a direct tuple  (object, relation, user:alice)
 	//   2. a subject-set   (object, relation, team:foo#member) where alice is a member
-	found, err := r.hasTuple(user, object, relation, depth)
+	//
+	// Computed permissions such as can_edit deliberately skip tuple lookup.
+	// The model does not allow those relations to be written, so accepting a
+	// computed tuple that entered a low-level store by mistake would make this
+	// evaluator disagree with OpenFGA and could over-grant access.
+	typ, _, err := rebac.ParseObject(string(object))
 	if err != nil {
-		return false, err
+		// ValidateCheckRequest has already checked the object, so this is only a
+		// defensive guard if hasRelation is reused internally in the future.
+		return false, fmt.Errorf("graph: parse object %q: %w", object, err)
 	}
-	if found {
-		return true, nil
+	if !isComputedRelation(typ, relation) {
+		found, err := r.hasTuple(user, object, relation, depth)
+		if err != nil {
+			return false, err
+		}
+		if found {
+			return true, nil
+		}
 	}
 
 	// ── Step 3 & 4: permission-model expansion ────────────────────────────────
 	// The tuple store said "no".  Ask the permission model whether this relation
 	// can be satisfied by a stronger relation on the same object, or (for
 	// documents) inherited from the parent workspace.
-	typ, _, err := rebac.ParseObject(string(object))
-	if err != nil {
-		// Unknown object type — cannot expand further.
-		return false, nil
-	}
-
 	switch typ {
 	case rebac.ObjectTypeTeam:
 		// e.g. "member" is satisfied by "admin"

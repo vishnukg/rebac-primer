@@ -16,7 +16,7 @@ package openfga
 import (
 	"context"
 	"fmt"
-	"slices"
+	"net/http"
 
 	openfga "github.com/openfga/go-sdk/client"
 
@@ -26,9 +26,10 @@ import (
 
 // Config points the adapter at a store + pinned model on an OpenFGA server.
 type Config struct {
-	APIURL  string // e.g. http://127.0.0.1:8080
-	StoreID string
-	ModelID string
+	APIURL     string // e.g. http://127.0.0.1:8080
+	StoreID    string
+	ModelID    string
+	HTTPClient *http.Client // optional; defaults to the SDK's HTTP client
 }
 
 // Service delegates authorization operations to an OpenFGA server. Consumers
@@ -53,6 +54,7 @@ func New(cfg Config) (*Service, error) {
 		ApiUrl:               cfg.APIURL,
 		StoreId:              cfg.StoreID,
 		AuthorizationModelId: cfg.ModelID,
+		HTTPClient:           cfg.HTTPClient,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("openfga: new client: %w", err)
@@ -84,24 +86,14 @@ func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.Chec
 
 // WriteTuples persists relationship facts to the OpenFGA store.
 //
-// Tuples that already exist are skipped before the write. The OpenFGA Write API
-// rejects a duplicate tuple as an error, but the application contract (and the
-// in-memory store) treats writes as idempotent — re-running the startup seed
-// against a populated store must be a no-op, not a crash. The read-then-write is
-// not atomic, so a concurrent writer can still race in a duplicate; that
-// best-effort idempotency is fine for this primer.
+// The conflict option makes duplicate writes atomic no-ops. That matches the
+// application contract and the in-memory store without a racy read-before-write
+// round trip.
 func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
 	writes := make([]openfga.ClientTupleKey, 0, len(tuples))
 	for _, t := range tuples {
 		if err := authz.ValidateTuple(t); err != nil {
 			return err
-		}
-		exists, err := s.tupleExists(ctx, t)
-		if err != nil {
-			return err
-		}
-		if exists {
-			continue
 		}
 		writes = append(writes, openfga.ClientTupleKey{
 			User:     string(t.User),
@@ -112,19 +104,18 @@ func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) erro
 	if len(writes) == 0 {
 		return nil
 	}
-	if _, err := s.client.Write(ctx).Body(openfga.ClientWriteRequest{Writes: writes}).Execute(); err != nil {
+	options := openfga.ClientWriteOptions{
+		Conflict: openfga.ClientWriteConflictOptions{
+			OnDuplicateWrites: openfga.CLIENT_WRITE_REQUEST_ON_DUPLICATE_WRITES_IGNORE,
+		},
+	}
+	if _, err := s.client.Write(ctx).
+		Body(openfga.ClientWriteRequest{Writes: writes}).
+		Options(options).
+		Execute(); err != nil {
 		return fmt.Errorf("openfga: write tuples: %w", err)
 	}
 	return nil
-}
-
-// tupleExists reports whether the exact tuple is already stored.
-func (s *Service) tupleExists(ctx context.Context, t rebac.TupleKey) (bool, error) {
-	stored, err := s.ListTuples(ctx, authz.TupleFilter{Object: t.Object, Relation: t.Relation})
-	if err != nil {
-		return false, err
-	}
-	return slices.Contains(stored, t), nil
 }
 
 // DeleteTuples removes relationship facts from the OpenFGA store.
@@ -134,13 +125,24 @@ func (s *Service) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) err
 	}
 	deletes := make([]openfga.ClientTupleKeyWithoutCondition, 0, len(tuples))
 	for _, t := range tuples {
+		if err := authz.ValidateTuple(t); err != nil {
+			return err
+		}
 		deletes = append(deletes, openfga.ClientTupleKeyWithoutCondition{
 			User:     string(t.User),
 			Relation: string(t.Relation),
 			Object:   string(t.Object),
 		})
 	}
-	if _, err := s.client.Write(ctx).Body(openfga.ClientWriteRequest{Deletes: deletes}).Execute(); err != nil {
+	options := openfga.ClientWriteOptions{
+		Conflict: openfga.ClientWriteConflictOptions{
+			OnMissingDeletes: openfga.CLIENT_WRITE_REQUEST_ON_MISSING_DELETES_IGNORE,
+		},
+	}
+	if _, err := s.client.Write(ctx).
+		Body(openfga.ClientWriteRequest{Deletes: deletes}).
+		Options(options).
+		Execute(); err != nil {
 		return fmt.Errorf("openfga: delete tuples: %w", err)
 	}
 	return nil

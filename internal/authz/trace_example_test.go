@@ -1,9 +1,9 @@
 package authz_test
 
 import (
-	"context"
 	"testing"
 
+	"rebac-primer/internal/authz"
 	"rebac-primer/internal/fixtures"
 	"rebac-primer/internal/rebac"
 )
@@ -32,14 +32,20 @@ func TestTrace(t *testing.T) {
 		{"casey can_read roadmap (denied: no path)", fixtures.Casey, rebac.RelationDocumentCanRead, fixtures.RoadmapDocument},
 	}
 
-	ev := newEvaluator()
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := ev.Evaluate(context.Background(), rebac.CheckRequest{
+			// Arrange
+			store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+			ev := authz.NewGraphEvaluator(store)
+
+			// Act
+			result, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
 				User:     tc.user,
 				Relation: tc.relation,
 				Object:   tc.object,
 			})
+
+			// Assert and report the trace.
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

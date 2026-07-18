@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,45 +13,28 @@ import (
 	"rebac-primer/internal/fixtures"
 )
 
-// newTestHandler builds a fully-wired http.Handler.
-// These are integration-level tests: they exercise the full stack
-// (authn → authz → domain → HTTP) without starting a real server.
-func newTestHandler(t *testing.T) http.Handler {
-	return newTestHandlerWithTokens(t, fixtures.DemoTokens())
-}
-
-func newTestHandlerWithTokens(t *testing.T, tokens map[string]documents.TokenClaims) http.Handler {
-	t.Helper()
-
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
-	evaluator := authz.NewGraphEvaluator(tupleStore)
-	authzSvc := authz.New(tupleStore, evaluator)
-
-	docRepo := documents.NewInMemoryRepository()
-	tokenVerifier := documents.NewDemoTokenVerifier(tokens)
-	docsSvc := documents.New(docRepo, authzSvc)
-
-	_, err := docsSvc.Create(context.Background(), documents.CreateDocumentInput{
-		ID:        "roadmapDocument",
-		Title:     "Roadmap",
-		Body:      "Initial roadmap document",
-		Workspace: fixtures.ProductWorkspace,
-		Actor:     fixtures.Alice,
-	})
-	if err != nil {
-		t.Fatalf("seed demo document: %v", err)
-	}
-
-	return api.NewServer(tokenVerifier, docsSvc)
-}
+// These integration-level tests exercise authn, authz, domain, and HTTP without
+// starting a real server. Each test arranges its own complete stack so it can be
+// read, changed, and run independently.
 
 func TestHandler_Health(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
@@ -66,13 +48,24 @@ func TestHandler_Health(t *testing.T) {
 }
 
 func TestHandler_Whoami_Returns200WithValidToken(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	req := httptest.NewRequest(http.MethodGet, "/whoami", nil)
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d — body: %s", rec.Code, rec.Body.String())
 	}
@@ -86,33 +79,58 @@ func TestHandler_Whoami_Returns200WithValidToken(t *testing.T) {
 }
 
 func TestHandler_Whoami_Returns401WithMissingToken(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	req := httptest.NewRequest(http.MethodGet, "/whoami", nil)
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", rec.Code)
 	}
 }
 
 func TestHandler_CreateDocument_Returns201ForEditor(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	payload := map[string]string{
 		"id":          "testDoc",
 		"title":       "Test Document",
 		"body":        "Hello, world",
 		"workspaceId": "productWorkspace",
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusCreated {
 		t.Errorf("expected 201, got %d — body: %s", rec.Code, rec.Body.String())
 	}
@@ -126,27 +144,42 @@ func TestHandler_CreateDocument_Returns201ForEditor(t *testing.T) {
 }
 
 func TestHandler_CreateDocument_Returns409ForExistingID(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	payload := map[string]string{
-		"id":          "roadmapDocument", // seeded by newTestHandler
+		"id":          "roadmapDocument", // seeded in this test's Arrange phase
 		"title":       "Duplicate",
 		"body":        "should not overwrite",
 		"workspaceId": "productWorkspace",
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusConflict {
 		t.Errorf("expected 409, got %d — body: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestHandler_CreateDocument_Returns400ForBlankFields(t *testing.T) {
+	// Arrange
 	cases := map[string]map[string]string{
 		"id":          {"id": " ", "title": "Test", "body": "Body", "workspaceId": "productWorkspace"},
 		"title":       {"id": "testDoc", "title": "\t", "body": "Body", "workspaceId": "productWorkspace"},
@@ -156,8 +189,19 @@ func TestHandler_CreateDocument_Returns400ForBlankFields(t *testing.T) {
 
 	for name, payload := range cases {
 		t.Run(name, func(t *testing.T) {
-			handler := newTestHandler(t)
-			body, _ := json.Marshal(payload)
+			tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+			authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+			docRepo := documents.NewInMemoryRepository()
+			if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+				t.Fatalf("seed repository: %v", err)
+			}
+			docsSvc := documents.New(docRepo, authzSvc)
+			tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+			handler := api.NewServer(tokenVerifier, docsSvc)
+			body, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatalf("marshal request body: %v", err)
+			}
 			req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer demo-token-alice")
@@ -165,6 +209,7 @@ func TestHandler_CreateDocument_Returns400ForBlankFields(t *testing.T) {
 
 			handler.ServeHTTP(rec, req)
 
+			// Assert
 			if rec.Code != http.StatusBadRequest {
 				t.Errorf("expected 400, got %d — body: %s", rec.Code, rec.Body.String())
 			}
@@ -173,53 +218,98 @@ func TestHandler_CreateDocument_Returns400ForBlankFields(t *testing.T) {
 }
 
 func TestHandler_CreateDocument_Returns401WhenTokenMissing(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	payload := map[string]string{
 		"id": "testDoc", "title": "Test", "body": "Body", "workspaceId": "productWorkspace",
 	}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", rec.Code)
 	}
 }
 
 func TestHandler_CreateDocument_Returns400ForUnknownJSONField(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	payload := []byte(`{"id":"testDoc","title":"Test","body":"Body","workspaceId":"productWorkspace","extra":true}`)
 	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d — body: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestHandler_CreateDocument_Returns415ForUnsupportedMediaType(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewBufferString("not json"))
 	req.Header.Set("Content-Type", "text/plain")
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusUnsupportedMediaType {
 		t.Errorf("expected 415, got %d — body: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestHandler_CreateDocument_Returns413ForOversizedBody(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	payload := append([]byte(`{"id":"`), bytes.Repeat([]byte("x"), (1<<20)+1)...)
 	payload = append(payload, []byte(`","title":"Test","body":"Body","workspaceId":"productWorkspace"}`)...)
 	req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(payload))
@@ -227,49 +317,84 @@ func TestHandler_CreateDocument_Returns413ForOversizedBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("expected 413, got %d — body: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestHandler_PatchDocument_Returns400ForMultipleJSONValues(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader([]byte(`{"body":"updated"} {}`)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d — body: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestHandler_PatchDocument_Returns400ForBlankBody(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader([]byte(`{"body":" "}`)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d — body: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestHandler_GetDocument_Returns200ForViewer(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument", nil)
 	req.Header.Set("Authorization", "Bearer demo-token-bob")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d — body: %s", rec.Code, rec.Body.String())
 	}
@@ -287,41 +412,77 @@ func TestHandler_GetDocument_Returns200ForViewer(t *testing.T) {
 }
 
 func TestHandler_GetDocument_Returns401WhenTokenMissing(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument", nil)
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", rec.Code)
 	}
 }
 
 func TestHandler_GetDocument_Returns403ForOutsider(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument", nil)
 	req.Header.Set("Authorization", "Bearer demo-token-casey")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("expected 403, got %d — body: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestHandler_PatchDocument_Returns403WhenWriteScopeMissing(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	payload := map[string]string{"body": "should not save"}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
 	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer demo-token-bob")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("expected 403, got %d — body: %s", rec.Code, rec.Body.String())
 	}
@@ -331,21 +492,35 @@ func TestHandler_PatchDocument_Returns403WhenWriteScopeMissing(t *testing.T) {
 }
 
 func TestHandler_PatchDocument_Returns403WhenReBACDeniesViewerWithWriteScope(t *testing.T) {
+	// Arrange
 	tokens := fixtures.DemoTokens()
 	tokens["demo-token-bob"] = documents.TokenClaims{
 		Sub:    "bob",
 		Scopes: []string{"documents:read", "documents:write"},
 	}
-	handler := newTestHandlerWithTokens(t, tokens)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(tokens)
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	payload := map[string]string{"body": "should not save"}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
 	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer demo-token-bob")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("expected 403, got %d — body: %s", rec.Code, rec.Body.String())
 	}
@@ -355,10 +530,11 @@ func TestHandler_PatchDocument_Returns403WhenReBACDeniesViewerWithWriteScope(t *
 }
 
 func TestHandler_GetDocument_Returns403WhenReadScopeMissing(t *testing.T) {
+	// Arrange
 	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docsSvc := documents.New(documents.NewInMemoryRepository(), authzSvc)
-	_, err := docsSvc.Create(context.Background(), documents.CreateDocumentInput{
+	_, err := docsSvc.Create(t.Context(), documents.CreateDocumentInput{
 		ID: "roadmapDocument", Title: "Roadmap", Body: "body",
 		Workspace: fixtures.ProductWorkspace, Actor: fixtures.Alice,
 	})
@@ -373,24 +549,40 @@ func TestHandler_GetDocument_Returns403WhenReadScopeMissing(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/documents/roadmapDocument", nil)
 	req.Header.Set("Authorization", "Bearer write-only")
 	rec := httptest.NewRecorder()
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("expected 403, got %d — body: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestHandler_PatchDocument_Returns200ForEditor(t *testing.T) {
-	handler := newTestHandler(t)
+	// Arrange
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
+	docRepo := documents.NewInMemoryRepository()
+	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	docsSvc := documents.New(docRepo, authzSvc)
+	tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+	handler := api.NewServer(tokenVerifier, docsSvc)
 	payload := map[string]string{"body": "updated by editor"}
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
 	req := httptest.NewRequest(http.MethodPatch, "/documents/roadmapDocument", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer demo-token-alice")
 	rec := httptest.NewRecorder()
 
+	// Act
 	handler.ServeHTTP(rec, req)
 
+	// Assert
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d — body: %s", rec.Code, rec.Body.String())
 	}

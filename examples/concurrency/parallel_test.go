@@ -11,14 +11,6 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// newEvaluator builds a graph evaluator over the standard fixture tuples.
-// The concurrency helpers under test work with any authz.Evaluator; here we
-// drive them with the real graph evaluator.
-func newEvaluator(extra ...rebac.TupleKey) *authz.GraphEvaluator {
-	all := append(fixtures.SeedRelationshipTuples(), extra...)
-	return authz.NewGraphEvaluator(authz.NewInMemoryStore(all...))
-}
-
 // blockingEvaluator is a fake Checker whose Evaluate does no work until the
 // context is cancelled, then reports the context error. It lets us exercise
 // AllPermissions' cancellation path deterministically.
@@ -32,7 +24,7 @@ func (blockingEvaluator) Evaluate(ctx context.Context, _ rebac.CheckRequest) (re
 func TestAllPermissions_CancelledContextReturnsError(t *testing.T) {
 	// Arrange: a context that is already cancelled, and an evaluator that only
 	// unblocks once the context is done.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	// Act
@@ -49,9 +41,14 @@ func TestAllPermissions_CancelledContextReturnsError(t *testing.T) {
 }
 
 func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
-	ev := newEvaluator()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 
-	summary, err := concurrency.AllPermissions(context.Background(), ev, fixtures.Alice, fixtures.RoadmapDocument)
+	// Act
+	summary, err := concurrency.AllPermissions(t.Context(), ev, fixtures.Alice, fixtures.RoadmapDocument)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -70,9 +67,14 @@ func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
 }
 
 func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
-	ev := newEvaluator()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 
-	summary, err := concurrency.AllPermissions(context.Background(), ev, fixtures.Bob, fixtures.RoadmapDocument)
+	// Act
+	summary, err := concurrency.AllPermissions(t.Context(), ev, fixtures.Bob, fixtures.RoadmapDocument)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,9 +93,14 @@ func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
 }
 
 func TestAllPermissions_NonDocumentObjectReturnsEmptySummary(t *testing.T) {
-	ev := newEvaluator()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 
-	summary, err := concurrency.AllPermissions(context.Background(), ev, fixtures.Alice, fixtures.ProductWorkspace)
+	// Act
+	summary, err := concurrency.AllPermissions(t.Context(), ev, fixtures.Alice, fixtures.ProductWorkspace)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,15 +110,19 @@ func TestAllPermissions_NonDocumentObjectReturnsEmptySummary(t *testing.T) {
 }
 
 func TestBulkCheck_ReturnsResultsInInputOrder(t *testing.T) {
-	ev := newEvaluator()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 	reqs := []rebac.CheckRequest{
 		{User: fixtures.Alice, Relation: rebac.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
 		{User: fixtures.Bob, Relation: rebac.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
 		{User: fixtures.Bob, Relation: rebac.RelationDocumentCanRead, Object: fixtures.RoadmapDocument},
 	}
 
-	results := concurrency.BulkCheck(context.Background(), ev, reqs)
+	// Act
+	results := concurrency.BulkCheck(t.Context(), ev, reqs)
 
+	// Assert
 	if len(results) != len(reqs) {
 		t.Fatalf("expected %d results, got %d", len(reqs), len(results))
 	}
@@ -130,8 +141,14 @@ func TestBulkCheck_ReturnsResultsInInputOrder(t *testing.T) {
 }
 
 func TestBulkCheck_EmptyInputReturnsEmptySlice(t *testing.T) {
-	ev := newEvaluator()
-	results := concurrency.BulkCheck(context.Background(), ev, nil)
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
+
+	// Act
+	results := concurrency.BulkCheck(t.Context(), ev, nil)
+
+	// Assert
 	if len(results) != 0 {
 		t.Errorf("expected empty results, got %d", len(results))
 	}

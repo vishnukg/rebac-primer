@@ -28,35 +28,11 @@ func (f *failingWriteAuthz) DeleteTuples(_ context.Context, tuples []rebac.Tuple
 	return nil
 }
 
-// newSeededService wires together a *documents.Service backed by the standard
-// fixture store and pre-creates the roadmap document so tests can read/update it.
-func newSeededService(t *testing.T) *documents.Service {
-	t.Helper()
-
-	// Authz service wired in-process (no HTTP hop in tests)
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
-	evaluator := authz.NewGraphEvaluator(store)
-	authzSvc := authz.New(store, evaluator)
-
-	// Documents service
-	repo := documents.NewInMemoryRepository()
-	svc := documents.New(repo, authzSvc)
-
-	_, err := svc.Create(context.Background(), documents.CreateDocumentInput{
-		ID:        "roadmapDocument",
-		Title:     "Roadmap",
-		Body:      "Initial roadmap document",
-		Workspace: fixtures.ProductWorkspace,
-		Actor:     fixtures.Alice,
-	})
-	if err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-	return svc
-}
-
 func TestDocumentService_Create_ForbiddenForViewer(t *testing.T) {
-	svc := newSeededService(t)
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, authz.NewGraphEvaluator(store))
+	svc := documents.New(documents.NewInMemoryRepository(), authzSvc)
 	input := documents.CreateDocumentInput{
 		ID:        "newDoc",
 		Title:     "New",
@@ -65,8 +41,10 @@ func TestDocumentService_Create_ForbiddenForViewer(t *testing.T) {
 		Actor:     fixtures.Bob,
 	}
 
-	_, err := svc.Create(context.Background(), input)
+	// Act
+	_, err := svc.Create(t.Context(), input)
 
+	// Assert
 	if err == nil {
 		t.Fatal("expected ForbiddenError but got nil")
 	}
@@ -77,7 +55,10 @@ func TestDocumentService_Create_ForbiddenForViewer(t *testing.T) {
 }
 
 func TestDocumentService_Create_SucceedsForEditor(t *testing.T) {
-	svc := newSeededService(t)
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, authz.NewGraphEvaluator(store))
+	svc := documents.New(documents.NewInMemoryRepository(), authzSvc)
 	input := documents.CreateDocumentInput{
 		ID:        "anotherDoc",
 		Title:     "Another",
@@ -86,7 +67,10 @@ func TestDocumentService_Create_SucceedsForEditor(t *testing.T) {
 		Actor:     fixtures.Alice,
 	}
 
-	doc, err := svc.Create(context.Background(), input)
+	// Act
+	doc, err := svc.Create(t.Context(), input)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -99,12 +83,23 @@ func TestDocumentService_Create_SucceedsForEditor(t *testing.T) {
 }
 
 func TestDocumentService_Create_RejectsExistingID(t *testing.T) {
-	svc := newSeededService(t)
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, authz.NewGraphEvaluator(store))
+	repo := documents.NewInMemoryRepository()
+	if err := repo.Create(t.Context(), documents.CollaborativeDocument{
+		ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document",
+		Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice,
+	}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	svc := documents.New(repo, authzSvc)
 
 	// alice is a workspace editor, so the authorization check passes — the create
 	// must still fail because the ID is taken. Allowing it would overwrite the
 	// document and grant alice a fresh owner tuple on it.
-	_, err := svc.Create(context.Background(), documents.CreateDocumentInput{
+	// Act
+	_, err := svc.Create(t.Context(), documents.CreateDocumentInput{
 		ID:        "roadmapDocument",
 		Title:     "Hijack",
 		Body:      "overwritten",
@@ -112,13 +107,14 @@ func TestDocumentService_Create_RejectsExistingID(t *testing.T) {
 		Actor:     fixtures.Alice,
 	})
 
+	// Assert
 	var alreadyExists *documents.DocumentAlreadyExistsError
 	if !errors.As(err, &alreadyExists) {
 		t.Fatalf("expected *DocumentAlreadyExistsError, got %T: %v", err, err)
 	}
 
 	// The stored document is untouched.
-	doc, err := svc.Read(context.Background(), "roadmapDocument", fixtures.Alice)
+	doc, err := svc.Read(t.Context(), "roadmapDocument", fixtures.Alice)
 	if err != nil {
 		t.Fatalf("read after rejected create: %v", err)
 	}
@@ -135,7 +131,7 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	svc := documents.New(documents.NewInMemoryRepository(), authzSvc)
 
 	// Act: alice (a workspace editor) creates a document.
-	if _, err := svc.Create(context.Background(), documents.CreateDocumentInput{
+	if _, err := svc.Create(t.Context(), documents.CreateDocumentInput{
 		ID: "d1", Title: "Roadmap", Body: "v1",
 		Workspace: fixtures.ProductWorkspace, Actor: fixtures.Alice,
 	}); err != nil {
@@ -145,7 +141,7 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	// Assert: alice can_delete d1. can_delete requires document owner, and a
 	// workspace editor only inherits document editor (can_edit) — never owner. So
 	// this passes only because Create wrote a direct (d1, owner, alice) tuple.
-	ownerCheck, err := authzSvc.Check(context.Background(), rebac.CheckRequest{
+	ownerCheck, err := authzSvc.Check(t.Context(), rebac.CheckRequest{
 		User: fixtures.Alice, Relation: rebac.RelationDocumentCanDelete, Object: rebac.Document("d1"),
 	})
 	if err != nil {
@@ -156,7 +152,7 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	}
 
 	// And bob (a workspace viewer) is not an owner — cannot delete.
-	viewerCheck, err := authzSvc.Check(context.Background(), rebac.CheckRequest{
+	viewerCheck, err := authzSvc.Check(t.Context(), rebac.CheckRequest{
 		User: fixtures.Bob, Relation: rebac.RelationDocumentCanDelete, Object: rebac.Document("d1"),
 	})
 	if err != nil {
@@ -168,19 +164,22 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 }
 
 func TestDocumentService_Create_WhenTupleWriteFails_RollsBackDocument(t *testing.T) {
+	// Arrange
 	repo := documents.NewInMemoryRepository()
 	authzClient := &failingWriteAuthz{}
 	svc := documents.New(repo, authzClient)
 
-	_, err := svc.Create(context.Background(), documents.CreateDocumentInput{
+	// Act
+	_, err := svc.Create(t.Context(), documents.CreateDocumentInput{
 		ID: "d1", Title: "Roadmap", Body: "v1",
 		Workspace: fixtures.ProductWorkspace, Actor: fixtures.Alice,
 	})
+	// Assert
 	if err == nil {
 		t.Fatal("expected tuple write error")
 	}
 
-	doc, findErr := repo.FindByID(context.Background(), "d1")
+	doc, findErr := repo.FindByID(t.Context(), "d1")
 	if findErr != nil {
 		t.Fatalf("FindByID returned error: %v", findErr)
 	}
@@ -193,9 +192,19 @@ func TestDocumentService_Create_WhenTupleWriteFails_RollsBackDocument(t *testing
 }
 
 func TestDocumentService_Read_ForbiddenForOutsider(t *testing.T) {
-	svc := newSeededService(t)
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, authz.NewGraphEvaluator(store))
+	repo := documents.NewInMemoryRepository()
+	if err := repo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	svc := documents.New(repo, authzSvc)
 
-	_, err := svc.Read(context.Background(), "roadmapDocument", fixtures.Casey)
+	// Act
+	_, err := svc.Read(t.Context(), "roadmapDocument", fixtures.Casey)
+
+	// Assert
 	if err == nil {
 		t.Fatal("expected ForbiddenError but got nil")
 	}
@@ -206,9 +215,15 @@ func TestDocumentService_Read_ForbiddenForOutsider(t *testing.T) {
 }
 
 func TestDocumentService_Read_NotFoundBeforeAuthCheck(t *testing.T) {
-	svc := newSeededService(t)
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, authz.NewGraphEvaluator(store))
+	svc := documents.New(documents.NewInMemoryRepository(), authzSvc)
 
-	_, err := svc.Read(context.Background(), "nonexistent", fixtures.Alice)
+	// Act
+	_, err := svc.Read(t.Context(), "nonexistent", fixtures.Alice)
+
+	// Assert
 	if err == nil {
 		t.Fatal("expected DocumentNotFoundError but got nil")
 	}
@@ -219,9 +234,19 @@ func TestDocumentService_Read_NotFoundBeforeAuthCheck(t *testing.T) {
 }
 
 func TestDocumentService_Read_SucceedsForViewer(t *testing.T) {
-	svc := newSeededService(t)
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, authz.NewGraphEvaluator(store))
+	repo := documents.NewInMemoryRepository()
+	if err := repo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	svc := documents.New(repo, authzSvc)
 
-	doc, err := svc.Read(context.Background(), "roadmapDocument", fixtures.Bob)
+	// Act
+	doc, err := svc.Read(t.Context(), "roadmapDocument", fixtures.Bob)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -231,14 +256,24 @@ func TestDocumentService_Read_SucceedsForViewer(t *testing.T) {
 }
 
 func TestDocumentService_Update_ForbiddenForViewer(t *testing.T) {
-	svc := newSeededService(t)
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, authz.NewGraphEvaluator(store))
+	repo := documents.NewInMemoryRepository()
+	if err := repo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	svc := documents.New(repo, authzSvc)
 	input := documents.UpdateDocumentInput{
 		ID:    "roadmapDocument",
 		Body:  "should not save",
 		Actor: fixtures.Bob,
 	}
 
-	_, err := svc.Update(context.Background(), input)
+	// Act
+	_, err := svc.Update(t.Context(), input)
+
+	// Assert
 	if err == nil {
 		t.Fatal("expected ForbiddenError but got nil")
 	}
@@ -249,14 +284,24 @@ func TestDocumentService_Update_ForbiddenForViewer(t *testing.T) {
 }
 
 func TestDocumentService_Update_SucceedsForEditor(t *testing.T) {
-	svc := newSeededService(t)
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	authzSvc := authz.New(store, authz.NewGraphEvaluator(store))
+	repo := documents.NewInMemoryRepository()
+	if err := repo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
+		t.Fatalf("seed repository: %v", err)
+	}
+	svc := documents.New(repo, authzSvc)
 	input := documents.UpdateDocumentInput{
 		ID:    "roadmapDocument",
 		Body:  "updated content",
 		Actor: fixtures.Alice,
 	}
 
-	updated, err := svc.Update(context.Background(), input)
+	// Act
+	updated, err := svc.Update(t.Context(), input)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

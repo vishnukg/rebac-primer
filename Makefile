@@ -9,7 +9,7 @@ export COMPOSE_MENU
 COMPOSE ?= docker compose -f deployments/docker-compose.yml
 GO_TOOLS := $(COMPOSE) --profile tools run --rm --build tools
 APP      := $(COMPOSE) --profile app
-FGA_CLI  := docker run --rm -v "$(CURDIR):/workspace" -w /workspace openfga/cli:v0.7.16
+FGA_CLI  := docker run --rm -v "$(CURDIR):/workspace" -w /workspace openfga/cli:v0.7.19
 
 .DEFAULT_GOAL := help
 
@@ -63,19 +63,19 @@ test-permission:
 vet:
 	$(GO_TOOLS) go vet ./...
 
-# staticcheck and govulncheck are pinned in go.mod; go run uses those module
-# versions without a global install.
+# staticcheck and govulncheck are pinned by go.mod's tool block, so go tool uses
+# those exact versions without a global install.
 lint:
-	$(GO_TOOLS) go run honnef.co/go/tools/cmd/staticcheck ./...
+	$(GO_TOOLS) go tool staticcheck ./...
 
 vulncheck:
-	$(GO_TOOLS) go run golang.org/x/vuln/cmd/govulncheck ./...
+	$(GO_TOOLS) go tool govulncheck ./...
 
 modernize:
 	$(GO_TOOLS) go fix -diff ./...
 
 check:
-	$(GO_TOOLS) sh -c 'test -z "$$(gofmt -l .)" || { echo "These files need gofmt:"; gofmt -l .; exit 1; }; go vet ./... && go run honnef.co/go/tools/cmd/staticcheck ./... && go test ./... && go test -race ./...'
+	$(GO_TOOLS) sh -c 'test -z "$$(gofmt -l .)" || { echo "These files need gofmt:"; gofmt -l .; exit 1; }; go vet ./... && go tool staticcheck ./... && go test ./... && go test -race ./...'
 
 shell:
 	$(GO_TOOLS) sh

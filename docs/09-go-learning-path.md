@@ -51,8 +51,12 @@ for understanding ReBAC, but they are part of the Go curriculum.
 Then read the ReBAC chapters so the code has a real problem to solve:
 
 ```text
-02 -> 03 -> 04 -> 05 -> 07 -> 27
+mental model -> 02 -> 03 -> 04 -> 05 -> 07 -> 27
 ```
+
+Do not attempt the Go and ReBAC paths as one uninterrupted reading list. Use
+the short first session in `START-HERE.md`, then alternate one Go chapter with
+one small code experiment.
 
 ## Coverage Map
 
@@ -216,7 +220,7 @@ Before treating an exercise as done:
 gofmt -w .
 go test ./...
 go vet ./...
-go run honnef.co/go/tools/cmd/staticcheck ./...
+go tool staticcheck ./...
 go test -race ./...
 ```
 

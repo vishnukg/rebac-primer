@@ -109,23 +109,16 @@ var (
 	_ authz.TupleRepository = (*mockRepository)(nil)
 )
 
-func sampleRequest() rebac.CheckRequest {
-	return rebac.CheckRequest{
-		User:     rebac.User("alice"),
-		Relation: rebac.RelationDocumentCanEdit,
-		Object:   rebac.Document("roadmapDocument"),
-	}
-}
-
 // ── Check ───────────────────────────────────────────────────────────────────
 
 func TestService_GivenEvaluatorAllows_WhenCheck_ThenReturnsEvaluatorResult(t *testing.T) {
 	// Arrange: a STUB evaluator pinned to an allowed result.
 	evaluator := stubEvaluator{result: rebac.CheckResult{Allowed: true, Trace: []string{"Result: allowed"}}}
 	svc := authz.New(stubRepository{}, evaluator)
+	req := rebac.CheckRequest{User: rebac.User("alice"), Relation: rebac.RelationDocumentCanEdit, Object: rebac.Document("roadmapDocument")}
 
 	// Act
-	result, err := svc.Check(context.Background(), sampleRequest())
+	result, err := svc.Check(t.Context(), req)
 
 	// Assert (state): the Service returns whatever the evaluator produced.
 	if err != nil {
@@ -140,9 +133,10 @@ func TestService_GivenEvaluatorFails_WhenCheck_ThenPropagatesError(t *testing.T)
 	// Arrange: a STUB evaluator that fails.
 	wantErr := errors.New("evaluator exploded")
 	svc := authz.New(stubRepository{}, stubEvaluator{err: wantErr})
+	req := rebac.CheckRequest{User: rebac.User("alice"), Relation: rebac.RelationDocumentCanEdit, Object: rebac.Document("roadmapDocument")}
 
 	// Act
-	_, err := svc.Check(context.Background(), sampleRequest())
+	_, err := svc.Check(t.Context(), req)
 
 	// Assert (state): the error is passed through unchanged.
 	if !errors.Is(err, wantErr) {
@@ -154,10 +148,10 @@ func TestService_GivenCheckRequest_WhenCheck_ThenDelegatesExactRequestToEvaluato
 	// Arrange: a MOCK evaluator so we can verify the delegation, not the result.
 	evaluator := &mockEvaluator{result: rebac.CheckResult{Allowed: true}}
 	svc := authz.New(stubRepository{}, evaluator)
-	req := sampleRequest()
+	req := rebac.CheckRequest{User: rebac.User("alice"), Relation: rebac.RelationDocumentCanEdit, Object: rebac.Document("roadmapDocument")}
 
 	// Act
-	if _, err := svc.Check(context.Background(), req); err != nil {
+	if _, err := svc.Check(t.Context(), req); err != nil {
 		t.Fatalf("Check returned unexpected error: %v", err)
 	}
 
@@ -182,7 +176,7 @@ func TestService_GivenTuples_WhenWriteTuples_ThenWritesEachToRepositoryInOrder(t
 	}
 
 	// Act
-	if err := svc.WriteTuples(context.Background(), tuples); err != nil {
+	if err := svc.WriteTuples(t.Context(), tuples); err != nil {
 		t.Fatalf("WriteTuples returned unexpected error: %v", err)
 	}
 
@@ -206,7 +200,7 @@ func TestService_GivenNoTuples_WhenWriteTuples_ThenRepositoryIsNotTouched(t *tes
 	svc := authz.New(repo, stubEvaluator{})
 
 	// Act
-	if err := svc.WriteTuples(context.Background(), nil); err != nil {
+	if err := svc.WriteTuples(t.Context(), nil); err != nil {
 		t.Fatalf("WriteTuples returned unexpected error: %v", err)
 	}
 
@@ -225,7 +219,7 @@ func TestService_GivenTuples_WhenDeleteTuples_ThenDeletesEachFromRepository(t *t
 	}
 
 	// Act
-	if err := svc.DeleteTuples(context.Background(), tuples); err != nil {
+	if err := svc.DeleteTuples(t.Context(), tuples); err != nil {
 		t.Fatalf("DeleteTuples returned unexpected error: %v", err)
 	}
 
@@ -248,7 +242,7 @@ func TestService_GivenStoredTuples_WhenListTuples_ThenReturnsRepositoryTuples(t 
 	svc := authz.New(stubRepository{all: stored}, stubEvaluator{})
 
 	// Act
-	got, err := svc.ListTuples(context.Background())
+	got, err := svc.ListTuples(t.Context())
 
 	// Assert (state)
 	if err != nil {
@@ -266,7 +260,7 @@ func TestService_GivenFilter_WhenListTuples_ThenPassesFilterToRepository(t *test
 	filter := authz.TupleFilter{Object: rebac.Workspace("productWorkspace"), Relation: rebac.RelationWorkspaceEditor}
 
 	// Act
-	if _, err := svc.ListTuples(context.Background(), filter); err != nil {
+	if _, err := svc.ListTuples(t.Context(), filter); err != nil {
 		t.Fatalf("ListTuples returned unexpected error: %v", err)
 	}
 
@@ -282,6 +276,7 @@ func TestService_GivenFilter_WhenListTuples_ThenPassesFilterToRepository(t *test
 // ── Tuple validation ────────────────────────────────────────────────────────
 
 func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAndWritesNothing(t *testing.T) {
+	// Arrange
 	// Each case is a tuple that is malformed in exactly one field. The Service must
 	// reject the whole batch with a *TupleValidationError and never call Write.
 	cases := map[string]rebac.TupleKey{
@@ -311,11 +306,14 @@ func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAnd
 
 	for name, tk := range cases {
 		t.Run(name, func(t *testing.T) {
+			// Arrange
 			repo := &mockRepository{}
 			svc := authz.New(repo, stubEvaluator{})
 
-			err := svc.WriteTuples(context.Background(), []rebac.TupleKey{tk})
+			// Act
+			err := svc.WriteTuples(t.Context(), []rebac.TupleKey{tk})
 
+			// Assert
 			var verr *authz.TupleValidationError
 			if !errors.As(err, &verr) {
 				t.Fatalf("expected *TupleValidationError, got %v", err)
@@ -328,6 +326,7 @@ func TestService_GivenInvalidTuple_WhenWriteTuples_ThenReturnsValidationErrorAnd
 }
 
 func TestService_GivenInvalidCheck_WhenCheck_ThenRejectsBeforeEvaluator(t *testing.T) {
+	// Arrange
 	cases := map[string]rebac.CheckRequest{
 		"subject must be user": {
 			User:     rebac.Team("platformTeam"),
@@ -343,11 +342,14 @@ func TestService_GivenInvalidCheck_WhenCheck_ThenRejectsBeforeEvaluator(t *testi
 
 	for name, req := range cases {
 		t.Run(name, func(t *testing.T) {
+			// Arrange
 			evaluator := &mockEvaluator{}
 			svc := authz.New(stubRepository{}, evaluator)
 
-			_, err := svc.Check(context.Background(), req)
+			// Act
+			_, err := svc.Check(t.Context(), req)
 
+			// Assert
 			var validationErr *authz.TupleValidationError
 			if !errors.As(err, &validationErr) {
 				t.Fatalf("expected *TupleValidationError, got %v", err)
@@ -360,6 +362,7 @@ func TestService_GivenInvalidCheck_WhenCheck_ThenRejectsBeforeEvaluator(t *testi
 }
 
 func TestService_GivenValidSubjectSetTuple_WhenWriteTuples_ThenSucceeds(t *testing.T) {
+	// Arrange
 	// A subject-set user ("team:platformTeam#member") is a valid User value and
 	// must pass validation.
 	repo := &mockRepository{}
@@ -370,7 +373,11 @@ func TestService_GivenValidSubjectSetTuple_WhenWriteTuples_ThenSucceeds(t *testi
 		rebac.SubjectSet(rebac.Team("platformTeam"), rebac.RelationTeamMember),
 	)
 
-	if err := svc.WriteTuples(context.Background(), []rebac.TupleKey{tuple}); err != nil {
+	// Act
+	err := svc.WriteTuples(t.Context(), []rebac.TupleKey{tuple})
+
+	// Assert
+	if err != nil {
 		t.Fatalf("expected subject-set tuple to be valid, got %v", err)
 	}
 	if len(repo.writes) != 1 {

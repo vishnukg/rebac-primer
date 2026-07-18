@@ -92,6 +92,17 @@ For each `(user, relation, object)` check, the evaluator tries:
 
 `docs/27-graph-evaluator-walkthrough.md` traces those steps line by line.
 
+Computed `can_*` permissions skip direct tuple lookup. They must be proved from
+the model (for example, `can_edit -> editor`), even if a malformed computed
+tuple somehow entered the low-level store. This keeps the teaching evaluator's
+decision semantics aligned with the OpenFGA model.
+
+The evaluator is intentionally a small subset, not a replacement OpenFGA
+implementation. It demonstrates direct relationships, subject sets, unions,
+same-object relation expansion, and document-to-workspace inheritance. It does
+not implement intersections, exclusions, conditions, contextual tuples,
+wildcards, consistency controls, or production-scale query planning.
+
 ## Documents Service
 
 Open `internal/documents/service.go`.

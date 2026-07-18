@@ -84,7 +84,7 @@ relation = workspace
 subject  = workspace:productWorkspace     ← the value that pointer holds
 ```
 
-Read it **object-first** (the Go struct / Zanzibar order) and it says exactly
+Read it **object-first** (the Go struct's field order) and it says exactly
 what your intuition wanted all along:
 
 ```
@@ -146,13 +146,15 @@ branch succeeds. That explore-and-backtrack *is* traversal.
 
 ### 6. Cycles, and why there is an active-path set
 
-A **cycle** is a path that loops back on itself (A → B → A). If a document's
-workspace pointed at itself, naive traversal would recurse forever. The guard
-remembers every `(object, relation)` pair in the current recursion chain. If it
-sees the same pair before the earlier call returns, it stops that cycle:
+A **cycle** is a path that loops back on itself (A → B → A). The test uses two
+malformed team usersets that contain each other. Normal tuple validation rejects
+them, but the evaluator still defends itself in case corrupt data bypasses that
+boundary. The guard remembers every `(object, relation)` pair in the current
+recursion chain. If it sees the same pair before the earlier call returns, it
+stops that cycle:
 
 ```
-Cycle detected at workspace:productWorkspace#owner; stop this branch
+Cycle detected at team:a#member; stop this branch
 ```
 
 The pair is removed when the call returns. That detail lets another independent

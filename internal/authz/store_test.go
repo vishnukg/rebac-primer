@@ -1,7 +1,6 @@
 package authz_test
 
 import (
-	"context"
 	"sync"
 	"testing"
 
@@ -15,26 +14,21 @@ import (
 // observable state.
 //
 // The store's methods take a context.Context and return an error to satisfy the
-// port (a real backend can fail or be cancelled). The in-memory store never
-// fails, so these tests pass context.Background() and ignore the nil error.
-
-func aliceMember() rebac.TupleKey {
-	return rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))
-}
-
-func bobViewer() rebac.TupleKey {
-	return rebac.Tuple(rebac.Workspace("productWorkspace"), rebac.RelationWorkspaceViewer, rebac.Subject(rebac.User("bob")))
-}
+// port. Tests check those errors even though this in-memory implementation does
+// not currently fail, keeping the examples safe to copy to real adapters.
 
 func TestStore_GivenSeededTuple_WhenHas_ThenReportsTrue(t *testing.T) {
 	// Arrange
-	tuple := aliceMember()
+	tuple := rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))
 	store := authz.NewInMemoryStore(tuple)
 
 	// Act
-	got, _ := store.Has(context.Background(), tuple.Object, tuple.Relation, tuple.User)
+	got, err := store.Has(t.Context(), tuple.Object, tuple.Relation, tuple.User)
 
 	// Assert
+	if err != nil {
+		t.Fatalf("Has returned unexpected error: %v", err)
+	}
 	if !got {
 		t.Errorf("Has(%+v) = false, want true", tuple)
 	}
@@ -43,12 +37,15 @@ func TestStore_GivenSeededTuple_WhenHas_ThenReportsTrue(t *testing.T) {
 func TestStore_GivenEmptyStore_WhenHas_ThenReportsFalse(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore()
-	tuple := aliceMember()
+	tuple := rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))
 
 	// Act
-	got, _ := store.Has(context.Background(), tuple.Object, tuple.Relation, tuple.User)
+	got, err := store.Has(t.Context(), tuple.Object, tuple.Relation, tuple.User)
 
 	// Assert
+	if err != nil {
+		t.Fatalf("Has returned unexpected error: %v", err)
+	}
 	if got {
 		t.Errorf("Has on empty store = true, want false")
 	}
@@ -57,13 +54,19 @@ func TestStore_GivenEmptyStore_WhenHas_ThenReportsFalse(t *testing.T) {
 func TestStore_GivenWrittenTuple_WhenHas_ThenReportsTrue(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore()
-	tuple := aliceMember()
+	tuple := rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))
 
 	// Act
-	store.Write(context.Background(), tuple)
+	if err := store.Write(t.Context(), tuple); err != nil {
+		t.Fatalf("Write returned unexpected error: %v", err)
+	}
 
 	// Assert
-	if got, _ := store.Has(context.Background(), tuple.Object, tuple.Relation, tuple.User); !got {
+	got, err := store.Has(t.Context(), tuple.Object, tuple.Relation, tuple.User)
+	if err != nil {
+		t.Fatalf("Has returned unexpected error: %v", err)
+	}
+	if !got {
 		t.Errorf("Has after Write = false, want true")
 	}
 }
@@ -71,54 +74,88 @@ func TestStore_GivenWrittenTuple_WhenHas_ThenReportsTrue(t *testing.T) {
 func TestStore_GivenDuplicateWrites_WhenFindAll_ThenTupleStoredOnce(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore()
-	tuple := aliceMember()
+	tuple := rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))
 
 	// Act: writing the same tuple twice must be idempotent.
-	store.Write(context.Background(), tuple)
-	store.Write(context.Background(), tuple)
+	if err := store.Write(t.Context(), tuple); err != nil {
+		t.Fatalf("first Write returned unexpected error: %v", err)
+	}
+	if err := store.Write(t.Context(), tuple); err != nil {
+		t.Fatalf("second Write returned unexpected error: %v", err)
+	}
 
 	// Assert
-	if got, _ := store.FindAll(context.Background()); len(got) != 1 {
+	got, err := store.FindAll(t.Context())
+	if err != nil {
+		t.Fatalf("FindAll returned unexpected error: %v", err)
+	}
+	if len(got) != 1 {
 		t.Errorf("FindAll length = %d, want 1 (writes must be idempotent)", len(got))
 	}
 }
 
 func TestStore_GivenStoredTuple_WhenDeleted_ThenHasReportsFalse(t *testing.T) {
 	// Arrange
-	tuple := aliceMember()
+	tuple := rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))
 	store := authz.NewInMemoryStore(tuple)
 
 	// Act
-	store.Delete(context.Background(), tuple)
+	if err := store.Delete(t.Context(), tuple); err != nil {
+		t.Fatalf("Delete returned unexpected error: %v", err)
+	}
 
 	// Assert
-	if got, _ := store.Has(context.Background(), tuple.Object, tuple.Relation, tuple.User); got {
+	got, err := store.Has(t.Context(), tuple.Object, tuple.Relation, tuple.User)
+	if err != nil {
+		t.Fatalf("Has returned unexpected error: %v", err)
+	}
+	if got {
 		t.Errorf("Has after Delete = true, want false")
 	}
 }
 
 func TestStore_GivenMissingTuple_WhenDeleted_ThenNoOp(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(aliceMember())
+	aliceMember := rebac.Tuple(
+		rebac.Team("platformTeam"),
+		rebac.RelationTeamMember,
+		rebac.Subject(rebac.User("alice")),
+	)
+	bobViewer := rebac.Tuple(
+		rebac.Workspace("productWorkspace"),
+		rebac.RelationWorkspaceViewer,
+		rebac.Subject(rebac.User("bob")),
+	)
+	store := authz.NewInMemoryStore(aliceMember)
 
 	// Act: deleting a tuple that was never written must not affect the store.
-	store.Delete(context.Background(), bobViewer())
+	if err := store.Delete(t.Context(), bobViewer); err != nil {
+		t.Fatalf("Delete returned unexpected error: %v", err)
+	}
 
 	// Assert
-	if got, _ := store.FindAll(context.Background()); len(got) != 1 {
+	got, err := store.FindAll(t.Context())
+	if err != nil {
+		t.Fatalf("FindAll returned unexpected error: %v", err)
+	}
+	if len(got) != 1 {
 		t.Errorf("FindAll length = %d, want 1 (deleting a missing tuple is a no-op)", len(got))
 	}
 }
 
 func TestStore_GivenMixedTuples_WhenFindByObjectRelation_ThenReturnsOnlyMatches(t *testing.T) {
 	// Arrange
-	match := bobViewer()
-	store := authz.NewInMemoryStore(match, aliceMember())
+	match := rebac.Tuple(rebac.Workspace("productWorkspace"), rebac.RelationWorkspaceViewer, rebac.Subject(rebac.User("bob")))
+	nonMatch := rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))
+	store := authz.NewInMemoryStore(match, nonMatch)
 
 	// Act
-	got, _ := store.FindByObjectRelation(context.Background(), match.Object, match.Relation)
+	got, err := store.FindByObjectRelation(t.Context(), match.Object, match.Relation)
 
 	// Assert
+	if err != nil {
+		t.Fatalf("FindByObjectRelation returned unexpected error: %v", err)
+	}
 	if len(got) != 1 || got[0] != match {
 		t.Errorf("FindByObjectRelation = %+v, want [%+v]", got, match)
 	}
@@ -126,8 +163,6 @@ func TestStore_GivenMixedTuples_WhenFindByObjectRelation_ThenReturnsOnlyMatches(
 
 func TestStore_GivenFilter_WhenFindAll_ThenReturnsMatchingTuples(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(aliceMember(), bobViewer())
-
 	cases := map[string]struct {
 		filter authz.TupleFilter
 		want   int
@@ -141,10 +176,18 @@ func TestStore_GivenFilter_WhenFindAll_ThenReturnsMatchingTuples(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			// Arrange: every subtest owns its store and seed data.
+			aliceMember := rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))
+			bobViewer := rebac.Tuple(rebac.Workspace("productWorkspace"), rebac.RelationWorkspaceViewer, rebac.Subject(rebac.User("bob")))
+			store := authz.NewInMemoryStore(aliceMember, bobViewer)
+
 			// Act
-			got, _ := store.FindAll(context.Background(), tc.filter)
+			got, err := store.FindAll(t.Context(), tc.filter)
 
 			// Assert
+			if err != nil {
+				t.Fatalf("FindAll returned unexpected error: %v", err)
+			}
 			if len(got) != tc.want {
 				t.Errorf("FindAll(%+v) length = %d, want %d", tc.filter, len(got), tc.want)
 			}
@@ -154,13 +197,18 @@ func TestStore_GivenFilter_WhenFindAll_ThenReturnsMatchingTuples(t *testing.T) {
 
 func TestStore_GivenTuples_WhenFindAll_ThenReturnsDeterministicOrder(t *testing.T) {
 	// Arrange: write in reverse lexical order.
-	store := authz.NewInMemoryStore(bobViewer(), aliceMember())
+	aliceMember := rebac.Tuple(rebac.Team("platformTeam"), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))
+	bobViewer := rebac.Tuple(rebac.Workspace("productWorkspace"), rebac.RelationWorkspaceViewer, rebac.Subject(rebac.User("bob")))
+	store := authz.NewInMemoryStore(bobViewer, aliceMember)
 
 	// Act
-	got, _ := store.FindAll(context.Background())
+	got, err := store.FindAll(t.Context())
 
 	// Assert: responses should not depend on Go's randomized map iteration order.
-	want := []rebac.TupleKey{aliceMember(), bobViewer()}
+	if err != nil {
+		t.Fatalf("FindAll returned unexpected error: %v", err)
+	}
+	want := []rebac.TupleKey{aliceMember, bobViewer}
 	if len(got) != len(want) {
 		t.Fatalf("FindAll length = %d, want %d", len(got), len(want))
 	}
@@ -184,13 +232,19 @@ func TestStore_GivenConcurrentWrites_WhenFindAll_ThenAllTuplesStored(t *testing.
 		go func(i int) {
 			defer wg.Done()
 			id := string(rune('A'+i%26)) + string(rune('0'+i/26))
-			store.Write(context.Background(), rebac.Tuple(rebac.Team(id), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice"))))
+			if err := store.Write(t.Context(), rebac.Tuple(rebac.Team(id), rebac.RelationTeamMember, rebac.Subject(rebac.User("alice")))); err != nil {
+				t.Errorf("Write returned unexpected error: %v", err)
+			}
 		}(i)
 	}
 	wg.Wait()
 
 	// Assert
-	if got, _ := store.FindAll(context.Background()); len(got) != n {
+	got, err := store.FindAll(t.Context())
+	if err != nil {
+		t.Fatalf("FindAll returned unexpected error: %v", err)
+	}
+	if len(got) != n {
 		t.Errorf("FindAll length = %d, want %d", len(got), n)
 	}
 }

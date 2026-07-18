@@ -11,15 +11,11 @@ import (
 // token → claims map, which is plain test data (a fixture), not a stub or mock:
 // there is no behaviour to fake and no interaction to verify.
 
-func newVerifier() *documents.DemoTokenVerifier {
-	return documents.NewDemoTokenVerifier(map[string]documents.TokenClaims{
-		"demo-token-alice": {Sub: "alice", Scopes: []string{"documents:read", "documents:write"}},
-	})
-}
-
 func TestVerifier_GivenValidBearerToken_WhenVerified_ThenReturnsAuthenticatedUser(t *testing.T) {
 	// Arrange
-	verifier := newVerifier()
+	verifier := documents.NewDemoTokenVerifier(map[string]documents.TokenClaims{
+		"demo-token-alice": {Sub: "alice", Scopes: []string{"documents:read", "documents:write"}},
+	})
 
 	// Act
 	user, err := verifier.VerifyAccessToken("Bearer demo-token-alice")
@@ -38,7 +34,9 @@ func TestVerifier_GivenValidBearerToken_WhenVerified_ThenReturnsAuthenticatedUse
 
 func TestVerifier_GivenLowercaseBearerScheme_WhenVerified_ThenReturnsAuthenticatedUser(t *testing.T) {
 	// Arrange
-	verifier := newVerifier()
+	verifier := documents.NewDemoTokenVerifier(map[string]documents.TokenClaims{
+		"demo-token-alice": {Sub: "alice", Scopes: []string{"documents:read", "documents:write"}},
+	})
 
 	// Act
 	user, err := verifier.VerifyAccessToken("bearer demo-token-alice")
@@ -54,7 +52,9 @@ func TestVerifier_GivenLowercaseBearerScheme_WhenVerified_ThenReturnsAuthenticat
 
 func TestVerifier_GivenMissingHeader_WhenVerified_ThenReturnsAuthenticationError(t *testing.T) {
 	// Arrange
-	verifier := newVerifier()
+	verifier := documents.NewDemoTokenVerifier(map[string]documents.TokenClaims{
+		"demo-token-alice": {Sub: "alice", Scopes: []string{"documents:read", "documents:write"}},
+	})
 
 	// Act
 	_, err := verifier.VerifyAccessToken("")
@@ -67,7 +67,9 @@ func TestVerifier_GivenMissingHeader_WhenVerified_ThenReturnsAuthenticationError
 
 func TestVerifier_GivenHeaderWithoutBearerPrefix_WhenVerified_ThenReturnsAuthenticationError(t *testing.T) {
 	// Arrange
-	verifier := newVerifier()
+	verifier := documents.NewDemoTokenVerifier(map[string]documents.TokenClaims{
+		"demo-token-alice": {Sub: "alice", Scopes: []string{"documents:read", "documents:write"}},
+	})
 
 	// Act
 	_, err := verifier.VerifyAccessToken("demo-token-alice")
@@ -80,7 +82,9 @@ func TestVerifier_GivenHeaderWithoutBearerPrefix_WhenVerified_ThenReturnsAuthent
 
 func TestVerifier_GivenBearerHeaderWithExtraParts_WhenVerified_ThenReturnsAuthenticationError(t *testing.T) {
 	// Arrange
-	verifier := newVerifier()
+	verifier := documents.NewDemoTokenVerifier(map[string]documents.TokenClaims{
+		"demo-token-alice": {Sub: "alice", Scopes: []string{"documents:read", "documents:write"}},
+	})
 
 	// Act
 	_, err := verifier.VerifyAccessToken("Bearer demo-token-alice extra")
@@ -93,7 +97,9 @@ func TestVerifier_GivenBearerHeaderWithExtraParts_WhenVerified_ThenReturnsAuthen
 
 func TestVerifier_GivenUnknownToken_WhenVerified_ThenReturnsAuthenticationError(t *testing.T) {
 	// Arrange
-	verifier := newVerifier()
+	verifier := documents.NewDemoTokenVerifier(map[string]documents.TokenClaims{
+		"demo-token-alice": {Sub: "alice", Scopes: []string{"documents:read", "documents:write"}},
+	})
 
 	// Act
 	_, err := verifier.VerifyAccessToken("Bearer not-a-real-token")
@@ -146,7 +152,9 @@ func TestVerifier_GivenCallerMutatesSeedClaims_WhenVerified_ThenUsesSnapshot(t *
 
 func TestVerifier_GivenCallerMutatesReturnedScopes_WhenVerifiedAgain_ThenUsesSnapshot(t *testing.T) {
 	// Arrange
-	verifier := newVerifier()
+	verifier := documents.NewDemoTokenVerifier(map[string]documents.TokenClaims{
+		"demo-token-alice": {Sub: "alice", Scopes: []string{"documents:read", "documents:write"}},
+	})
 	user, err := verifier.VerifyAccessToken("Bearer demo-token-alice")
 	if err != nil {
 		t.Fatalf("VerifyAccessToken returned unexpected error: %v", err)

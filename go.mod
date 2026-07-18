@@ -2,7 +2,7 @@ module rebac-primer
 
 go 1.25.0
 
-toolchain go1.26.4
+toolchain go1.26.5
 
 require github.com/openfga/go-sdk v0.8.2
 

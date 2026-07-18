@@ -3,6 +3,40 @@
 You do **not** need to read all the docs or all the code. This page is the
 on-ramp. The rest of the repo is a reference library.
 
+The on-ramp does not replace or abbreviate that library. It only controls when
+new ideas are introduced. Every detailed chapter, comparison, implementation
+walkthrough, experiment, and production topic remains available through the
+[complete course map](docs/00-course-map.md).
+
+## If You Feel Overwhelmed
+
+Do only this first session:
+
+1. Read “The One Sentence” and “Keep It In Your Head” below.
+2. Run `make trace` (or `go test -v -run TestTrace ./internal/authz` with local
+   Go).
+3. Read [the mental-model chapter](docs/rebac-mental-model.md) only through
+   “Walk The Alice Decision Backward.”
+4. Explain these three facts aloud:
+   - a tuple is a changing product fact
+   - the model contains reusable rules
+   - a check asks whether one user belongs to one permission set
+5. Stop.
+
+That is enough for one session. Defer—not discard—these topics:
+
+```text
+OAuth/OIDC
+production migration
+Docker operations
+concurrency and generics
+policy-engine comparisons
+```
+
+Those topics remain part of the full course. They matter later, but none is
+required to understand why Alice can edit the roadmap document. The course map
+tells you when to bring each one back.
+
 ## The One Sentence
 
 > Alice can edit the roadmap document **because** she is in the platform team,
@@ -31,13 +65,47 @@ subject --relation--> object
 The Go `TupleKey` struct lists its fields as `Object`, `Relation`, `User`, but
 that is an internal field order—not a different relationship.
 
+## Keep It In Your Head
+
+Use this three-layer picture:
+
+```text
+model  + tuples + check = decision
+rules    facts    question  allow or deny
+```
+
+- The **model** is the reusable grammar: owners are editors, editors are
+  viewers, and document editors can come from the parent workspace.
+- **Tuples** are changing product facts: Alice belongs to this team, this team
+  edits that workspace, and this document belongs to that workspace.
+- A **check** asks whether one user belongs to the effective set for one
+  relation on one object.
+
+Read every tuple as one sentence:
+
+```text
+<subject> is a <relation> of <object>
+```
+
+The only unusual subject is `team:platformTeam#member`. It means a set—“all
+members of the platform team”—rather than one person. The evaluator starts at
+the requested permission and works backward through allowed rules and facts. If
+it cannot prove a path to the user, the answer is deny.
+
+Authentication supplies “who is asking.” ReBAC answers “may that identity do
+this action to this object?” Keep those as two separate questions.
+
+The full version of this memory aid—including sets, usersets, roles versus
+permissions, debugging, and modeling at work—is
+[A ReBAC Mental Model You Can Reuse](docs/rebac-mental-model.md).
+
 ## Before You Begin
 
 Choose one toolchain:
 
 - Docker Desktop or another working Docker engine, then use the `make` commands
   throughout the course.
-- Go 1.26.4 locally, then run the equivalent `go` commands directly.
+- Go 1.26.5 locally, then run the equivalent `go` commands directly.
 
 Check the Docker path with:
 
@@ -49,24 +117,25 @@ make test
 The optional OpenFGA exercises additionally require the `fga` CLI and `jq` on
 your host; the migration chapter lists the setup check.
 
-## Choose Your Route
+## Choose Your Route Later
 
 You do not need the same route as every other reader.
 Do not read files in numeric order; the numbers group related topics, while the
 routes below define the learning order.
 
-### Fast route: understand ReBAC
+### Full route: understand ReBAC
 
 If graphs and OpenFGA are completely new, the optional
 [graph and OpenFGA notes](notes-graphs-and-openfga.md) provide a short preview.
 
-1. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
-2. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
-3. [ReBAC concepts](docs/04-rebac-concepts.md)
-4. [OpenFGA model](docs/05-openfga-model.md)
-5. [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md)
-6. [Policy-based authorization](docs/08-policy-based-authorization.md)
-7. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
+1. [Reusable ReBAC mental model](docs/rebac-mental-model.md)
+2. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
+3. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
+4. [ReBAC concepts](docs/04-rebac-concepts.md)
+5. [OpenFGA model](docs/05-openfga-model.md)
+6. [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md)
+7. [Policy-based authorization](docs/08-policy-based-authorization.md)
+8. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
 
 ### Go route: understand the implementation
 
@@ -79,7 +148,7 @@ If Go is new to you, start with the self-contained language foundation:
 5. [HTTP, JSON, context, and application lifecycle](docs/13-go-http-json-and-context.md)
 6. [Go idioms and patterns](docs/14-go-idioms-and-patterns.md)
 
-Then read the fast ReBAC route and continue with:
+Then read the full ReBAC route above and continue with:
 
 1. [Go language guide for this repository](docs/20-go-language-guide.md)
 2. [Architecture](docs/06-architecture.md)
@@ -97,24 +166,28 @@ chapters 09, 14, and 22-25.
 
 ### Production route: understand the boundaries
 
-Read [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md),
-then [OAuth and OIDC](docs/01-oauth-authentication.md),
-[migration](docs/26-openfga-migration.md),
-[the OpenFGA adapter](docs/34-openfga-adapter-walkthrough.md), and
-[production readiness](docs/40-production-readiness.md). The OAuth chapter is
+Start with the [reusable mental model](docs/rebac-mental-model.md), then read
+[Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md),
+[OAuth and OIDC](docs/01-oauth-authentication.md), the staged
+[in-process-to-OpenFGA migration](docs/26-openfga-migration.md),
+[the OpenFGA adapter](docs/34-openfga-adapter-walkthrough.md), and the final
+[production gates](docs/40-production-readiness.md). The OAuth chapter is
 intentionally substantial; its "core path" markers tell you where a first
 reading can stop.
 
-## One File To Read
+## Four Files, In This Order
 
-Open this with `docs/27-graph-evaluator-walkthrough.md` beside it:
+Ignore the rest of the code on your first pass:
 
-```text
-internal/authz/evaluator.go
-```
+1. `internal/fixtures/fixtures.go` — the four changing relationship facts.
+2. `deployments/openfga/model.fga` — the reusable policy rules.
+3. `internal/authz/evaluator_test.go` — start with
+   `TestGraphEvaluator_TeamMemberCanEditDocument` to see the question and answer.
+4. `internal/authz/evaluator.go` — read `Evaluate`, then `hasRelation`, with
+   [doc 27](docs/27-graph-evaluator-walkthrough.md) beside it.
 
-If you understand `hasRelation` and its four steps, you understand the core
-ReBAC algorithm.
+Do not try to understand every helper on the first pass. If you can explain why
+the first evaluator test is allowed, you have understood the core system.
 
 ## Three Commands
 

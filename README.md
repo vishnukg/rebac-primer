@@ -27,8 +27,13 @@ docs/                      Tutorial chapters
 
 ## Start Here
 
-Read [START-HERE.md](START-HERE.md), then follow
-[docs/00-course-map.md](docs/00-course-map.md).
+If the repository feels large, read only [START-HERE.md](START-HERE.md) and do
+its twenty-minute first session. Stop there for the day. This changes the
+**sequence**, not the depth: the full Go, ReBAC, OAuth, OpenFGA, architecture,
+testing, operations, and production literature remains in the repository. The
+[course map](docs/00-course-map.md) is both the complete literature index and a
+way to choose what to learn next—not a list you must complete before touching
+the code.
 
 New to Go:
 
@@ -43,14 +48,15 @@ New to Go:
    [interfaces and embedding](docs/24-go-interfaces-embedding.md), and
    [testing](docs/25-go-testing.md)
 
-Minimal ReBAC path:
+Core ReBAC reading order:
 
-1. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
-2. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
-3. [ReBAC concepts](docs/04-rebac-concepts.md)
-4. [OpenFGA model](docs/05-openfga-model.md)
-5. [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md)
-6. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
+1. [Reusable ReBAC mental model](docs/rebac-mental-model.md)
+2. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
+3. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
+4. [ReBAC concepts](docs/04-rebac-concepts.md)
+5. [OpenFGA model](docs/05-openfga-model.md)
+6. [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md)
+7. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
 
 Then choose the Go implementation or production path from the course map.
 Finish the Go path with the
@@ -63,7 +69,9 @@ concurrency, generics, middleware-style interfaces, and HTTP seams.
 
 ## Commands
 
-This repo uses the [3 Musketeers](https://3musketeers.io/) pattern:
+This repo uses the
+[3 Musketeers](https://www.amaysim.technology/blog/o6jjumnnv8a1w2bzg5j6bqk2fzbigu)
+pattern:
 
 ```text
 make -> docker compose -> containerized tools
@@ -114,5 +122,6 @@ Casey has no path through the graph, so access is denied.
 The in-process graph evaluator is the learning implementation. The OpenFGA
 adapter demonstrates the external authorization-service direction. Both concrete
 backends satisfy the narrow interface declared by each consumer, while OpenFGA
-stores and evaluates the relationships remotely. The rest of the demo still
-requires the production work listed in doc 40.
+stores and evaluates the relationships remotely. The staged migration and its
+exit criteria are in [doc 26](docs/26-openfga-migration.md); the remaining
+production controls are in [doc 40](docs/40-production-readiness.md).

@@ -1,14 +1,12 @@
 package openfga_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
 	"rebac-primer/internal/authz/contract"
 	"rebac-primer/internal/fixtures"
 	"rebac-primer/internal/openfga"
-	"rebac-primer/internal/rebac"
 )
 
 // TestContract_OpenFGA holds the OpenFGA backend to the *same* canonical contract
@@ -22,10 +20,13 @@ import (
 //	set -a; . deployments/openfga/.ids.env; set +a
 //	go test -run TestContract_OpenFGA ./internal/openfga
 //
-// Run it against a freshly seeded store, BEFORE starting the server: the server's
-// startup seed makes alice the demo document's owner, and that extra owner tuple
-// flips the can_delete answers the contract pins down.
+// Run it against a store containing this model, BEFORE starting the application:
+// the application's startup seed makes alice the demo document's owner, and that
+// extra owner tuple flips the can_delete answers the contract pins down. The test
+// writes every relationship it needs, so the seed script is convenient but not a
+// hidden data dependency.
 func TestContract_OpenFGA(t *testing.T) {
+	// Arrange
 	apiURL := os.Getenv("OPENFGA_API_URL")
 	storeID := os.Getenv("OPENFGA_STORE_ID")
 	modelID := os.Getenv("OPENFGA_MODEL_ID")
@@ -38,18 +39,15 @@ func TestContract_OpenFGA(t *testing.T) {
 		t.Fatalf("new openfga service: %v", err)
 	}
 
-	// seed.sh writes only the demo workspace/team policy tuples. The
-	// document→workspace tuple and contract-only owner/admin tuples are normally
-	// outside that bootstrap path; write them here so the test is self-contained.
-	// WriteTuples is idempotent, so re-running the test against the same store is safe.
-	tuples := []rebac.TupleKey{
-		rebac.Tuple(fixtures.RoadmapDocument, rebac.RelationDocumentWorkspace, rebac.Subject(fixtures.ProductWorkspace)),
-	}
-	tuples = append(tuples, contract.ExtraTuples()...)
-	err = svc.WriteTuples(context.Background(), tuples)
+	// Arrange the complete relationship graph inside this test. WriteTuples is
+	// idempotent, so the same contract also works against a store previously
+	// populated by seed.sh.
+	tuples := append(fixtures.SeedRelationshipTuples(), contract.ExtraTuples()...)
+	err = svc.WriteTuples(t.Context(), tuples)
 	if err != nil {
 		t.Fatalf("seed contract tuples: %v", err)
 	}
 
+	// Act and Assert: each contract row performs one Check and verifies its result.
 	contract.Run(t, svc.Check)
 }

@@ -18,6 +18,10 @@ This chapter teaches only the graph theory needed for authorization.
 Keep a pencil nearby. The chapter works better if you redraw the five-node graph
 yourself instead of only reading the diagrams.
 
+On a first pass, read the one-sentence version, vocabulary cheat sheet, worked
+traversal, and checkpoint. Return to cycles and complexity after you have run
+the evaluator trace.
+
 ## One Sentence Version
 
 A graph is just things connected to other things.

@@ -27,6 +27,10 @@ Read this after doc 07. By the end you should be able to:
   OpenFGA DSL, and explain the trade-offs
 - decide which layer a new rule belongs in
 
+This is a later comparison chapter, not a prerequisite for understanding the
+repository. If you are still learning tuples and usersets, skip it until you can
+explain the Alice decision without looking at the code.
+
 ## The Problem: Authorization Written as Code
 
 Start with the version every codebase grows first:
@@ -657,7 +661,7 @@ Architecture and standards:
 - [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
 - [XACML 3.0 specification](https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html)
   — origin of PEP/PDP/PIP/PAP and the combining algorithms
-- [NIST SP 800-162 (ABAC)](https://csrc.nist.gov/publications/detail/sp/800-162/final)
+- [NIST SP 800-162 (ABAC)](https://csrc.nist.gov/pubs/sp/800/162/upd2/final)
 
 General policy engines:
 
@@ -672,4 +676,4 @@ ReBAC engines as policy systems:
 - [Zanzibar: Google's Consistent, Global Authorization System](https://www.usenix.org/conference/atc19/presentation/pang)
 - [OpenFGA configuration language](https://openfga.dev/docs/configuration-language)
 - [OpenFGA conditions (CEL)](https://openfga.dev/docs/modeling/conditions)
-- [Common Expression Language (CEL)](https://github.com/google/cel-spec)
+- [Common Expression Language (CEL)](https://github.com/cel-expr/cel-spec)

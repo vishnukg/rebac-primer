@@ -64,12 +64,11 @@ func ExtraTuples() []rebac.TupleKey {
 // relationships, dana directly owns the roadmap document, erin is a platform
 // team admin, and the roadmap document lives in the workspace.
 //
-// Every backend must produce these exact answers. To run it against OpenFGA, the
-// store must hold the same tuples: the policy tuples from deployments/openfga/
-// seed.sh plus the document's workspace tuple and ExtraTuples, which the OpenFGA
-// contract test writes itself. The store must hold no unrelated tuples — in
-// particular, starting the server seeds a demo document owned by alice, and that
-// owner tuple changes the can_delete answers this contract pins down.
+// Every backend must produce these exact answers. The OpenFGA contract test
+// writes SeedRelationshipTuples and ExtraTuples itself. The store must hold no
+// unrelated tuples—in particular, starting the application seeds a demo document
+// owned by alice, and that owner tuple changes the can_delete answers this
+// contract pins down.
 func Cases() []Case {
 	doc := fixtures.RoadmapDocument
 	ws := fixtures.ProductWorkspace
@@ -129,15 +128,21 @@ func Cases() []Case {
 // mismatch. Pass evaluator.Evaluate (from-scratch) or service.Check (OpenFGA).
 func Run(t *testing.T, check CheckFunc) {
 	t.Helper()
-	ctx := context.Background()
 
 	for _, c := range Cases() {
 		t.Run(c.Name, func(t *testing.T) {
-			result, err := check(ctx, rebac.CheckRequest{
+			// Arrange
+			ctx := t.Context()
+			req := rebac.CheckRequest{
 				User:     c.User,
 				Relation: c.Relation,
 				Object:   c.Object,
-			})
+			}
+
+			// Act
+			result, err := check(ctx, req)
+
+			// Assert
 			if err != nil {
 				t.Fatalf("check returned error: %v", err)
 			}

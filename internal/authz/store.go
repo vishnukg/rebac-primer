@@ -1,8 +1,9 @@
 package authz
 
 import (
+	"cmp"
 	"context"
-	"sort"
+	"slices"
 	"sync"
 
 	"rebac-primer/internal/rebac"
@@ -108,13 +109,13 @@ func matchesFilter(k rebac.TupleKey, f TupleFilter) bool {
 }
 
 func sortTuples(tuples []rebac.TupleKey) {
-	sort.Slice(tuples, func(i, j int) bool {
-		if tuples[i].Object != tuples[j].Object {
-			return tuples[i].Object < tuples[j].Object
+	slices.SortFunc(tuples, func(a, b rebac.TupleKey) int {
+		if n := cmp.Compare(a.Object, b.Object); n != 0 {
+			return n
 		}
-		if tuples[i].Relation != tuples[j].Relation {
-			return tuples[i].Relation < tuples[j].Relation
+		if n := cmp.Compare(a.Relation, b.Relation); n != 0 {
+			return n
 		}
-		return tuples[i].User < tuples[j].User
+		return cmp.Compare(a.User, b.User)
 	})
 }

@@ -10,8 +10,14 @@ The repository declares its Go version in `go.mod`:
 
 ```text
 go 1.25.0
-toolchain go1.26.4
+toolchain go1.26.5
 ```
+
+These lines have different jobs. `go 1.25.0` is the minimum language/module
+version the code promises to support. `toolchain go1.26.5` suggests the current
+patched compiler and standard library for people working in this module. Go
+1.26 intentionally defaults new modules to the previous supported language
+version, so this is deliberate rather than a mismatch.
 
 You can use either:
 
@@ -71,6 +77,28 @@ func splitSubject(...) // package-private
 Exported means visible to another Go package, not necessarily to another module.
 Directories named `internal` add another boundary: only code beneath the parent
 of `internal` can import them.
+
+### Tool dependencies
+
+`go.mod` can also pin development commands:
+
+```go
+tool (
+    golang.org/x/vuln/cmd/govulncheck
+    honnef.co/go/tools/cmd/staticcheck
+)
+```
+
+Run them through the Go toolchain:
+
+```bash
+go tool staticcheck ./...
+go tool govulncheck ./...
+```
+
+This uses the versions selected by the module rather than depending on an
+untracked global installation. The tools do not become imports in the server
+binary.
 
 ## Variables and Constants
 

@@ -103,7 +103,9 @@ explicit.
 cancellation and deadlines across HTTP, domain, datastore, and OpenFGA calls.
 
 Do not store a context in a long-lived struct. Pass it through the call chain.
-Tests commonly use `context.Background()`.
+Tests use `t.Context()` (or `b.Context()` in benchmarks), which Go cancels as
+the test finishes. This gives test-owned work a lifecycle without hand-written
+cleanup. Program composition roots still begin with `context.Background()`.
 
 ## Slices, Maps, and Copies
 
@@ -137,10 +139,13 @@ The normal quality loop is:
 gofmt -w .
 go test ./...
 go vet ./...
-go run honnef.co/go/tools/cmd/staticcheck ./...
+go tool staticcheck ./...
 go test -race ./...
 go fix -diff ./...
 ```
+
+The non-standard commands are declared in `go.mod`'s `tool` block, so `go tool`
+runs the module-pinned versions without a global installation.
 
 `go fix -diff` reports modern Go rewrites without changing files. Go 1.26
 revamped `go fix` around analyzers, so it is now useful as a modernization

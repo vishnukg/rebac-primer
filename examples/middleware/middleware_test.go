@@ -2,7 +2,6 @@ package middleware_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -12,19 +11,10 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// seedStore builds a tuple store from the standard fixture tuples.
-func seedStore(extra ...rebac.TupleKey) *authz.InMemoryStore {
-	all := append(fixtures.SeedRelationshipTuples(), extra...)
-	return authz.NewInMemoryStore(all...)
-}
-
-// newEvaluator wraps seedStore + the real graph evaluator.
-func newEvaluator(extra ...rebac.TupleKey) *authz.GraphEvaluator {
-	return authz.NewGraphEvaluator(seedStore(extra...))
-}
-
 func TestAuditEvaluator_DelegatesResultToInner(t *testing.T) {
-	ev := newEvaluator()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 	var buf bytes.Buffer
 	audit := middleware.NewAuditEvaluator(ev, &buf)
 	req := rebac.CheckRequest{
@@ -33,7 +23,10 @@ func TestAuditEvaluator_DelegatesResultToInner(t *testing.T) {
 		Object:   fixtures.RoadmapDocument,
 	}
 
-	result, err := audit.Evaluate(context.Background(), req)
+	// Act
+	result, err := audit.Evaluate(t.Context(), req)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,7 +36,9 @@ func TestAuditEvaluator_DelegatesResultToInner(t *testing.T) {
 }
 
 func TestAuditEvaluator_WritesLogLine(t *testing.T) {
-	ev := newEvaluator()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 	var buf bytes.Buffer
 	audit := middleware.NewAuditEvaluator(ev, &buf)
 	req := rebac.CheckRequest{
@@ -52,7 +47,10 @@ func TestAuditEvaluator_WritesLogLine(t *testing.T) {
 		Object:   fixtures.RoadmapDocument,
 	}
 
-	_, err := audit.Evaluate(context.Background(), req)
+	// Act
+	_, err := audit.Evaluate(t.Context(), req)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -66,17 +64,22 @@ func TestAuditEvaluator_WritesLogLine(t *testing.T) {
 }
 
 func TestAuditEvaluator_SatisfiesCheckerInterface(t *testing.T) {
-	ev := newEvaluator()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	ev := authz.NewGraphEvaluator(store)
 	var buf bytes.Buffer
 
 	// Assign to Checker — if the interface is not satisfied, this fails.
 	var c middleware.Checker = middleware.NewAuditEvaluator(ev, &buf)
 
-	result, err := c.Evaluate(context.Background(), rebac.CheckRequest{
+	// Act
+	result, err := c.Evaluate(t.Context(), rebac.CheckRequest{
 		User:     fixtures.Alice,
 		Relation: rebac.RelationDocumentCanRead,
 		Object:   fixtures.RoadmapDocument,
 	})
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -86,15 +89,19 @@ func TestAuditEvaluator_SatisfiesCheckerInterface(t *testing.T) {
 }
 
 func TestReadOnlyStore_ExposesReadMethods(t *testing.T) {
-	store := seedStore()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
 	ro := middleware.NewReadOnlyStore(store)
 
+	// Act
 	found, err := ro.Has(
-		context.Background(),
+		t.Context(),
 		fixtures.PlatformTeam,
 		rebac.RelationTeamMember,
 		rebac.Subject(fixtures.Alice),
 	)
+
+	// Assert
 	if err != nil {
 		t.Fatalf("Has returned unexpected error: %v", err)
 	}
@@ -104,15 +111,20 @@ func TestReadOnlyStore_ExposesReadMethods(t *testing.T) {
 }
 
 func TestReadOnlyStore_CanDriveGraphEvaluator(t *testing.T) {
-	store := seedStore()
+	// Arrange
+	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
 	ro := middleware.NewReadOnlyStore(store)
 
 	ev := authz.NewGraphEvaluator(ro)
-	result, err := ev.Evaluate(context.Background(), rebac.CheckRequest{
+
+	// Act
+	result, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
 		User:     fixtures.Alice,
 		Relation: rebac.RelationDocumentCanEdit,
 		Object:   fixtures.RoadmapDocument,
 	})
+
+	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

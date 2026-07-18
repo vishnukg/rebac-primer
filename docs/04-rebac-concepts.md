@@ -14,6 +14,8 @@ does user:alice have can_edit on document:roadmapDocument?
 
 This chapter gives names to the pieces you already saw in the graph chapter.
 It is deliberately compact: learn the vocabulary, then use it immediately.
+For a single reusable picture tying these terms together, keep
+[the ReBAC mental model](rebac-mental-model.md) beside this chapter.
 
 ## The Core Thought Process
 
@@ -200,6 +202,19 @@ rebac.CheckRequest{
 The evaluator tries to prove that request by following only the tuples and
 model rules admitted by `can_edit`. An arbitrary graph connection is not
 enough.
+
+This model is grant-oriented and defaults to deny:
+
+```text
+proof of an allowed path exists  -> allow
+no allowed path can be proved    -> deny
+```
+
+There are no stored `deny` tuples in this primer and no “deny overrides allow”
+rule. OpenFGA can model exclusions, but explicit-deny semantics add policy and
+debugging complexity and should be introduced only for a real requirement.
+Removing the last tuple that supports a path revokes the derived access, subject
+to the consistency behavior of the authorization backend.
 
 In OpenFGA API terminology, the subject field is named `user`, but it can
 represent a human, workload, another object, userset, or typed wildcard when the

@@ -496,8 +496,8 @@ Useful operations may include:
 |---|---|
 | Check | One subject, permission, and resource |
 | BatchCheck | Several independent checks |
-| ListResources | Resources a subject may access |
-| ListSubjects | Subjects with access to a resource |
+| ListObjects / ListResources | Resources a subject may access |
+| ListUsers / ListSubjects | Subjects with access to a resource |
 | Explain/Expand | Debug policy structure or a decision |
 | WriteRelationships | Add or remove relationship facts |
 | WatchChanges | Feed relationship updates to consumers |
@@ -980,5 +980,6 @@ Zanzibar-style systems:
 - [OpenFGA query consistency](https://openfga.dev/docs/interacting/consistency)
 - [OpenFGA model testing](https://openfga.dev/docs/modeling/testing)
 
-The OpenFGA documentation was reviewed on June 20, 2026; several cited pages
-were updated on June 19, 2026.
+The OpenFGA documentation was reviewed on July 18, 2026. Production,
+consistency, adoption, and migration guidance cited by this course was updated
+by OpenFGA in July 2026.
