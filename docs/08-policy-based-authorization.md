@@ -94,7 +94,7 @@ all four pieces change at the same cadence: an application deploy. After the
 split:
 
 ```text
-A user joins a team          -> write one tuple            (data)
+A user joins a team          -> write one relationship     (data)
 "Commenters can react"       -> edit the model, redeploy   (policy)
 "Support intersection rules" -> engine work                (code)
 ```
@@ -142,7 +142,7 @@ In this repository:
 
 | Role | This repo (custom evaluator) | This repo (OpenFGA backend) |
 |---|---|---|
-| PEP | `documents.Service` calling `Authorizer.Check`; HTTP layer maps deny to 403 | same |
+| PEP | `documents.Service` calling `AuthorizationService.Check`; HTTP layer maps deny to 403 | same |
 | PDP | `authz.GraphEvaluator` | the OpenFGA server's Check API |
 | PIP | `authz.InMemoryStore` through relationship ports | OpenFGA's tuple storage |
 | PAP | rule tables in `internal/authz/model.go`, changed via code review | `model.fga` plus `deployments/openfga/seed.sh` and model IDs |
@@ -558,7 +558,7 @@ Deciding which layer owns a new rule is a design skill. The question to ask:
 | caller may use the documents API at all | token scopes | code at the boundary |
 | no writes from untrusted networks | request context | contextual policy |
 | editors can edit their workspace's documents | stored relationships | ReBAC model |
-| alice is on the platform team | a fact, not a rule | tuple (data) |
+| alice is on the platform team | a fact, not a rule | relationship (data) |
 | share link expires after 7 days | relationship + time | ReBAC with a condition (CEL), or contextual policy |
 | blocked users lose access regardless of grants | relationships, deny semantics | ReBAC exclusion (`but not blocked`) — see doc 07 on the testing cost |
 
@@ -574,8 +574,8 @@ Map the anatomy from earlier onto the code:
 
 | Policy-engine concept | Where it is in this repo |
 |---|---|
-| policy language | four constructs: direct grant, subject set, implied-by rule, workspace inheritance |
-| compiled policy | the `impliedBy` tables in `internal/authz/model.go` |
+| policy language | permission mapping plus direct relationship, subject set, implied-by rule, and workspace inheritance |
+| compiled policy | the `permissionRules` and `impliedBy` tables in `internal/authz/model.go` |
 | PAP | editing those tables in a reviewed Go change |
 | PIP / facts | `InMemoryStore` through `RelationshipReader` (`internal/authz/store.go`) |
 | decision request | `rebac.CheckRequest` |
@@ -586,11 +586,12 @@ Map the anatomy from earlier onto the code:
 | explanation | the `Trace` in `CheckResult` |
 | policy versioning | none — the gap doc 26 discusses when migrating to OpenFGA's immutable model IDs |
 
-The four steps `hasRelation` tries in order are the policy language. Each
-step is one rule form the engine knows how to evaluate:
+After `Evaluate` maps the requested permission to a base relation, the four
+steps `hasRelation` tries in order are the relation-resolution part of the
+policy language. Each step is one rule form the engine knows how to evaluate:
 
 ```text
-step 1  direct tuple          "alice was granted editor on this document"
+step 1  direct relationship   "alice was granted editor on this document"
 step 2  subject set           "a group was granted it, and alice is in the group"
 step 3  implied-by rule       "a stronger relation she holds implies it"
 step 4  parent inheritance    "the parent workspace granted it"
@@ -611,7 +612,7 @@ versioned? How are decisions explained? Those six answers are the product.
 ## Exercise
 
 For each product rule, decide: application code, contextual policy
-(OPA/Cedar-style expression), ReBAC model change, or tuple write. Name the
+(OPA/Cedar-style expression), ReBAC model change, or relationship write. Name the
 facts the rule needs and who has them.
 
 ```text
@@ -628,11 +629,11 @@ Suggested answers (reason before reading):
 ```text
 1. code at the boundary — facts: token claims; the request has them
 2. model — a can_comment permission derived over existing relations
-3. tuple — a fact changed, no rule changed
+3. relationship — a fact changed, no rule changed
 4. model (exclusion) or code guard — pick deliberately; exclusions carry
    testing cost, a code guard splits the policy; both defensible
 5. contextual policy — facts: request network; ReBAC never sees them
-6. tuple with a condition (expiry) — relationship plus time context
+6. conditional relationship (an OpenFGA tuple with expiry) — relationship plus time context
 ```
 
 ## Checkpoint

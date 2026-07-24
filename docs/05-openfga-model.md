@@ -47,9 +47,11 @@ The design process is:
 2. Identify durable facts to store as tuples: team membership, team access to a
    workspace, direct workspace/document ownership, and a document's parent
    workspace.
-3. Identify derived relationships: admin implies member, owner implies editor,
-   editor implies viewer, document access can come from the parent workspace.
-4. Identify application permissions: read, comment, edit, delete.
+3. Identify relation and inheritance rules: admin implies member, owner implies
+   editor, editor implies viewer, and document access can come from the parent
+   workspace.
+4. Identify application permissions: `can_read`, `can_comment`, `can_edit`,
+   `can_delete`.
 5. Represent permissions as computed relations in OpenFGA so callers ask for intent
    (`can_edit`) rather than implementation detail (`editor from workspace`).
 6. Write contract tests before trusting the model.
@@ -59,7 +61,7 @@ That gives this rule of thumb:
 ```text
 Facts that product workflows mutate go in tuples.
 Rules that explain what facts mean go in the model.
-Operations that code enforces become can_* permissions.
+Operations that code enforces are protected by `can_*` permissions.
 ```
 
 ## Types
@@ -85,8 +87,8 @@ type team
 An admin is also a member.
 
 Why: team membership is a group fact, and `admin` is a stronger team relation.
-If someone administers a team, they should also satisfy checks that only require
-team membership. The model captures that once with `member: [user] or admin`
+If someone administers a team, they should also belong to the team's `member`
+set. The model captures that once with `member: [user] or admin`
 instead of writing both `admin` and `member` tuples for every admin.
 
 ## Workspace

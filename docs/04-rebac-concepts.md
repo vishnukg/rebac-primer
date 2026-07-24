@@ -67,7 +67,7 @@ type Resource string
 
 ## Relations
 
-Relations name durable or structural connections:
+Relations name associations or sets used as policy evidence:
 
 ```text
 member

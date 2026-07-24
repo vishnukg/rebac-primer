@@ -92,7 +92,7 @@ func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
 	}
 }
 
-func TestAllPermissions_NonDocumentObjectReturnsEmptySummary(t *testing.T) {
+func TestAllPermissions_NonDocumentResourceReturnsEmptySummary(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)

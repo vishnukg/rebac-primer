@@ -17,7 +17,7 @@ import (
 // port. Tests check those errors even though this in-memory implementation does
 // not currently fail, keeping the examples safe to copy to real adapters.
 
-func TestStore_GivenSeededTuple_WhenHas_ThenReportsTrue(t *testing.T) {
+func TestStore_GivenSeededRelationship_WhenHas_ThenReportsTrue(t *testing.T) {
 	// Arrange
 	relationship := rebac.NewRelationship(rebac.Subject(rebac.User("alice")), rebac.RelationTeamMember, rebac.Team("platformTeam"))
 	store := authz.NewInMemoryStore(relationship)
@@ -51,7 +51,7 @@ func TestStore_GivenEmptyStore_WhenHas_ThenReportsFalse(t *testing.T) {
 	}
 }
 
-func TestStore_GivenWrittenTuple_WhenHas_ThenReportsTrue(t *testing.T) {
+func TestStore_GivenWrittenRelationship_WhenHas_ThenReportsTrue(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore()
 	relationship := rebac.NewRelationship(rebac.Subject(rebac.User("alice")), rebac.RelationTeamMember, rebac.Team("platformTeam"))
@@ -71,7 +71,7 @@ func TestStore_GivenWrittenTuple_WhenHas_ThenReportsTrue(t *testing.T) {
 	}
 }
 
-func TestStore_GivenDuplicateWrites_WhenFindAll_ThenTupleStoredOnce(t *testing.T) {
+func TestStore_GivenDuplicateWrites_WhenFindAll_ThenRelationshipStoredOnce(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore()
 	relationship := rebac.NewRelationship(rebac.Subject(rebac.User("alice")), rebac.RelationTeamMember, rebac.Team("platformTeam"))
@@ -94,7 +94,7 @@ func TestStore_GivenDuplicateWrites_WhenFindAll_ThenTupleStoredOnce(t *testing.T
 	}
 }
 
-func TestStore_GivenStoredTuple_WhenDeleted_ThenHasReportsFalse(t *testing.T) {
+func TestStore_GivenStoredRelationship_WhenDeleted_ThenHasReportsFalse(t *testing.T) {
 	// Arrange
 	relationship := rebac.NewRelationship(rebac.Subject(rebac.User("alice")), rebac.RelationTeamMember, rebac.Team("platformTeam"))
 	store := authz.NewInMemoryStore(relationship)
@@ -114,7 +114,7 @@ func TestStore_GivenStoredTuple_WhenDeleted_ThenHasReportsFalse(t *testing.T) {
 	}
 }
 
-func TestStore_GivenMissingTuple_WhenDeleted_ThenNoOp(t *testing.T) {
+func TestStore_GivenMissingRelationship_WhenDeleted_ThenNoOp(t *testing.T) {
 	// Arrange
 	aliceMember := rebac.NewRelationship(
 		rebac.Subject(rebac.User("alice")),
@@ -143,7 +143,7 @@ func TestStore_GivenMissingTuple_WhenDeleted_ThenNoOp(t *testing.T) {
 	}
 }
 
-func TestStore_GivenMixedTuples_WhenFindByResourceRelation_ThenReturnsOnlyMatches(t *testing.T) {
+func TestStore_GivenMixedRelationships_WhenFindByResourceRelation_ThenReturnsOnlyMatches(t *testing.T) {
 	// Arrange
 	match := rebac.NewRelationship(rebac.Subject(rebac.User("bob")), rebac.RelationWorkspaceViewer, rebac.Workspace("productWorkspace"))
 	nonMatch := rebac.NewRelationship(rebac.Subject(rebac.User("alice")), rebac.RelationTeamMember, rebac.Team("platformTeam"))
@@ -161,7 +161,7 @@ func TestStore_GivenMixedTuples_WhenFindByResourceRelation_ThenReturnsOnlyMatche
 	}
 }
 
-func TestStore_GivenFilter_WhenFindAll_ThenReturnsMatchingTuples(t *testing.T) {
+func TestStore_GivenFilter_WhenFindAll_ThenReturnsMatchingRelationships(t *testing.T) {
 	// Arrange
 	cases := map[string]struct {
 		filter authz.RelationshipFilter
@@ -195,7 +195,7 @@ func TestStore_GivenFilter_WhenFindAll_ThenReturnsMatchingTuples(t *testing.T) {
 	}
 }
 
-func TestStore_GivenTuples_WhenFindAll_ThenReturnsDeterministicOrder(t *testing.T) {
+func TestStore_GivenRelationships_WhenFindAll_ThenReturnsDeterministicOrder(t *testing.T) {
 	// Arrange: write in reverse lexical order.
 	aliceMember := rebac.NewRelationship(rebac.Subject(rebac.User("alice")), rebac.RelationTeamMember, rebac.Team("platformTeam"))
 	bobViewer := rebac.NewRelationship(rebac.Subject(rebac.User("bob")), rebac.RelationWorkspaceViewer, rebac.Workspace("productWorkspace"))
@@ -219,7 +219,7 @@ func TestStore_GivenTuples_WhenFindAll_ThenReturnsDeterministicOrder(t *testing.
 	}
 }
 
-func TestStore_GivenConcurrentWrites_WhenFindAll_ThenAllTuplesStored(t *testing.T) {
+func TestStore_GivenConcurrentWrites_WhenFindAll_ThenAllRelationshipsStored(t *testing.T) {
 	// Arrange: distinct relationships written from many goroutines. With -race this
 	// exercises the store's mutex.
 	store := authz.NewInMemoryStore()

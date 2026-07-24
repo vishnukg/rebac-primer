@@ -44,8 +44,8 @@ import "rebac-primer/internal/rebac"
 type impliedBy map[rebac.Relation][]rebac.Relation
 
 // permissionRules maps each application permission to the base relation that
-// satisfies it. Permissions are policy results; relations are the durable facts
-// and derived role-like sets used to prove those results.
+// satisfies it. Permissions are policy results; relations name the stored
+// associations and derived role-like sets used to prove those results.
 var permissionRules = map[rebac.ResourceType]map[rebac.Permission][]rebac.Relation{
 	rebac.ResourceTypeWorkspace: {
 		rebac.PermissionWorkspaceCreateDocument: {rebac.RelationWorkspaceEditor},
@@ -122,8 +122,9 @@ var workspaceRules = impliedBy{
 //
 // Hierarchy of base relations: owner ⊆ editor ⊆ viewer as sets of subjects
 //
-// Permissions are deliberately a separate domain type. ValidateCheckRequest
-// maps each permission to its required base relation:
+// Permissions are deliberately a separate domain type. Evaluate maps each
+// permission to its required base relation; ValidateCheckRequest uses the same
+// mapping to reject permissions that are not valid for the resource type:
 //
 //	can_read    ← viewer (and therefore editor and owner)
 //	can_comment ← viewer (and therefore editor and owner)

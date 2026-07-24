@@ -147,7 +147,7 @@ func TestGraphEvaluator_CycleDetectionDoesNotHang(t *testing.T) {
 	}
 }
 
-func TestGraphEvaluator_IgnoresStoredComputedPermission(t *testing.T) {
+func TestGraphEvaluator_IgnoresStoredPermissionValue(t *testing.T) {
 	// Arrange
 	// can_edit is computed from editor; the model does not permit a can_edit
 	// relationship. Seed the low-level store directly to prove corrupted data cannot
@@ -171,7 +171,7 @@ func TestGraphEvaluator_IgnoresStoredComputedPermission(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result.Allowed {
-		t.Error("computed can_edit relationship granted access; want model-derived denial")
+		t.Error("invalid relationship using can_edit as its relation granted access; want denial")
 	}
 }
 

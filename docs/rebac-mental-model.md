@@ -10,8 +10,9 @@ remaining sections are a reference for modeling and debugging later.
 ## The One Equation
 
 ```text
-model + relationships + check request = decision
-rules   current facts   question        allow, deny, or error
+model + relationships + check request
+  -> decision (allow or deny), when evaluation succeeds
+  -> evaluation error, when it cannot decide
 ```
 
 Those parts change on different clocks:
@@ -82,7 +83,7 @@ rules are valid.
 
 ### 3. Relation and permission
 
-A relation names a durable or structural set on a resource:
+A relation names an association or set used as policy evidence on a resource:
 
 ```text
 team:platformTeam#member
@@ -114,7 +115,7 @@ its `user`, `relation`, and `object` tuple fields.
 
 ### 5. Permission check
 
-Application code should ask for the operation it wants to perform:
+Application code should ask for the permission required by the operation:
 
 ```text
 Check(user:alice, can_edit, document:roadmapDocument)
@@ -222,9 +223,11 @@ Use these distinctions when modeling:
 | computed permission | Alice can edit document | no |
 | request context | current time, device risk | no long-lived relationship |
 
-Roles are relationships scoped to a resource. Permissions are the authorities
-application code enforces. Keeping `editor` separate from `can_edit` allows the
-meaning of `can_edit` to evolve without changing every call site.
+Role-like names such as `owner` and `editor` are relations scoped to a
+resource; assigning a subject to one is a relationship. Permissions are the
+authorities application code enforces. Keeping `editor` separate from
+`can_edit` allows the meaning of `can_edit` to evolve without changing every
+call site.
 
 ## Allow, Deny, And Error
 

@@ -4,7 +4,7 @@
 //
 // # Why this exists
 //
-// The same permission model is encoded more than once — the from-scratch rule
+// The same authorization policy is encoded more than once — the from-scratch rule
 // tables in model.go and the OpenFGA DSL (deployments/openfga/model.fga) — and
 // nothing forces the encodings to agree. This package pins the intended behavior
 // as data so a drift in any one of them fails a test instead of silently changing

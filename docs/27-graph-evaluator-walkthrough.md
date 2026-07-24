@@ -348,8 +348,8 @@ workspace relationship needed.
 What happens if the graph has a loop?  For example:
 
 ```
-(team:a, member, team:b#member)
-(team:b, member, team:a#member)   ← points back to the first userset
+(team:b#member, member, team:a)
+(team:a#member, member, team:b)   ← points back to the first userset
 ```
 
 Those relationships are intentionally invalid for this repository's model—team
@@ -388,7 +388,7 @@ revisit the same graph node without being incorrectly denied.
 
 ---
 
-## The permission model rules
+## Permission mappings and relation rules
 
 `internal/authz/model.go` holds a permission-to-relation mapping and three
 relation-hierarchy tables—one per resource type. Each hierarchy table maps a
@@ -407,7 +407,7 @@ then recurses for each stronger relation that could satisfy it.  If a stronger
 relation is found, the weaker one is satisfied automatically.
 
 ```
-Check "viewer" on workspace:productWorkspace for alice:
+Resolve "viewer" on workspace:productWorkspace for alice:
   workspaceRules["viewer"] = ["editor"]
   → check "editor" instead
     workspaceRules["editor"] = ["owner"]
@@ -512,8 +512,9 @@ func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
 ```
 
 No changes to the traversal algorithm are needed—the permission mapping and
-relation tables drive it. The model and validation edits are important because this repository keeps a
-teaching evaluator and an OpenFGA model intentionally aligned.
+relation tables drive it. The permission mapping, OpenFGA model, and contract
+test edits are important because this repository keeps a teaching evaluator
+and an OpenFGA model intentionally aligned.
 
 Next: choose `20-go-language-guide.md` and `21-go-rebac-implementation.md` to
 study the Go design, or read docs 26 and 34 for the staged path from this

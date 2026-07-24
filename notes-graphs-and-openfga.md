@@ -313,7 +313,7 @@ read?"), `BatchCheck` (many checks at once), `Expand` (debug a relation).
 | the rules | `internal/authz/model.go` tables | `model.fga` DSL |
 | the facts | in-memory relationship store (`internal/authz/store.go`) | OpenFGA's tuple datastore |
 | `X from Y` inheritance | `expandDocument` in `internal/authz/evaluator.go` | the `from` keyword |
-| computed permission | `documentRules[can_edit] = {editor}` | `define can_edit: editor` |
+| computed permission | `permissionRules[document][can_edit] = {editor}` | `define can_edit: editor` |
 | the Check | `GraphEvaluator.Evaluate` | OpenFGA `/check` |
 
 The repo can run **either** backend behind the same interface — set

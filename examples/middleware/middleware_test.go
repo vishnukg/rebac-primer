@@ -56,7 +56,7 @@ func TestAuditEvaluator_WritesLogLine(t *testing.T) {
 	}
 	line := buf.String()
 	if !strings.Contains(line, "can_edit") {
-		t.Errorf("expected log to mention relation can_edit, got: %s", line)
+		t.Errorf("expected log to mention permission can_edit, got: %s", line)
 	}
 	if !strings.Contains(line, "denied") {
 		t.Errorf("expected log to mention denied, got: %s", line)

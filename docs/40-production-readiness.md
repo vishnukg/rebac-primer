@@ -78,7 +78,8 @@ personal and regulated data in relationship keys.
 
 Document creation spans a document store and an authorization store. The primer
 uses compensating cleanup. Production systems normally use an outbox/domain
-event and idempotent consumers so failed tuple writes are retried reliably.
+event and idempotent consumers so failed OpenFGA tuple writes are retried
+reliably.
 
 Treat a successful policy denial and an indeterminate engine failure as
 different outcomes. Both may block the operation, but only the latter should

@@ -58,7 +58,8 @@ When you read ReBAC code, keep asking:
 
 ```text
 What node am I on?
-What relation am I checking?
+What permission was requested?
+Which relation is the policy currently resolving?
 Which edge can I follow next?
 Is this place already on my current recursion path?
 ```
@@ -195,8 +196,11 @@ owner
 editor
 viewer
 workspace
-can_edit
 ```
+
+`can_edit` is a permission, not a relation in the repository's domain
+language. OpenFGA represents both in its relation namespace, but the adapter
+owns that vocabulary translation.
 
 ## Directed edges
 
@@ -291,13 +295,14 @@ That is the core mental model.
 
 Traversal means walking the graph.
 
-The authorizer starts with a question:
+The authorization evaluator starts with a question:
 
 ```text
 Check(user:alice, can_edit, document:roadmapDocument)
 ```
 
-Then it expands relations using the model:
+First it maps the permission to a relation, then expands that relation using
+the model:
 
 ```text
 can_edit -> editor
@@ -332,7 +337,7 @@ Step 5:
   is user:alice a member of team:platformTeam?
 
 Step 6:
-  yes, tuple exists:
+  yes, relationship exists:
   user:alice member team:platformTeam
 
 Result:
@@ -355,7 +360,7 @@ Result: denied
 
 ## The model is the map
 
-Tuples are facts:
+Relationships are facts:
 
 ```text
 user:alice                  member     team:platformTeam
@@ -374,7 +379,7 @@ workspace editor accepts team member subject sets
 Diagram:
 
 ```text
-Tuples                      Model
+Relationships               Model
 ──────                      ─────
 raw edges       +           traversal rules
 who has what                what implies what
@@ -419,7 +424,7 @@ It means:
 the set of users reachable through team:platformTeam member
 ```
 
-So this tuple:
+So this relationship:
 
 ```text
 team:platformTeam#member  editor  workspace:productWorkspace
@@ -441,7 +446,7 @@ team:platformTeam#member
   └─editor of─► workspace:productWorkspace
 ```
 
-Subject sets let one tuple represent many users.
+Subject sets let one relationship represent many users.
 
 ## Cycles
 

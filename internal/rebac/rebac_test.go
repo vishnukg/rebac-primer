@@ -73,7 +73,7 @@ func TestParseResource_GivenMalformedReference_WhenParsed_ThenReturnsError(t *te
 	}
 }
 
-func TestSubjectSet_GivenObjectAndRelation_WhenBuilt_ThenFormatsAsObjectHashRelation(t *testing.T) {
+func TestSubjectSet_GivenResourceAndRelation_WhenBuilt_ThenFormatsAsResourceHashRelation(t *testing.T) {
 	// Arrange
 	resource := rebac.Team("platformTeam")
 
@@ -86,7 +86,7 @@ func TestSubjectSet_GivenObjectAndRelation_WhenBuilt_ThenFormatsAsObjectHashRela
 	}
 }
 
-func TestParseSubjectSet_GivenSubjectSet_WhenParsed_ThenSplitsObjectAndRelation(t *testing.T) {
+func TestParseSubjectSet_GivenSubjectSet_WhenParsed_ThenSplitsResourceAndRelation(t *testing.T) {
 	// Arrange
 	input := rebac.SubjectSet(rebac.Team("platformTeam"), rebac.RelationTeamMember)
 
@@ -139,7 +139,7 @@ func TestIsSubjectSet_GivenSubjectSet_WhenChecked_ThenReportsTrue(t *testing.T) 
 	}
 }
 
-func TestIsSubjectSet_GivenPlainObject_WhenChecked_ThenReportsFalse(t *testing.T) {
+func TestIsSubjectSet_GivenPlainResource_WhenChecked_ThenReportsFalse(t *testing.T) {
 	// Arrange
 	subject := rebac.Subject(rebac.User("alice"))
 
@@ -152,7 +152,7 @@ func TestIsSubjectSet_GivenPlainObject_WhenChecked_ThenReportsFalse(t *testing.T
 	}
 }
 
-func TestObjectConstructor_GivenEmptyID_WhenBuilt_ThenPanics(t *testing.T) {
+func TestResourceConstructor_GivenEmptyID_WhenBuilt_ThenPanics(t *testing.T) {
 	// Arrange: the constructors guard against empty ids, which would produce an
 	// ambiguous "user:" reference.
 	defer func() {

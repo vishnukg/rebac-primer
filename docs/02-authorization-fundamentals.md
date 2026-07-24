@@ -4,7 +4,8 @@ Authorization is the part of the system that decides whether an authenticated
 subject can perform an action on a resource.
 
 ```text
-subject + action + resource -> allow or deny
+business operation:   subject + action + resource
+authorization check:  Check(subject, required permission, resource) -> decision
 ```
 
 Before ReBAC makes sense, you need to understand the common authorization models
@@ -41,13 +42,13 @@ Now global roles are not enough.
 
 ## The decision shape
 
-Every authorization check needs the same three pieces:
+Every authorization check in this repository needs the same three pieces:
 
 ```text
-subject + action + resource -> allow or deny
+Check(subject, permission, resource) -> decision
 ```
 
-For this repo:
+The business action determines which permission the application checks:
 
 ```text
 subject             = user:alice
@@ -56,15 +57,21 @@ required permission = can_edit
 resource            = document:roadmapDocument
 ```
 
-The check becomes:
+The business question is:
 
 ```text
 Can user:alice edit document:roadmapDocument?
 ```
 
+The authorization check is:
+
+```text
+Check(user:alice, can_edit, document:roadmapDocument)
+```
+
 The application attempts the `edit` action and asks the authorization domain
-for the `can_edit` permission. Relations are the durable facts used to derive
-that permission:
+for the `can_edit` permission. Relationships are the durable facts used to
+derive that permission; their relation names describe what each fact means:
 
 ```text
 relationship: Alice is a member of Platform Team
@@ -92,7 +99,7 @@ load/parse target
   |
   v
 authorize
-  "can user:alice edit document:roadmapDocument?"
+  Check(user:alice, can_edit, document:roadmapDocument)
   |
   +-- denied  -> return 403
   |
@@ -190,7 +197,7 @@ Mistake 4: making the HTTP handler own the policy.
 
 ```text
 Bad:  every route knows graph rules
-Good: document domain asks Authorizer for an allow/deny decision
+Good: document domain asks the authorization service for a decision
 ```
 
 ## DAC, MAC, RBAC, ABAC, ReBAC
@@ -392,7 +399,7 @@ Now team membership is the source of truth.
 ┌──────────────┐
 │ HTTP handler │ parses request
 └──────┬───────┘
-       │ subject + action + resource
+       │ business request: subject + action + resource
        ▼
 ┌──────────────┐
 │ Document     │ enforces business rule
@@ -400,9 +407,9 @@ Now team membership is the source of truth.
 └──────┬───────┘
        │ Check(subject, permission, resource)
        ▼
-┌──────────────┐
-│ Authorizer   │ graph authorizer or OpenFGA adapter
-└──────┬───────┘
+┌───────────────────────┐
+│ Authorization Service │ graph evaluator or OpenFGA adapter
+└───────────┬───────────┘
        │ relationship graph
        ▼
 ┌──────────────┐
@@ -416,7 +423,7 @@ The important separation:
 ```text
 HTTP parses.
 Domain decides when authz is required.
-Authorizer answers allow/deny.
+The authorization service returns an allow/deny decision.
 Relationship store holds facts.
 ```
 
@@ -471,7 +478,7 @@ agent run
   |
   v
 tool call
-  asks Authorizer before touching data
+  asks the authorization service before touching data
 ```
 
 Diagram:
@@ -550,8 +557,11 @@ ReBAC can model these relationships too:
 user:alice                  member     team:platformTeam
 team:platformTeam#member    editor     workspace:productWorkspace
 workspace:productWorkspace  workspace  document:roadmapDocument
-agent:docAssistant          can_use    tool:update_document
+agent:docAssistant          approved_agent  tool:update_document
 ```
+
+Here `approved_agent` is stored evidence; policy derives the checked `can_use`
+permission from it.
 
 The important production habit is the same as normal web apps:
 

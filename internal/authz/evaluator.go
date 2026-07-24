@@ -340,13 +340,14 @@ func (r *resolution) subjectSetContains(
 	return r.hasRelation(subjectResource, ssObj, ssRel, depth+1)
 }
 
-// ── Permission-model expansion (step 3) ───────────────────────────────────────
+// ── Relation-hierarchy expansion (step 3) ─────────────────────────────────────
 
-// expandByRules consults the permission model's implied-by table.
+// expandByRules consults the policy model's relation-hierarchy table.
 //
-// The table says things like "can_edit is implied by editor" and "editor is
-// implied by owner".  If we failed to find <relation> directly, we check each
-// stronger relation that would satisfy it.
+// The table says things like "viewer is implied by editor" and "editor is
+// implied by owner". If we failed to find <relation> directly, we check each
+// stronger relation that would satisfy it. Permission-to-relation mapping has
+// already happened in Evaluate before this traversal begins.
 //
 // Example — checking "editor" on workspace:productWorkspace:
 //

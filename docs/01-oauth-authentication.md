@@ -821,7 +821,7 @@ ReBAC check
 allow or deny → handler runs business logic
 ```
 
-Your document domain should receive an already-verified actor id. It should not
+Your document domain should receive an already-verified subject ID. It should not
 parse JWTs or call the IdP.
 
 ```text

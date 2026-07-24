@@ -59,7 +59,7 @@ Alice can edit Roadmap Document.
 The core decision shape remains:
 
 ```text
-Can subject S perform permission P on resource R?
+Does subject S have permission P on resource R?
 ```
 
 For this repository:
@@ -84,7 +84,7 @@ decision.
 A practical system often combines models:
 
 ```text
-authentication  → establishes the principal
+authentication  → establishes the subject's identity
 OAuth scope     → permits a client to call an API category
 ReBAC           → checks resource-specific relationships
 ABAC/context    → adds time, network, risk, or resource attributes
@@ -185,7 +185,7 @@ computed permissions can_read, can_edit, can_delete
 
 Base relations are usually product concepts people understand. Structural
 relations connect resources so access can inherit. Computed permissions are the
-operations application code checks.
+authorities that business operations require.
 
 This repo's policy follows that shape:
 
@@ -194,9 +194,9 @@ This repo's policy follows that shape:
 | base relation | `workspace#editor` | a workspace-scoped role-like fact |
 | subject set | `team#member` | grant access to a dynamic group |
 | structural relation | `document#workspace` | connect child document to parent workspace |
-| hierarchy rule | `viewer includes editor` | avoid duplicating weaker-role tuples |
+| hierarchy rule | `viewer includes editor` | avoid duplicating weaker-role relationships |
 | inheritance rule | `editor from workspace` | reuse workspace access for documents |
-| computed permission | `can_edit: editor` | let application code check an action |
+| computed permission | `can_edit: editor` | let code check the permission required by an action |
 
 When extending the model, place a new concept in the right layer. For example,
 `folder` would probably be a new resource type plus a structural relation;
@@ -272,7 +272,7 @@ other personal data in relationship keys.
 
 ### Relation
 
-A named relationship:
+A named association or set used as policy evidence:
 
 ```text
 member
@@ -282,11 +282,12 @@ editor
 viewer
 ```
 
-Relations describe facts or sets of subjects associated with a resource.
+Relations describe how subjects are associated with a resource. A relationship
+assigns a particular subject to one of those relations.
 
 ### Permission
 
-An application action expressed as a policy result:
+A policy-derived authority required by an application action:
 
 ```text
 can_read
@@ -469,10 +470,11 @@ that stores the relationship data itself.
 Start with a small API:
 
 ```text
-Check(subject, permission, resource) -> allow or deny
+Check(subject, permission, resource) -> decision
 ```
 
-A production response often needs more than a boolean:
+A decision is allow or deny; an evaluation failure is an error, not a third
+decision. A production response often needs more than a boolean:
 
 ```json
 {
@@ -492,7 +494,8 @@ Useful operations may include:
 | ListObjects / ListResources | Resources a subject may access |
 | ListUsers / ListSubjects | Subjects with access to a resource |
 | Explain/Expand | Debug policy structure or a decision |
-| WriteRelationships | Add or remove relationship facts |
+| WriteRelationships | Add relationship facts |
+| DeleteRelationships | Remove relationship facts |
 | WatchChanges | Feed relationship updates to consumers |
 
 Do not assume listing is merely “run Check for every database row.” That can

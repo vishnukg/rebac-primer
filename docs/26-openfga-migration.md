@@ -253,9 +253,10 @@ Exit gate: reviewers can predict every contract result from product sentences.
 
 Model two or three real workflows, including a difficult one. Include tenant
 boundaries, nested groups, resource inheritance, custom sharing, or contextual
-rules if the product needs them. Decide which relations are writable facts and
-which `can_*` names are domain permissions represented as computed relations in
-OpenFGA.
+rules if the product needs them. Decide which relations may appear in stored
+relationships and which are purely derived, and which `can_*` names are domain
+permissions represented as computed relations in OpenFGA. Only concrete
+relationships are written as facts.
 
 Run OpenFGA model tests for allows and denies. Check the required listing and
 search flows too; a fast `Check` does not prove `ListObjects` or `ListUsers`

@@ -165,7 +165,7 @@ That makes a capability boundary visible to the compiler:
 ```go
 ro := middleware.NewReadOnlyStore(store)
 ro.Has(ctx, subject, relation, resource) // ok
-ro.Write(ctx, relationships)              // does not compile
+ro.Write(ctx, relationship)               // does not compile
 ```
 
 Embedding is not inheritance. The outer type can add methods, override promoted

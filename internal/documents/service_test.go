@@ -140,7 +140,7 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 
 	// Assert: alice can_delete d1. can_delete requires document owner, and a
 	// workspace editor only inherits document editor (can_edit) — never owner. So
-	// this passes only because Create wrote a direct (d1, owner, alice) relationship.
+	// this passes only because Create wrote a direct (alice, owner, d1) relationship.
 	ownerCheck, err := authzSvc.Check(t.Context(), rebac.CheckRequest{
 		Subject: fixtures.Alice, Permission: rebac.PermissionDocumentDelete, Resource: rebac.Document("d1"),
 	})
@@ -163,7 +163,7 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	}
 }
 
-func TestDocumentService_Create_WhenTupleWriteFails_RollsBackDocument(t *testing.T) {
+func TestDocumentService_Create_WhenRelationshipWriteFails_RollsBackDocument(t *testing.T) {
 	// Arrange
 	repo := documents.NewInMemoryRepository()
 	authzClient := &failingWriteAuthz{}

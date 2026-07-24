@@ -13,7 +13,7 @@ to show the important ReBAC ideas.
 ## Repository Map
 
 ```text
-internal/rebac/          Domain vocabulary: Subject, Resource, Relation, Permission
+internal/rebac/          Domain vocabulary: subjects, resources, relations, relationships, permissions, decisions
 internal/authz/          AuthZ service, relationship store, graph evaluator, policy rules
 internal/openfga/        OpenFGA-backed authorization service
 internal/documents/      Documents service, repository, demo token verifier
@@ -111,7 +111,7 @@ Bob can read but not edit.
 Casey has no path through the graph, so access is denied.
 ```
 
-| Subject or resource | ReBAC ID | Role |
+| Subject or resource | ReBAC ID | Place in the story |
 |---|---|---|
 | Alice | `user:alice` | platform team member; can edit |
 | Bob | `user:bob` | workspace viewer; can read only |

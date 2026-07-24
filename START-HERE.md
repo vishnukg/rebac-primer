@@ -71,8 +71,9 @@ The Go `Relationship` struct uses those same domain names: `Subject`,
 Use this three-layer picture:
 
 ```text
-model  + relationships + check = decision
-rules    facts    question  allow or deny
+model + relationships + check
+  -> decision (allow or deny), when evaluation succeeds
+  -> evaluation error, when it cannot decide
 ```
 
 - The **model** is the reusable grammar: owners are editors, editors are
@@ -97,8 +98,8 @@ Authentication supplies “who is asking.” ReBAC answers “may that identity 
 this action to this resource?” Keep those as two separate questions.
 
 The stable vocabulary is: actions are attempted by the application, relations
-describe durable facts, and policy derives permissions such as `can_edit`.
-Application code checks permissions. See
+name policy associations, relationships record durable facts, and policy
+derives permissions such as `can_edit`. Application code checks permissions. See
 [Authorization Domain Language](docs/authorization-domain-language.md).
 
 The full version of this memory aid—including sets, usersets, roles versus
