@@ -7,20 +7,20 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// Service answers authorization questions and manages relationship tuples.
+// Service answers authorization questions and manages relationships.
 // Construct it with [New]; its zero value is not usable.
 //
 // Its methods have pointer receivers because Service contains collaborators and
 // should not be copied. Consumers normally accept *Service through a narrow
 // interface declared in the consuming package.
 type Service struct {
-	writer    TupleWriter
-	lister    TupleLister
+	writer    RelationshipWriter
+	lister    RelationshipLister
 	evaluator Evaluator
 }
 
-// New creates a Service from a TupleRepository and an Evaluator.
-func New(repository TupleRepository, evaluator Evaluator) *Service {
+// New creates a Service from a RelationshipRepository and an Evaluator.
+func New(repository RelationshipRepository, evaluator Evaluator) *Service {
 	return &Service{writer: repository, lister: repository, evaluator: evaluator}
 }
 
@@ -34,42 +34,45 @@ func (d *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.Chec
 	return d.evaluator.Evaluate(ctx, req)
 }
 
-// WriteTuples persists new relationship facts.
+// WriteRelationships persists new relationship facts.
 //
-// Every tuple is validated before any is written, so a single malformed tuple
-// rejects the whole batch (returning a [TupleValidationError]) instead of
-// leaving a half-applied write. Validation guards the graph: a tuple whose
-// object or user does not parse would silently never match during a check, which
-// is the kind of bug that quietly grants or denies the wrong access.
-func (d *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
-	for _, t := range tuples {
-		if err := ValidateTuple(t); err != nil {
+// Every relationship is validated before any is written, so a single malformed
+// fact rejects the whole batch (returning a [RelationshipValidationError])
+// instead of leaving a half-applied write. Validation guards the graph: a
+// relationship whose resource or subject does not parse would silently never
+// match during a check, which is the kind of bug that quietly grants or denies
+// the wrong access.
+func (d *Service) WriteRelationships(ctx context.Context, relationships []rebac.Relationship) error {
+	for _, relationship := range relationships {
+		if err := ValidateRelationship(relationship); err != nil {
 			return err
 		}
 	}
-	for _, t := range tuples {
-		if err := d.writer.Write(ctx, t); err != nil {
-			return fmt.Errorf("write tuple (%s, %s, %s): %w", t.Object, t.Relation, t.User, err)
+	for _, relationship := range relationships {
+		if err := d.writer.Write(ctx, relationship); err != nil {
+			return fmt.Errorf("write relationship (%s, %s, %s): %w",
+				relationship.Subject, relationship.Relation, relationship.Resource, err)
 		}
 	}
 	return nil
 }
 
-// DeleteTuples removes relationship facts.
+// DeleteRelationships removes relationship facts.
 //
-// Deletes are intentionally lenient: removing a malformed or non-existent tuple
-// is a harmless no-op, so we do not validate here. Rejecting a delete would only
-// make it harder to clean up bad data that somehow got in.
-func (d *Service) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
-	for _, t := range tuples {
-		if err := d.writer.Delete(ctx, t); err != nil {
-			return fmt.Errorf("delete tuple (%s, %s, %s): %w", t.Object, t.Relation, t.User, err)
+// Deletes are intentionally lenient: removing a malformed or non-existent
+// relationship is a harmless no-op, so we do not validate here. Rejecting a
+// delete would only make it harder to clean up bad data that somehow got in.
+func (d *Service) DeleteRelationships(ctx context.Context, relationships []rebac.Relationship) error {
+	for _, relationship := range relationships {
+		if err := d.writer.Delete(ctx, relationship); err != nil {
+			return fmt.Errorf("delete relationship (%s, %s, %s): %w",
+				relationship.Subject, relationship.Relation, relationship.Resource, err)
 		}
 	}
 	return nil
 }
 
-// ListTuples returns stored tuples, optionally filtered.
-func (d *Service) ListTuples(ctx context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error) {
+// ListRelationships returns stored relationships, optionally filtered.
+func (d *Service) ListRelationships(ctx context.Context, filter ...RelationshipFilter) ([]rebac.Relationship, error) {
 	return d.lister.FindAll(ctx, filter...)
 }

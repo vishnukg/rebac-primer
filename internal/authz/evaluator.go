@@ -1,4 +1,4 @@
-// GraphEvaluator answers permission checks by walking the relationship-tuple
+// GraphEvaluator answers permission checks by walking the relationship
 // graph. It implements the [Evaluator] interface.
 //
 // # Graphs in one paragraph
@@ -6,22 +6,21 @@
 // A graph is a set of nodes connected by edges.  In this system:
 //
 //   - Nodes  = entities  (a user, a team, a workspace, a document)
-//   - Edges  = relationship tuples
+//   - Edges  = relationships
 //
-// OpenFGA presents a tuple as (subject, relation, object). For example:
+// A relationship is represented as (subject, relation, resource). For example:
 //
 //	(user:alice, member, team:platformTeam)
 //
-// reads "user:alice is a member of team:platformTeam". This package stores the
-// same values in TupleKey fields ordered as Object, Relation, User.
+// reads "user:alice is a member of team:platformTeam".
 //
 // # What a permission check is
 //
-// A check answers: "does <user> belong to the effective userset for
-// <object>#<relation>?"
+// A check answers: "does <subject> have <permission> on <resource>?"
 //
 // For example, "does user:alice have can_edit on document:roadmapDocument?"
-// asks whether user:alice belongs to document:roadmapDocument#can_edit.
+// maps can_edit to the editor relation, then asks whether Alice belongs to the
+// effective editor set for that document.
 //
 // The learner-facing relationship chain is:
 //
@@ -30,18 +29,19 @@
 //	workspace:productWorkspace --workspace of--> document:roadmapDocument
 //
 // The implementation resolves that chain in reverse, beginning with the
-// requested object and relation and searching for the subject.
+// requested resource and the relation required by the permission, then searching
+// for the subject.
 //
 // # The traversal algorithm (depth-first search)
 //
 // The evaluator performs depth-first search (DFS): it picks a branch and
-// follows it all the way down before trying another. For a writable relation it
-// tries four things in order; a computed permission starts at rule expansion:
+// follows it all the way down before trying another. After the checked permission
+// is mapped to a required relation, the evaluator tries four things in order:
 //
-//  1. Direct lookup      — is there a tuple (object, relation, user) in the store?
-//  2. Subject-set        — is there a tuple (object, relation, group#rel) where
-//     user is a member of that group? Computed can_* permissions skip steps 1–2.
-//  3. Rule expansion     — does the permission model say this relation is implied
+//  1. Direct lookup      — is there a relationship (subject, relation, resource)?
+//  2. Subject-set        — is there a relationship (group#rel, relation, resource)
+//     where the checked subject is a member of that group?
+//  3. Rule expansion     — does the policy model say this relation is implied
 //     by a stronger relation? If so, recurse with that relation.
 //  4. Workspace inherit  — (documents only) follow the "workspace" pointer to the
 //     parent workspace and check the same relation there.
@@ -54,7 +54,7 @@
 // Malformed relationship data can contain cycles (for example, team:a#member can
 // contain team:b#member while team:b#member contains team:a#member). Without a
 // guard, the traversal would recurse forever. The active-path set records every
-// (object#relation) pair on the current recursion path. If we encounter the same
+// (resource#relation) pair on the current recursion path. If we encounter the same
 // pair before unwinding, we found a cycle and stop that branch. Removing entries
 // as calls return still allows a shared node to be evaluated through a different,
 // independent path.
@@ -75,20 +75,20 @@ import (
 // a comparable resolution-depth limit for the same reason.
 const defaultMaxDepth = 100
 
-// GraphEvaluator traverses the tuple graph to answer Check requests.
+// GraphEvaluator traverses the relationship graph to answer Check requests.
 // Construct with [NewGraphEvaluator]; do not use the zero value directly.
 type GraphEvaluator struct {
-	store    TupleReader
+	store    RelationshipReader
 	maxDepth int
 }
 
 type relationVisit struct {
-	object   rebac.Object
+	resource rebac.Resource
 	relation rebac.Relation
 }
 
-// NewGraphEvaluator creates a GraphEvaluator backed by the given TupleReader.
-func NewGraphEvaluator(store TupleReader) *GraphEvaluator {
+// NewGraphEvaluator creates a GraphEvaluator backed by the given RelationshipReader.
+func NewGraphEvaluator(store RelationshipReader) *GraphEvaluator {
 	return &GraphEvaluator{store: store, maxDepth: defaultMaxDepth}
 }
 
@@ -110,13 +110,13 @@ type resolution struct {
 
 // Evaluate is the entry point for a permission check.
 //
-// It answers: "does req.User have req.Relation on req.Object?"
+// It answers: "does req.Subject have req.Permission on req.Resource?"
 //
 // Example input:
 //
-//	req.User     = "user:alice"
-//	req.Relation = "can_edit"
-//	req.Object   = "document:roadmapDocument"
+//	req.Subject    = "user:alice"
+//	req.Permission = "can_edit"
+//	req.Resource   = "document:roadmapDocument"
 //
 // It returns a CheckResult with Allowed=true/false and a Trace: a human-readable
 // log of every step the traversal took, useful for debugging.  The trace is
@@ -128,21 +128,35 @@ func (g *GraphEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
 	if err := ValidateCheckRequest(req); err != nil {
 		return rebac.CheckResult{}, err
 	}
+	resourceType, _, err := rebac.ParseResource(string(req.Resource))
+	if err != nil {
+		return rebac.CheckResult{}, err
+	}
 	r := &resolution{
 		ev:  g,
 		ctx: ctx,
 		// Start the trace with the question being asked.
 		trace: []string{
-			fmt.Sprintf("Check whether %s has %s on %s", req.User, req.Relation, req.Object),
+			fmt.Sprintf("Check whether %s has permission %s on %s",
+				req.Subject, req.Permission, req.Resource),
 		},
 		visiting: make(map[relationVisit]bool),
 	}
 
-	allowed, err := r.hasRelation(req.User, req.Object, req.Relation, 0)
-	if err != nil {
-		// Return the partial trace alongside the error so callers can still see how
-		// far the traversal got before it was cancelled or hit a store failure.
-		return rebac.CheckResult{Trace: r.trace}, err
+	var allowed bool
+	for _, relation := range permissionRelationsFor(resourceType, req.Permission) {
+		r.trace = append(r.trace, fmt.Sprintf(
+			"Permission %s requires relation %s", req.Permission, relation,
+		))
+		allowed, err = r.hasRelation(req.Subject, req.Resource, relation, 0)
+		if err != nil {
+			// Return the partial trace alongside the error so callers can still see how
+			// far the traversal got before it was cancelled or hit a store failure.
+			return rebac.CheckResult{Trace: r.trace}, err
+		}
+		if allowed {
+			break
+		}
 	}
 
 	if allowed {
@@ -158,40 +172,37 @@ func (g *GraphEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
 
 // hasRelation is the recursive heart of the traversal.
 //
-// It answers: "does user have relation on object?" by trying — in order —
-// a direct tuple lookup, subject-set expansion, permission-model rule expansion,
+// It answers: "does subject have relation on resource?" by trying — in order —
+// a direct relationship lookup, subject-set expansion, policy-model rule expansion,
 // and (for documents) workspace inheritance.
 //
 // Concrete trace for "alice / can_edit / document:roadmapDocument":
 //
-//	hasRelation(alice, document:roadmapDocument, can_edit)
-//	  step 1: hasTuple → no direct tuple for alice/can_edit
-//	  step 3: expand: can_edit is implied by editor (documentRules)
-//	    hasRelation(alice, document:roadmapDocument, editor)
-//	      step 1: hasTuple → no direct tuple for alice/editor
+//	permission can_edit requires relation editor
+//	hasRelation(alice, document:roadmapDocument, editor)
+//	      step 1: hasRelationship → no direct relationship for alice/editor
 //	      step 3: expand: editor is implied by owner (documentRules)
 //	        hasRelation(alice, document:roadmapDocument, owner)
-//	          step 1: hasTuple → no direct tuple
+//	          step 1: hasRelationship → no direct relationship
 //	          step 3: no rules for document/owner
 //	          step 4: workspace inherit → check owner on workspace:productWorkspace
 //	            hasRelation(alice, workspace:productWorkspace, owner) → false ✗
 //	          → false
 //	      step 4: workspace inherit → check editor on workspace:productWorkspace
 //	        hasRelation(alice, workspace:productWorkspace, editor)
-//	          step 1: hasTuple direct → miss
-//	          step 2: hasTuple subject-set → team:platformTeam#member found!
+//	          step 1: hasRelationship direct → miss
+//	          step 2: hasRelationship subject-set → team:platformTeam#member found!
 //	            subjectSetContains(alice, team:platformTeam#member)
 //	              hasRelation(alice, team:platformTeam, member)
-//	                step 1: hasTuple direct → (team:platformTeam, member, alice) FOUND ✓
+//	                step 1: direct relationship → (alice, member, team:platformTeam) FOUND ✓
 //	              → true ✓
 //	          → true ✓
 //	        → true ✓
 //	      → true ✓
-//	    → true ✓
-//	  → true ✓ (can_edit satisfied by editor path)
+//	→ true ✓ (can_edit satisfied by editor path)
 func (r *resolution) hasRelation(
-	user rebac.Object,
-	object rebac.Object,
+	subject rebac.Resource,
+	resource rebac.Resource,
 	relation rebac.Relation,
 	depth int,
 ) (bool, error) {
@@ -207,115 +218,91 @@ func (r *resolution) hasRelation(
 	// so a deep (but acyclic) or hostile graph cannot exhaust the stack or hang the
 	// request. Exceeding it is an error, not a silent "denied".
 	if depth > r.ev.maxDepth {
-		return false, fmt.Errorf("graph: max resolution depth %d exceeded at %s#%s", r.ev.maxDepth, object, relation)
+		return false, fmt.Errorf("graph: max resolution depth %d exceeded at %s#%s", r.ev.maxDepth, resource, relation)
 	}
 
 	// ── Cycle guard ───────────────────────────────────────────────────────────
 	// If this pair is already on the active recursion path, stop the cycle.
-	visitKey := relationVisit{object: object, relation: relation}
+	visitKey := relationVisit{resource: resource, relation: relation}
 	if r.visiting[visitKey] {
-		r.trace = append(r.trace, fmt.Sprintf("Cycle detected at %s#%s; stop this branch", object, relation))
+		r.trace = append(r.trace, fmt.Sprintf("Cycle detected at %s#%s; stop this branch", resource, relation))
 		return false, nil
 	}
 	r.visiting[visitKey] = true
 	defer delete(r.visiting, visitKey)
 
-	// ── Steps 1 & 2: direct tuple + subject-set ───────────────────────────────
-	// Look in the tuple store.  This covers both:
-	//   1. a direct tuple  (object, relation, user:alice)
-	//   2. a subject-set   (object, relation, team:foo#member) where alice is a member
-	//
-	// Computed permissions such as can_edit deliberately skip tuple lookup.
-	// The model does not allow those relations to be written, so accepting a
-	// computed tuple that entered a low-level store by mistake would make this
-	// evaluator disagree with OpenFGA and could over-grant access.
-	typ, _, err := rebac.ParseObject(string(object))
+	// ── Steps 1 & 2: direct relationship + subject-set ────────────────────────
+	// Look in the relationship store. This covers both:
+	//   1. a direct fact (subject, relation, resource)
+	//   2. a subject-set fact (team:foo#member, relation, resource)
+	typ, _, err := rebac.ParseResource(string(resource))
 	if err != nil {
-		// ValidateCheckRequest has already checked the object, so this is only a
+		// ValidateCheckRequest has already checked the resource, so this is only a
 		// defensive guard if hasRelation is reused internally in the future.
-		return false, fmt.Errorf("graph: parse object %q: %w", object, err)
+		return false, fmt.Errorf("graph: parse resource %q: %w", resource, err)
 	}
-	if !isComputedRelation(typ, relation) {
-		found, err := r.hasTuple(user, object, relation, depth)
-		if err != nil {
-			return false, err
-		}
-		if found {
-			return true, nil
-		}
-	}
-
-	// ── Step 3 & 4: permission-model expansion ────────────────────────────────
-	// The tuple store said "no".  Ask the permission model whether this relation
-	// can be satisfied by a stronger relation on the same object, or (for
-	// documents) inherited from the parent workspace.
-	switch typ {
-	case rebac.ObjectTypeTeam:
-		// e.g. "member" is satisfied by "admin"
-		return r.expandByRules(teamRules, user, object, relation, depth)
-	case rebac.ObjectTypeWorkspace:
-		// e.g. "viewer" is satisfied by "editor", "editor" by "owner"
-		return r.expandByRules(workspaceRules, user, object, relation, depth)
-	case rebac.ObjectTypeDocument:
-		// Documents have both rule expansion AND workspace inheritance.
-		return r.expandDocument(user, object, relation, depth)
-	}
-
-	return false, nil
-}
-
-// ── Tuple lookup (steps 1 & 2) ────────────────────────────────────────────────
-
-// hasTuple checks the tuple store for a match.
-//
-// It has two sub-steps:
-//
-//  1. Direct match — "does (object, relation, user:alice) exist literally?"
-//     Example: (team:platformTeam, member, user:alice) → yes, stop here.
-//
-//  2. Subject-set match — "does any tuple (object, relation, group#rel) exist
-//     where alice is a member of that group?"
-//     Example: (workspace:productWorkspace, editor, team:platformTeam#member)
-//     → check if alice has 'member' on team:platformTeam → recursion.
-//
-// The subject-set check is what allows "grant access to a whole team with one
-// tuple" — you write (workspace, editor, team#member) once and every team
-// member gets it automatically.
-func (r *resolution) hasTuple(
-	user rebac.Object,
-	object rebac.Object,
-	relation rebac.Relation,
-	depth int,
-) (bool, error) {
-	// Step 1: direct lookup.
-	// The store answers "does this exact (object, relation, user) triple exist?"
-	direct, err := r.ev.store.Has(r.ctx, object, relation, rebac.Subject(user))
+	found, err := r.hasRelationship(subject, resource, relation, depth)
 	if err != nil {
-		return false, fmt.Errorf("store.Has(%s, %s, %s): %w", object, relation, user, err)
+		return false, err
 	}
-	if direct {
-		r.trace = append(r.trace, fmt.Sprintf("Found direct tuple (%s, %s, %s)", object, relation, user))
+	if found {
 		return true, nil
 	}
 
-	// Step 2: subject-set lookup.
-	// Scan all tuples for (object, relation, *).  For each one whose "user" field
-	// is a subject set (contains '#'), recursively check whether our user is a
-	// member of that set.
-	candidates, err := r.ev.store.FindByObjectRelation(r.ctx, object, relation)
-	if err != nil {
-		return false, fmt.Errorf("store.FindByObjectRelation(%s, %s): %w", object, relation, err)
+	// ── Steps 3 & 4: policy-model expansion ───────────────────────────────────
+	// The relationship store said "no". Ask the policy model whether a stronger
+	// relation on the same resource or an inherited workspace relation satisfies it.
+	switch typ {
+	case rebac.ResourceTypeTeam:
+		return r.expandByRules(teamRules, subject, resource, relation, depth)
+	case rebac.ResourceTypeWorkspace:
+		return r.expandByRules(workspaceRules, subject, resource, relation, depth)
+	case rebac.ResourceTypeDocument:
+		return r.expandDocument(subject, resource, relation, depth)
+	default:
+		return false, nil
 	}
-	for _, tk := range candidates {
-		if !rebac.IsSubjectSet(tk.User) {
+}
+
+// ── Relationship lookup (steps 1 & 2) ────────────────────────────────────────
+
+// hasRelationship checks the relationship store for a match.
+func (r *resolution) hasRelationship(
+	subject rebac.Resource,
+	resource rebac.Resource,
+	relation rebac.Relation,
+	depth int,
+) (bool, error) {
+	direct, err := r.ev.store.Has(r.ctx, rebac.Subject(subject), relation, resource)
+	if err != nil {
+		return false, fmt.Errorf("store.Has(%s, %s, %s): %w", subject, relation, resource, err)
+	}
+	if direct {
+		r.trace = append(r.trace, fmt.Sprintf(
+			"Found direct relationship (%s, %s, %s)", subject, relation, resource,
+		))
+		return true, nil
+	}
+
+	candidates, err := r.ev.store.FindByResourceRelation(r.ctx, resource, relation)
+	if err != nil {
+		return false, fmt.Errorf(
+			"store.FindByResourceRelation(%s, %s): %w", resource, relation, err,
+		)
+	}
+	for _, relationship := range candidates {
+		if !rebac.IsSubjectSet(relationship.Subject) {
 			continue
 		}
-		contains, err := r.subjectSetContains(user, tk.User, depth)
+		contains, err := r.subjectSetContains(subject, relationship.Subject, depth)
 		if err != nil {
 			return false, err
 		}
 		if contains {
-			r.trace = append(r.trace, fmt.Sprintf("Found subject-set tuple (%s, %s, %s)", object, relation, tk.User))
+			r.trace = append(r.trace, fmt.Sprintf(
+				"Found subject-set relationship (%s, %s, %s)",
+				relationship.Subject, relation, resource,
+			))
 			return true, nil
 		}
 	}
@@ -330,14 +317,14 @@ func (r *resolution) hasTuple(
 //
 // To check whether alice is in team:platformTeam#member, we split the string:
 //
-//	object   = "team:platformTeam"
+//	resource = "team:platformTeam"
 //	relation = "member"
 //
 // …and recursively ask: "does user:alice have member on team:platformTeam?"
-// That is another hasRelation call — which might find a direct tuple, or expand
+// That is another hasRelation call—which might find a direct relationship or expand
 // further.  This is where the graph traversal "goes up" through groups.
 func (r *resolution) subjectSetContains(
-	user rebac.Object,
+	subjectResource rebac.Resource,
 	subject rebac.Subject,
 	depth int,
 ) (bool, error) {
@@ -346,9 +333,11 @@ func (r *resolution) subjectSetContains(
 	if err != nil {
 		return false, nil
 	}
-	r.trace = append(r.trace, fmt.Sprintf("Resolve subject set %s: does it contain %s?", subject, user))
+	r.trace = append(r.trace, fmt.Sprintf(
+		"Resolve subject set %s: does it contain %s?", subject, subjectResource,
+	))
 	// Recurse: check membership in the group.
-	return r.hasRelation(user, ssObj, ssRel, depth+1)
+	return r.hasRelation(subjectResource, ssObj, ssRel, depth+1)
 }
 
 // ── Permission-model expansion (step 3) ───────────────────────────────────────
@@ -366,19 +355,19 @@ func (r *resolution) subjectSetContains(
 //	→ if that returns true, editor is also satisfied.
 //
 // This is how role hierarchies work: you define the pyramid once in the rule
-// table, not in every tuple.
+// table, not in every relationship.
 func (r *resolution) expandByRules(
 	rules impliedBy,
-	user rebac.Object,
-	object rebac.Object,
+	subject rebac.Resource,
+	resource rebac.Resource,
 	relation rebac.Relation,
 	depth int,
 ) (bool, error) {
 	// rules[relation] is the list of stronger relations that imply relation.
 	// If the key is missing, the slice is nil and the loop body never runs.
 	for _, implied := range rules[relation] {
-		r.trace = append(r.trace, fmt.Sprintf("%s %s includes %s", object, relation, implied))
-		ok, err := r.hasRelation(user, object, implied, depth+1)
+		r.trace = append(r.trace, fmt.Sprintf("%s %s includes %s", resource, relation, implied))
+		ok, err := r.hasRelation(subject, resource, implied, depth+1)
 		if err != nil {
 			return false, err
 		}
@@ -402,20 +391,20 @@ func (r *resolution) expandByRules(
 //	document:roadmapDocument --[workspace]--> workspace:productWorkspace
 //
 // If user alice has "editor" on workspace:productWorkspace, she also has
-// "editor" on document:roadmapDocument — even without a direct document tuple.
+// "editor" on document:roadmapDocument—even without a direct document relationship.
 //
-// In code: follow every "workspace" tuple on this document to its parent
+// In code: follow every "workspace" relationship on this document to its parent
 // workspace, then recursively check the same relation on that workspace.
-// Only owner, editor, and viewer are inheritable — computed permissions like
-// can_edit are resolved at the document level by expandByRules, not inherited.
+// Only owner, editor, and viewer are inheritable. Evaluate maps a permission
+// such as can_edit to one of those relations before traversal begins.
 func (r *resolution) expandDocument(
-	user rebac.Object,
-	object rebac.Object,
+	subject rebac.Resource,
+	resource rebac.Resource,
 	relation rebac.Relation,
 	depth int,
 ) (bool, error) {
-	// Step 3: rule expansion (e.g. can_edit → editor, editor → owner).
-	ok, err := r.expandByRules(documentRules, user, object, relation, depth)
+	// Step 3: same-resource relation expansion (e.g. editor → owner).
+	ok, err := r.expandByRules(documentRules, subject, resource, relation, depth)
 	if err != nil {
 		return false, err
 	}
@@ -425,36 +414,35 @@ func (r *resolution) expandDocument(
 
 	// Step 4: workspace inheritance.
 	// Only base relations (owner, editor, viewer) propagate from workspace to
-	// document.  Computed permissions (can_edit, can_read, …) are derived at
-	// the document level — inheriting them would double-expand the rules.
-	if relation == rebac.RelationDocumentOwner ||
-		relation == rebac.RelationDocumentEditor ||
-		relation == rebac.RelationDocumentViewer {
+	// document. Permissions have already been mapped to a required relation.
+	if isDocumentBaseRelation(relation) {
 
-		// A document can have multiple workspace tuples in theory.
+		// A document can have multiple workspace relationships in theory.
 		// In practice the fixtures have exactly one: roadmapDocument → productWorkspace.
-		parents, err := r.ev.store.FindByObjectRelation(r.ctx, object, rebac.RelationDocumentWorkspace)
+		parents, err := r.ev.store.FindByResourceRelation(
+			r.ctx, resource, rebac.RelationDocumentWorkspace,
+		)
 		if err != nil {
-			return false, fmt.Errorf("store.FindByObjectRelation(%s, workspace): %w", object, err)
+			return false, fmt.Errorf(
+				"store.FindByResourceRelation(%s, workspace): %w", resource, err,
+			)
 		}
 		for _, parent := range parents {
 			r.trace = append(r.trace, fmt.Sprintf(
-				"%s %s can inherit %s from %s", object, relation, relation, parent.User,
+				"%s %s can inherit %s from %s", resource, relation, relation, parent.Subject,
 			))
 
-			// parent.User is the Subject field of the workspace tuple.
-			// Its value is the workspace's Object string, e.g. "workspace:productWorkspace".
-			// We cast Subject → Object to use it as the next node in the traversal.
-			wsObj := rebac.Object(parent.User)
+			// The relationship subject is the parent workspace resource.
+			workspace := rebac.Resource(parent.Subject)
 
-			// Safety check: the tuple should point at a workspace, not some other type.
-			wsTyp, _, err := rebac.ParseObject(string(wsObj))
-			if err != nil || wsTyp != rebac.ObjectTypeWorkspace {
+			// Safety check: the relationship should point at a workspace.
+			wsTyp, _, err := rebac.ParseResource(string(workspace))
+			if err != nil || wsTyp != rebac.ResourceTypeWorkspace {
 				continue
 			}
 
-			// Recurse: does the user have this relation on the parent workspace?
-			ok, err := r.hasRelation(user, wsObj, relation, depth+1)
+			// Recurse: does the subject have this relation on the parent workspace?
+			ok, err := r.hasRelation(subject, workspace, relation, depth+1)
 			if err != nil {
 				return false, err
 			}

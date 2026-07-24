@@ -18,9 +18,9 @@ Do only this first session:
 3. Read [the mental-model chapter](docs/rebac-mental-model.md) only through
    “Walk The Alice Decision Backward.”
 4. Explain these three facts aloud:
-   - a tuple is a changing product fact
+   - a relationship is a changing product fact
    - the model contains reusable rules
-   - a check asks whether one user belongs to one permission set
+   - a check asks whether one subject has one permission on one resource
 5. Stop.
 
 That is enough for one session. Defer—not discard—these topics:
@@ -56,44 +56,50 @@ workspace:productWorkspace
   --workspace of--> document:roadmapDocument
 ```
 
-The arrows use the OpenFGA tuple convention:
+The arrows show the domain relationship convention:
 
 ```text
-subject --relation--> object
+subject --relation--> resource
 ```
 
-The Go `TupleKey` struct lists its fields as `Object`, `Relation`, `User`, but
-that is an internal field order—not a different relationship.
+The Go `Relationship` struct uses those same domain names: `Subject`,
+`Relation`, and `Resource`. The OpenFGA adapter translates them to that API's
+`user`, `relation`, and `object` fields.
 
 ## Keep It In Your Head
 
 Use this three-layer picture:
 
 ```text
-model  + tuples + check = decision
+model  + relationships + check = decision
 rules    facts    question  allow or deny
 ```
 
 - The **model** is the reusable grammar: owners are editors, editors are
   viewers, and document editors can come from the parent workspace.
-- **Tuples** are changing product facts: Alice belongs to this team, this team
+- **Relationships** are changing product facts: Alice belongs to this team, this team
   edits that workspace, and this document belongs to that workspace.
-- A **check** asks whether one user belongs to the effective set for one
-  relation on one object.
+- A **check** asks whether one subject has one permission on one resource:
+  `Check(subject, permission, resource)`.
 
-Read every tuple as one sentence:
+Read every relationship as one sentence:
 
 ```text
-<subject> is a <relation> of <object>
+<subject> is a <relation> of <resource>
 ```
 
 The only unusual subject is `team:platformTeam#member`. It means a set—“all
 members of the platform team”—rather than one person. The evaluator starts at
 the requested permission and works backward through allowed rules and facts. If
-it cannot prove a path to the user, the answer is deny.
+it cannot prove a path to the subject, the answer is deny.
 
 Authentication supplies “who is asking.” ReBAC answers “may that identity do
-this action to this object?” Keep those as two separate questions.
+this action to this resource?” Keep those as two separate questions.
+
+The stable vocabulary is: actions are attempted by the application, relations
+describe durable facts, and policy derives permissions such as `can_edit`.
+Application code checks permissions. See
+[Authorization Domain Language](docs/authorization-domain-language.md).
 
 The full version of this memory aid—including sets, usersets, roles versus
 permissions, debugging, and modeling at work—is
@@ -208,7 +214,7 @@ user:alice -> team membership -> workspace editor -> document
 
 1. Run the trace test.
 2. Open `internal/fixtures/fixtures.go`.
-3. Change one tuple.
+3. Change one relationship.
 4. Predict which checks change.
 5. Run the trace test again.
 

@@ -69,7 +69,7 @@ curl "http://127.0.0.1:4001/whoami" \
 ## Flow
 
 ```text
-client -> internal/api -> internal/documents -> internal/authz -> tuple graph
+client -> internal/api -> internal/documents -> internal/authz -> relationship graph
 ```
 
 With `AUTHZ_BACKEND=openfga`, the last hop becomes:
@@ -84,9 +84,9 @@ internal/documents -> internal/openfga -> OpenFGA server
 
 ```text
 POST   /check
-POST   /tuples
-DELETE /tuples
-GET    /tuples
+POST   /relationships
+DELETE /relationships
+GET    /relationships
 ```
 
 Run its integration tests:
@@ -95,10 +95,10 @@ Run its integration tests:
 go test -v ./examples/authzhttp
 ```
 
-Those tests exercise HTTP decoding, tuple validation, writes, revocation, and
+Those tests exercise HTTP decoding, relationship validation, writes, revocation, and
 permission checks over the real in-process authorization service.
 
-In production, exposing tuple mutation is a privileged administrative API. It
+In production, exposing relationship mutation is a privileged administrative API. It
 requires strong service authentication, authorization, audit logging, request
 limits, and careful ownership rules. The example intentionally focuses only on
 the client/server shape.

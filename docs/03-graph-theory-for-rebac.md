@@ -49,7 +49,7 @@ each connection means.
 | Node | A thing | `user:alice` |
 | Edge | A connection between two nodes | `user:alice → team:platformTeam` |
 | Label | The name on an edge | `member`, `editor`, `viewer`, `workspace` |
-| Direction | Which way the relationship is written | subject points to object |
+| Direction | Which way the relationship is written | subject points to resource |
 | Path | A chain of relationships | user -> team -> workspace -> document |
 | Reachability | Whether a valid policy path exists | is Alice in the document's editor set? |
 | Cycle | A path that loops back | A points to B, B points to A |
@@ -109,13 +109,13 @@ editor line -> can_edit, can_read, and can_comment
 owner line  -> can_delete, can_edit, can_read, and can_comment
 ```
 
-Tuples are the current map data. If a tuple is removed, a route may disappear.
+Relationships are the current map data. If a relationship is removed, a route may disappear.
 
 ## Nodes
 
 A node is a thing in the graph.
 
-In this repo, nodes are OpenFGA objects:
+In the domain, nodes are resources (called objects by OpenFGA):
 
 ```text
 user:alice
@@ -166,13 +166,13 @@ Read it as:
 user:alice is a member of team:platformTeam
 ```
 
-The repository's internal Go struct lists the same values differently:
+The repository's domain struct uses the same meanings explicitly:
 
 ```text
-Object=team:platformTeam, Relation=member, User=user:alice
+Subject=user:alice, Relation=member, Resource=team:platformTeam
 ```
 
-That is a struct field order, not a different graph relationship.
+The OpenFGA adapter translates those fields to `user`, `relation`, and `object`.
 
 ## Labels
 
@@ -382,11 +382,11 @@ who has what                what implies what
              = authorization decision
 ```
 
-If tuples are data, the model is logic.
+If relationships are data, the model is logic.
 
 ## The complete tutorial graph
 
-Here are the five connected objects in the seeded graph:
+Here are the five connected resources in the seeded graph:
 
 ```text
 user:alice ──member of──► team:platformTeam
@@ -455,14 +455,14 @@ Cycles can happen in relationship graphs. A traversal algorithm must avoid
 walking forever.
 
 The Go evaluator keeps an **active-path set** containing each
-`(object, relation)` pair in the current recursion chain. If the same pair
+`(resource, relation)` pair in the current recursion chain. If the same pair
 appears before the earlier call has returned, the traversal found a cycle and
 stops that branch.
 
 Go (`evaluator.go`):
 
 ```go
-visitKey := relationVisit{object: object, relation: relation}
+visitKey := relationVisit{resource: resource, relation: relation}
 if r.visiting[visitKey] {
     return false
 }
@@ -500,11 +500,11 @@ If the explanation takes a paragraph, simplify the model.
 
 | Graph term | ReBAC meaning |
 |------------|---------------|
-| node | object such as `user:alice` or `document:roadmapDocument` |
-| edge | tuple relationship |
+| node | resource such as `user:alice` or `document:roadmapDocument` |
+| edge | relationship |
 | label | relation name such as `member` or `editor` |
 | path | chain of relationships proving access |
-| traversal | checking relation definitions and tuples |
+| traversal | checking relation definitions and relationships |
 | reachability | whether access can be proven |
 | cycle | relationship loop that traversal must avoid |
 
@@ -513,8 +513,8 @@ If the explanation takes a paragraph, simplify the model.
 Every ReBAC check is this:
 
 ```text
-Does the subject belong to the requested relation's effective set through valid
-model expansions and stored tuples?
+Does the subject have the requested permission on the resource through valid
+model expansions and stored relationships?
 ```
 
 Example:
@@ -570,11 +570,11 @@ Explain ReBAC using graph words:
 
 ```text
 ReBAC stores authorization facts as labeled edges between nodes. A check asks
-whether a subject belongs to a relation's effective set through a policy-valid
-chain of relationships.
+whether a subject has a permission on a resource through a policy-valid chain
+of relationships.
 ```
 
 If that sentence makes sense, you have enough graph theory to continue.
 
 Next: [ReBAC concepts](04-rebac-concepts.md) gives the graph pieces their ReBAC
-names: object, relation, tuple, subject set, and check.
+names: subject, resource, relation, relationship, permission, and decision.

@@ -25,7 +25,7 @@ The shortest accurate distinction is:
 ```text
 OAuth 2.0  → authorize a client to access an API
 OIDC       → authenticate a user to a client
-ReBAC      → authorize that user on a specific application object
+ReBAC      → authorize that subject on a specific application resource
 ```
 
 ### OAuth 2.0: delegated API access
@@ -97,7 +97,7 @@ Authorization   →  What can you do?
 
 OIDC handles user authentication to the client. OAuth access tokens carry
 authority to a resource server. Your ReBAC system handles application-specific,
-object-level authorization. They hand off to each other:
+resource-level authorization. They hand off to each other:
 
 ```text
 OIDC client:
@@ -840,13 +840,13 @@ scope: documents.read   →  may this client call the read API?
 scope: documents.write  →  may this client call the write API?
 ```
 
-These are not per-object decisions. They just say whether the client application
+These are not per-resource decisions. They just say whether the client application
 is allowed to call a category of API at all.
 
-ReBAC is fine-grained and object-specific:
+ReBAC is fine-grained and resource-specific:
 
 ```text
-can user:alice edit document:roadmapDocument?  ←  specific object, specific user
+does user:alice have can_edit on document:roadmapDocument? ← specific resource and subject
 ```
 
 You usually need both:
@@ -854,12 +854,12 @@ You usually need both:
 ```text
 Access token has documents.write scope?    yes, client is authorized to call the API
        ↓
-ReBAC: can alice edit this document?       yes, this specific object is allowed
+ReBAC: can Alice edit this document?       yes, this specific resource is allowed
        ↓
 allow action
 ```
 
-OAuth scopes are not a replacement for object-level authorization. That is
+OAuth scopes are not a replacement for resource-level authorization. That is
 exactly the gap ReBAC fills.
 
 ## Which flow should I use?
@@ -950,7 +950,7 @@ Bad:    user:alice@example.com   (emails change)
 Better: map (trusted issuer, subject) to an internal immutable user id
 ```
 
-**4. Treating OAuth scopes as object permissions**
+**4. Treating OAuth scopes as resource permissions**
 
 ```text
 Bad:    documents.write scope → can edit every document
@@ -987,14 +987,14 @@ This course teaches the modern posture:
 
 OIDC establishes the login identity, and the resource server validates the
 access token used for the API request. ReBAC then uses the resulting stable
-subject identity to decide what it may do on a specific object.
+subject identity to decide what it may do on a specific resource.
 
 Three separate questions:
 
 - OIDC ID-token validation tells the client: **which user authenticated?**
 - OAuth access-token validation tells the API: **is this token valid for me and
   what authority does it carry?**
-- ReBAC answers: **what may this user do with this specific object?**
+- ReBAC answers: **what permission does this subject have on this resource?**
 
 ## Further reading
 

@@ -28,11 +28,11 @@ Rules:
 
 - the bearer token must be valid
 - the token must contain `documents:write`
-- the actor must have `can_delete` on the document
+- the subject must have `can_delete` on the document
 - a successful deletion returns HTTP 204
 - deleting a missing document returns HTTP 404
 - insufficient OAuth scope and failed ReBAC checks remain distinct cases
-- document relationship tuples must be removed with the document
+- document relationships must be removed with the document
 
 Before coding, write down which package owns each rule.
 
@@ -44,7 +44,7 @@ Open `internal/documents/service_test.go`. Add tests for:
 2. a viewer being denied
 3. a missing document
 4. an authorization backend error
-5. tuple cleanup failure
+5. relationship cleanup failure
 
 Run only the new tests:
 
@@ -77,7 +77,7 @@ Add a method with a shape similar to:
 func (s *Service) Delete(
     ctx context.Context,
     id string,
-    actor rebac.Object,
+    subject rebac.Resource,
 ) error
 ```
 
@@ -85,14 +85,14 @@ The method should:
 
 1. load the document
 2. check `can_delete`
-3. remove document relationship tuples
+3. remove document relationships
 4. delete the document
 
 There is no transaction shared by the document repository and authorization
 backend. Choose and document an ordering and failure policy. Consider:
 
-- what happens if tuple deletion succeeds but document deletion fails?
-- what happens if document deletion succeeds but tuple deletion fails?
+- what happens if relationship deletion succeeds but document deletion fails?
+- what happens if document deletion succeeds but relationship deletion fails?
 - can compensating work restore the previous state?
 - should cleanup use the canceled request context?
 
@@ -146,7 +146,7 @@ In `internal/api/handler_test.go`, cover:
 Assert more than status where it matters:
 
 - the required bearer challenge for scope failures
-- the document ID and actor passed to the service
+- the document ID and subject passed to the service
 - an empty body for HTTP 204
 
 Run:

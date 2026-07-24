@@ -16,48 +16,50 @@ type Checker interface {
 	Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
 }
 
-// PermissionSummary maps a Relation to whether it is allowed for a given user
-// and object.  It is the return type of [AllPermissions].
-type PermissionSummary map[rebac.Relation]bool
+// PermissionSummary maps a Permission to whether it is allowed for a subject
+// and resource. It is the return type of [AllPermissions].
+type PermissionSummary map[rebac.Permission]bool
 
-// AllPermissions checks every computed permission on an object for a user
-// concurrently.  It spawns one goroutine per relation and collects results
+// AllPermissions checks every permission on a resource for a subject
+// concurrently. It spawns one goroutine per permission and collects results
 // through a channel, returning when all checks complete or the context is done.
 //
-// Use this to build a "what can this user do?" summary — for example, when a
+// Use this to build a "what can this subject do?" summary—for example, when a
 // UI needs to know which action buttons to render.
-func AllPermissions(ctx context.Context, auth Checker, user rebac.Object, object rebac.Object) (PermissionSummary, error) {
-	relations := computedRelationsFor(object)
-	if len(relations) == 0 {
+func AllPermissions(ctx context.Context, auth Checker, subject rebac.Resource, resource rebac.Resource) (PermissionSummary, error) {
+	permissions := permissionsFor(resource)
+	if len(permissions) == 0 {
 		return PermissionSummary{}, nil
 	}
 
 	type outcome struct {
-		relation rebac.Relation
-		allowed  bool
-		err      error
+		permission rebac.Permission
+		allowed    bool
+		err        error
 	}
 
 	// Buffer the channel so goroutines never block if the receiver is slow.
-	ch := make(chan outcome, len(relations))
+	ch := make(chan outcome, len(permissions))
 
-	for _, rel := range relations {
-		go func(rel rebac.Relation) {
-			result, err := auth.Evaluate(ctx, rebac.CheckRequest{User: user, Relation: rel, Object: object})
-			ch <- outcome{relation: rel, allowed: result.Allowed, err: err}
-		}(rel)
+	for _, permission := range permissions {
+		go func(permission rebac.Permission) {
+			result, err := auth.Evaluate(ctx, rebac.CheckRequest{
+				Subject: subject, Permission: permission, Resource: resource,
+			})
+			ch <- outcome{permission: permission, allowed: result.Allowed, err: err}
+		}(permission)
 	}
 
-	summary := make(PermissionSummary, len(relations))
-	for range len(relations) {
+	summary := make(PermissionSummary, len(permissions))
+	for range len(permissions) {
 		// select waits on whichever happens first: the next result arriving, or
 		// the caller's context being cancelled / timing out.
 		select {
 		case out := <-ch:
 			if out.err != nil {
-				return nil, fmt.Errorf("check %s: %w", out.relation, out.err)
+				return nil, fmt.Errorf("check %s: %w", out.permission, out.err)
 			}
-			summary[out.relation] = out.allowed
+			summary[out.permission] = out.allowed
 		case <-ctx.Done():
 			// Caller cancelled or timed out. Return its reason immediately.
 			// The still-running goroutines each send one value into ch, which is
@@ -72,7 +74,7 @@ func AllPermissions(ctx context.Context, auth Checker, user rebac.Object, object
 
 // BulkCheck runs a list of CheckRequests concurrently using a WaitGroup and
 // returns results in the same order as the input slice.  Unlike AllPermissions,
-// it works with arbitrary (user, relation, object) combinations.
+// it works with arbitrary (subject, permission, resource) combinations.
 //
 // If any check returns an error the corresponding Err field is set; the other
 // results are still returned.  The caller decides whether to treat any error as
@@ -99,19 +101,18 @@ type BulkResult struct {
 	Err     error
 }
 
-// computedRelationsFor returns the computed (action) relations that make sense
-// to check for a given object type.
-func computedRelationsFor(object rebac.Object) []rebac.Relation {
-	typ, _, err := rebac.ParseObject(string(object))
+// permissionsFor returns the permissions that make sense for a resource type.
+func permissionsFor(resource rebac.Resource) []rebac.Permission {
+	typ, _, err := rebac.ParseResource(string(resource))
 	if err != nil {
 		return nil
 	}
-	if typ == rebac.ObjectTypeDocument {
-		return []rebac.Relation{
-			rebac.RelationDocumentCanRead,
-			rebac.RelationDocumentCanComment,
-			rebac.RelationDocumentCanEdit,
-			rebac.RelationDocumentCanDelete,
+	if typ == rebac.ResourceTypeDocument {
+		return []rebac.Permission{
+			rebac.PermissionDocumentRead,
+			rebac.PermissionDocumentComment,
+			rebac.PermissionDocumentEdit,
+			rebac.PermissionDocumentDelete,
 		}
 	}
 	return nil

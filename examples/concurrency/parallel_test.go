@@ -42,7 +42,7 @@ func TestAllPermissions_CancelledContextReturnsError(t *testing.T) {
 
 func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 
 	// Act
@@ -53,22 +53,22 @@ func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := map[rebac.Relation]bool{
-		rebac.RelationDocumentCanRead:    true,
-		rebac.RelationDocumentCanComment: true,
-		rebac.RelationDocumentCanEdit:    true,
-		rebac.RelationDocumentCanDelete:  false,
+	want := map[rebac.Permission]bool{
+		rebac.PermissionDocumentRead:    true,
+		rebac.PermissionDocumentComment: true,
+		rebac.PermissionDocumentEdit:    true,
+		rebac.PermissionDocumentDelete:  false,
 	}
-	for rel, expected := range want {
-		if got := summary[rel]; got != expected {
-			t.Errorf("summary[%s] = %v, want %v", rel, got, expected)
+	for permission, expected := range want {
+		if got := summary[permission]; got != expected {
+			t.Errorf("summary[%s] = %v, want %v", permission, got, expected)
 		}
 	}
 }
 
 func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 
 	// Act
@@ -78,23 +78,23 @@ func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !summary[rebac.RelationDocumentCanRead] {
+	if !summary[rebac.PermissionDocumentRead] {
 		t.Error("expected viewer can_read=true")
 	}
-	if !summary[rebac.RelationDocumentCanComment] {
+	if !summary[rebac.PermissionDocumentComment] {
 		t.Error("expected viewer can_comment=true")
 	}
-	if summary[rebac.RelationDocumentCanEdit] {
+	if summary[rebac.PermissionDocumentEdit] {
 		t.Error("expected viewer can_edit=false")
 	}
-	if summary[rebac.RelationDocumentCanDelete] {
+	if summary[rebac.PermissionDocumentDelete] {
 		t.Error("expected viewer can_delete=false")
 	}
 }
 
 func TestAllPermissions_NonDocumentObjectReturnsEmptySummary(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 
 	// Act
@@ -105,18 +105,18 @@ func TestAllPermissions_NonDocumentObjectReturnsEmptySummary(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(summary) != 0 {
-		t.Errorf("expected empty summary for workspace object, got %d entries", len(summary))
+		t.Errorf("expected empty summary for workspace resource, got %d entries", len(summary))
 	}
 }
 
 func TestBulkCheck_ReturnsResultsInInputOrder(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 	reqs := []rebac.CheckRequest{
-		{User: fixtures.Alice, Relation: rebac.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
-		{User: fixtures.Bob, Relation: rebac.RelationDocumentCanEdit, Object: fixtures.RoadmapDocument},
-		{User: fixtures.Bob, Relation: rebac.RelationDocumentCanRead, Object: fixtures.RoadmapDocument},
+		{Subject: fixtures.Alice, Permission: rebac.PermissionDocumentEdit, Resource: fixtures.RoadmapDocument},
+		{Subject: fixtures.Bob, Permission: rebac.PermissionDocumentEdit, Resource: fixtures.RoadmapDocument},
+		{Subject: fixtures.Bob, Permission: rebac.PermissionDocumentRead, Resource: fixtures.RoadmapDocument},
 	}
 
 	// Act
@@ -142,7 +142,7 @@ func TestBulkCheck_ReturnsResultsInInputOrder(t *testing.T) {
 
 func TestBulkCheck_EmptyInputReturnsEmptySlice(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 
 	// Act

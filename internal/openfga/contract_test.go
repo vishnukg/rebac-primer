@@ -39,11 +39,11 @@ func TestContract_OpenFGA(t *testing.T) {
 		t.Fatalf("new openfga service: %v", err)
 	}
 
-	// Arrange the complete relationship graph inside this test. WriteTuples is
+	// Arrange the complete relationship graph inside this test. WriteRelationships is
 	// idempotent, so the same contract also works against a store previously
 	// populated by seed.sh.
-	tuples := append(fixtures.SeedRelationshipTuples(), contract.ExtraTuples()...)
-	err = svc.WriteTuples(t.Context(), tuples)
+	tuples := append(fixtures.SeedRelationships(), contract.ExtraRelationships()...)
+	err = svc.WriteRelationships(t.Context(), tuples)
 	if err != nil {
 		t.Fatalf("seed contract tuples: %v", err)
 	}

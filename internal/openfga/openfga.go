@@ -4,12 +4,12 @@
 //
 // Why this implements the whole application-facing capability (not Evaluator):
 // The graph build swaps the Evaluator port, but writes still go through the
-// in-process tuple store. The public operations here all carry ctx + error, so
-// checks and tuple writes can both go to OpenFGA and remain consistent.
+// in-process relationship store. The public operations here all carry ctx + error, so
+// checks and relationship writes can both go to OpenFGA and remain consistent.
 //
-// The model and the workspace/team policy tuples are seeded into the store out
-// of band (deployments/openfga/seed.sh). Document-level tuples are still written
-// at runtime by the documents service via WriteTuples — they just land in
+// The model and the workspace/team relationships are seeded into the store out
+// of band (deployments/openfga/seed.sh). Document relationships are still written
+// at runtime by the documents service via WriteRelationships — they just land in
 // OpenFGA instead of the in-memory store.
 package openfga
 
@@ -70,9 +70,11 @@ func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.Chec
 		return rebac.CheckResult{}, err
 	}
 	resp, err := s.client.Check(ctx).Body(openfga.ClientCheckRequest{
-		User:     string(req.User),
-		Relation: string(req.Relation),
-		Object:   string(req.Object),
+		// OpenFGA's transport vocabulary is user/relation/object. In the
+		// application domain these values are subject/permission/resource.
+		User:     string(req.Subject),
+		Relation: string(req.Permission),
+		Object:   string(req.Resource),
 	}).Execute()
 	if err != nil {
 		return rebac.CheckResult{}, fmt.Errorf("openfga: check: %w", err)
@@ -80,25 +82,28 @@ func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.Chec
 	allowed := resp.GetAllowed()
 	return rebac.CheckResult{
 		Allowed: allowed,
-		Trace:   []string{fmt.Sprintf("OpenFGA: %s %s %s -> %t", req.User, req.Relation, req.Object, allowed)},
+		Trace: []string{fmt.Sprintf(
+			"OpenFGA: subject=%s permission=%s resource=%s -> %t",
+			req.Subject, req.Permission, req.Resource, allowed,
+		)},
 	}, nil
 }
 
-// WriteTuples persists relationship facts to the OpenFGA store.
+// WriteRelationships persists relationship facts to the OpenFGA tuple store.
 //
 // The conflict option makes duplicate writes atomic no-ops. That matches the
 // application contract and the in-memory store without a racy read-before-write
 // round trip.
-func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
-	writes := make([]openfga.ClientTupleKey, 0, len(tuples))
-	for _, t := range tuples {
-		if err := authz.ValidateTuple(t); err != nil {
+func (s *Service) WriteRelationships(ctx context.Context, relationships []rebac.Relationship) error {
+	writes := make([]openfga.ClientTupleKey, 0, len(relationships))
+	for _, relationship := range relationships {
+		if err := authz.ValidateRelationship(relationship); err != nil {
 			return err
 		}
 		writes = append(writes, openfga.ClientTupleKey{
-			User:     string(t.User),
-			Relation: string(t.Relation),
-			Object:   string(t.Object),
+			User:     string(relationship.Subject),
+			Relation: string(relationship.Relation),
+			Object:   string(relationship.Resource),
 		})
 	}
 	if len(writes) == 0 {
@@ -118,20 +123,20 @@ func (s *Service) WriteTuples(ctx context.Context, tuples []rebac.TupleKey) erro
 	return nil
 }
 
-// DeleteTuples removes relationship facts from the OpenFGA store.
-func (s *Service) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error {
-	if len(tuples) == 0 {
+// DeleteRelationships removes relationship facts from the OpenFGA tuple store.
+func (s *Service) DeleteRelationships(ctx context.Context, relationships []rebac.Relationship) error {
+	if len(relationships) == 0 {
 		return nil
 	}
-	deletes := make([]openfga.ClientTupleKeyWithoutCondition, 0, len(tuples))
-	for _, t := range tuples {
-		if err := authz.ValidateTuple(t); err != nil {
+	deletes := make([]openfga.ClientTupleKeyWithoutCondition, 0, len(relationships))
+	for _, relationship := range relationships {
+		if err := authz.ValidateRelationship(relationship); err != nil {
 			return err
 		}
 		deletes = append(deletes, openfga.ClientTupleKeyWithoutCondition{
-			User:     string(t.User),
-			Relation: string(t.Relation),
-			Object:   string(t.Object),
+			User:     string(relationship.Subject),
+			Relation: string(relationship.Relation),
+			Object:   string(relationship.Resource),
 		})
 	}
 	options := openfga.ClientWriteOptions{
@@ -148,21 +153,24 @@ func (s *Service) DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) err
 	return nil
 }
 
-// ListTuples reads tuples back from the OpenFGA store, optionally filtered by
-// object and/or relation.
+// ListRelationships reads relationships back from OpenFGA, optionally filtered
+// by resource and/or relation.
 //
 // A relation-only filter is rejected up front: the OpenFGA Read API requires at
 // least an object type alongside a relation, so forwarding that filter would
 // fail server-side with a less helpful error. The in-memory store supports it;
 // this is one of the small capability differences between the two backends.
-func (s *Service) ListTuples(ctx context.Context, filter ...authz.TupleFilter) ([]rebac.TupleKey, error) {
+func (s *Service) ListRelationships(
+	ctx context.Context,
+	filter ...authz.RelationshipFilter,
+) ([]rebac.Relationship, error) {
 	body := openfga.ClientReadRequest{}
 	if len(filter) > 0 {
-		if filter[0].Object == "" && filter[0].Relation != "" {
-			return nil, fmt.Errorf("openfga: list tuples: the OpenFGA Read API cannot filter by relation alone; set Object too or drop the Relation filter")
+		if filter[0].Resource == "" && filter[0].Relation != "" {
+			return nil, fmt.Errorf("openfga: list relationships: the OpenFGA Read API cannot filter by relation alone; set Resource too or drop the Relation filter")
 		}
-		if filter[0].Object != "" {
-			object := string(filter[0].Object)
+		if filter[0].Resource != "" {
+			object := string(filter[0].Resource)
 			body.Object = &object
 		}
 		if filter[0].Relation != "" {
@@ -170,7 +178,7 @@ func (s *Service) ListTuples(ctx context.Context, filter ...authz.TupleFilter) (
 			body.Relation = &relation
 		}
 	}
-	var out []rebac.TupleKey
+	var out []rebac.Relationship
 	var continuationToken *string
 	for {
 		resp, err := s.client.Read(ctx).
@@ -178,14 +186,14 @@ func (s *Service) ListTuples(ctx context.Context, filter ...authz.TupleFilter) (
 			Options(openfga.ClientReadOptions{ContinuationToken: continuationToken}).
 			Execute()
 		if err != nil {
-			return nil, fmt.Errorf("openfga: read tuples: %w", err)
+			return nil, fmt.Errorf("openfga: read relationships: %w", err)
 		}
 		for _, t := range resp.GetTuples() {
 			key := t.GetKey()
-			out = append(out, rebac.TupleKey{
-				Object:   rebac.Object(key.GetObject()),
+			out = append(out, rebac.Relationship{
+				Subject:  rebac.Subject(key.GetUser()),
 				Relation: rebac.Relation(key.GetRelation()),
-				User:     rebac.Subject(key.GetUser()),
+				Resource: rebac.Resource(key.GetObject()),
 			})
 		}
 

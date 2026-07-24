@@ -2,7 +2,7 @@ name: ReBAC Primer Model Contract
 model_file: ./model.fga
 
 tuples:
-  # ── The demo story — identical to fixtures.SeedRelationshipTuples ───────────
+  # ── The demo story — identical to fixtures.SeedRelationships ────────────────
   # Alice reaches the document only as an inherited editor (team member → workspace
   # editor → document editor), never as an owner. Bob is a workspace viewer. Casey
   # has no path. Keep these four in lockstep with the Go fixtures so both backends
@@ -22,7 +22,7 @@ tuples:
   # ── Contract-only coverage ──────────────────────────────────────────────────
   # The demo story has no document owner, so on its own it never exercises the
   # `define can_delete: owner` path. Dana is a direct owner that exists only in
-  # the contract-only tuples, not in SeedRelationshipTuples. Keeping it off Alice
+  # the contract-only tuples, not in SeedRelationships. Keeping it off Alice
   # is deliberate: it leaves the demo cast consistent across both backends.
   - user: user:dana
     relation: owner
@@ -94,18 +94,21 @@ tests:
       - user: user:alice
         object: workspace:productWorkspace
         assertions:
+          can_create_document: true
           owner: false
           editor: true
           viewer: true
       - user: user:erin
         object: workspace:productWorkspace
         assertions:
+          can_create_document: true
           owner: true
           editor: true
           viewer: true
       - user: user:bob
         object: workspace:productWorkspace
         assertions:
+          can_create_document: false
           owner: false
           editor: false
           viewer: true

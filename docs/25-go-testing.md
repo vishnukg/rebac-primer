@@ -15,13 +15,13 @@ your code and reports what happened.
 A test function starts with `Test`:
 
 ```go
-func TestParseObject(t *testing.T) {
-    typ, id, err := ParseObject("document:roadmap")
+func TestParseResource(t *testing.T) {
+    typ, id, err := ParseResource("document:roadmap")
     if err != nil {
-        t.Fatalf("ParseObject returned error: %v", err)
+        t.Fatalf("ParseResource returned error: %v", err)
     }
-    if typ != ObjectTypeDocument {
-        t.Errorf("type = %q, want %q", typ, ObjectTypeDocument)
+    if typ != ResourceTypeDocument {
+        t.Errorf("type = %q, want %q", typ, ResourceTypeDocument)
     }
     if id != "roadmap" {
         t.Errorf("id = %q, want roadmap", id)
@@ -85,7 +85,7 @@ go test -v -run TestTrace ./internal/authz
 Table tests make repeated input/output rules visible:
 
 ```go
-func TestParseObject(t *testing.T) {
+func TestParseResource(t *testing.T) {
     tests := []struct {
         name    string
         input   string
@@ -97,7 +97,7 @@ func TestParseObject(t *testing.T) {
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            _, _, err := ParseObject(tt.input)
+            _, _, err := ParseResource(tt.input)
             if (err != nil) != tt.wantErr {
                 t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
             }
@@ -119,7 +119,7 @@ arrangement of many others.
 ```go
 func TestGraphEvaluator_AllowsTeamEditor(t *testing.T) {
     // Arrange
-    store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+    store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
     evaluator := authz.NewGraphEvaluator(store)
     request := rebac.CheckRequest{/* ... */}
 
@@ -138,7 +138,7 @@ func TestGraphEvaluator_AllowsTeamEditor(t *testing.T) {
 
 Use Arrange / Act / Assert explicitly. Keep the Act small—ideally the single
 behavior named by the test. A test may use canonical product data such as
-`fixtures.SeedRelationshipTuples()`, which returns a fresh slice, but it still
+`fixtures.SeedRelationships()`, which returns a fresh slice, but it still
 constructs its own store and evaluator.
 
 `t.Helper()` remains useful for narrowly focused assertion or decoding helpers:
@@ -235,7 +235,7 @@ Fuzz tests generate inputs for code that accepts arbitrary data. They are
 excellent for parsers and boundary code:
 
 ```bash
-go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/rebac
+go test -fuzz=FuzzParseResource -fuzztime=30s ./internal/rebac
 ```
 
 A fuzz target should check invariants:
@@ -304,7 +304,7 @@ go test ./internal/authz
 go test -v -run TestTrace ./internal/authz
 go test -run TestGraphEvaluator_PermissionMatrix ./internal/authz
 go test -bench=. -benchtime=5s ./internal/authz
-go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/rebac
+go test -fuzz=FuzzParseResource -fuzztime=30s ./internal/rebac
 go test -race ./...
 go test -count=1 ./...       # bypass the test cache
 go test -shuffle=on ./...    # expose order dependencies

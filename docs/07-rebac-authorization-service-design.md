@@ -1,6 +1,6 @@
 # Designing a ReBAC Authorization Service
 
-This chapter moves from the mechanics of tuples and graph traversal to the
+This chapter moves from the mechanics of relationships and graph traversal to the
 engineering decisions required for a real authorization service.
 
 Read it after the OpenFGA model chapter. The goal is not to teach one vendor or
@@ -73,7 +73,7 @@ systems may express policy as:
 
 - relationship tuples plus userset/set-algebra rules
 - graph path expressions
-- object-oriented relationship paths
+- resource-oriented relationship paths
 - a hybrid of relationships, roles, and attributes
 
 The common idea is that the relationship structure is part of the authorization
@@ -86,7 +86,7 @@ A practical system often combines models:
 ```text
 authentication  → establishes the principal
 OAuth scope     → permits a client to call an API category
-ReBAC           → checks object-specific relationships
+ReBAC           → checks resource-specific relationships
 ABAC/context    → adds time, network, risk, or resource attributes
 ```
 
@@ -99,7 +99,7 @@ team:platform#member editor workspace:product
 
 `editor` is role-like, but it is scoped to one workspace and reached through a
 relationship. The problem ReBAC solves is not “roles are always bad.” It solves
-the mismatch between global roles and object-specific collaboration, ownership,
+the mismatch between global roles and resource-specific collaboration, ownership,
 hierarchies, sharing, and delegation.
 
 ## Start With Product Sentences
@@ -133,21 +133,21 @@ After writing product sentences, classify each sentence before touching the DSL:
 
 | Product sentence | Classification | Where it goes |
 |---|---|---|
-| Alice is in platformTeam | durable relationship fact | tuple |
-| platformTeam members edit productWorkspace | durable relationship fact using a subject set | tuple |
-| roadmapDocument lives in productWorkspace | durable structural fact | tuple |
+| Alice is in platformTeam | durable relationship fact | relationship data |
+| platformTeam members edit productWorkspace | durable relationship fact using a subject set | relationship data |
+| roadmapDocument lives in productWorkspace | durable structural fact | relationship data |
 | workspace editors can edit workspace documents | reusable derivation rule | model |
 | document owners can delete documents | application permission rule | model |
 | user has `documents:write` OAuth scope | request/token attribute | checked outside ReBAC |
 
 This classification prevents two common mistakes:
 
-- storing derived permissions as tuples, which creates duplicated authorization
+- storing derived permissions as relationships, which creates duplicated authorization
   state and hard revocation
 - putting changing product facts into the model, which makes ordinary workflow
   changes require policy deployment
 
-The model should be boring and reusable. The tuples should carry the changing
+The model should be boring and reusable. Relationships should carry the changing
 product state.
 
 Ask these questions before modeling:
@@ -184,7 +184,7 @@ computed permissions can_read, can_edit, can_delete
 ```
 
 Base relations are usually product concepts people understand. Structural
-relations connect objects so access can inherit. Computed permissions are the
+relations connect resources so access can inherit. Computed permissions are the
 operations application code checks.
 
 This repo's policy follows that shape:
@@ -199,9 +199,9 @@ This repo's policy follows that shape:
 | computed permission | `can_edit: editor` | let application code check an action |
 
 When extending the model, place a new concept in the right layer. For example,
-`folder` would probably be a new object type plus a structural relation;
+`folder` would probably be a new resource type plus a structural relation;
 `can_share` would probably be a computed permission; "Alice is a reviewer"
-would probably be a tuple.
+would probably be a relationship.
 
 ## The Graph Has Semantics
 
@@ -247,7 +247,7 @@ Names vary between systems, but a robust design usually needs these concepts.
 
 ### Subject
 
-The actor whose authority is being checked:
+The entity whose authority is being checked:
 
 ```text
 user:alice
@@ -257,7 +257,7 @@ agent:document-assistant
 
 Do not assume every subject is a human user.
 
-### Resource or object
+### Resource
 
 The protected entity:
 
@@ -306,12 +306,12 @@ editor includes owner
 Callers ask for `can_edit`; they do not need to know how that permission is
 currently derived.
 
-### Relationship tuple
+### Relationship
 
 A stored relationship fact:
 
 ```text
-subject + relation + object
+subject + relation + resource
 ```
 
 For example:
@@ -320,17 +320,10 @@ For example:
 user:alice  member  team:platform
 ```
 
-For this course, the canonical external representation is OpenFGA's:
+The Go `Relationship` fields are `Subject`, `Relation`, and `Resource`.
+OpenFGA's adapter translates those to `user`, `relation`, and `object`.
 
-```text
-subject + relation + object
-```
-
-This repository's Go `TupleKey` lists fields as `Object`, `Relation`, `User`.
-That internal struct layout does not reverse or change the relationship. Read
-field names and convert explicitly at adapter boundaries.
-
-### Direct and implied relationships
+### Relationships and derived permissions
 
 A direct relationship is backed by stored data:
 
@@ -338,7 +331,7 @@ A direct relationship is backed by stored data:
 user:alice member team:platform
 ```
 
-An implied relationship is derived by policy:
+A permission is derived by policy:
 
 ```text
 Alice can_edit roadmap
@@ -349,7 +342,7 @@ access causes duplication, write amplification, and difficult revocation.
 
 ### Subject sets or usersets
 
-A subject set represents everyone related to an object by a relation:
+A subject set represents everyone related to a resource by a relation:
 
 ```text
 team:platform#member
@@ -614,7 +607,7 @@ forget.
 
 Approaches include:
 
-- tenant as a parent object in the graph
+- tenant as a parent resource in the graph
 - tenant-qualified resource IDs
 - isolated stores or databases for stronger boundaries
 - a required tenant relationship on every permission path
@@ -757,7 +750,7 @@ Cost depends on:
 - datastore and cache behavior
 
 Set limits for depth, breadth, result size, and request concurrency. Measure
-real permission shapes rather than benchmarking only direct tuples.
+real permission shapes rather than benchmarking only direct relationships.
 
 Model clarity is a performance and security feature. Prefer a short,
 explainable path:
@@ -836,7 +829,7 @@ authorization system also requires:
 
 It also requires ongoing ownership of semantic correctness. Features that begin
 as “just traverse a graph” become substantially harder when you add nested
-groups, intersection, exclusion, listing, cycles, consistency, hot objects,
+groups, intersection, exclusion, listing, cycles, consistency, hot resources,
 multi-tenancy, migrations, and bounded evaluation.
 
 ### Comparison
@@ -844,7 +837,7 @@ multi-tenancy, migrations, and bounded evaluation.
 | Concern | OpenFGA | Custom implementation |
 |---|---|---|
 | Policy language | Provided DSL/JSON model | Design and maintain your own |
-| Tuple validation | Enforced against model | Implement and test it |
+| Relationship validation | Enforced against model | Implement and test it |
 | Check evaluation | Provided | Implement graph/set evaluation |
 | ListObjects/ListUsers | Provided with operational limits | Design algorithms and indexes |
 | Conditions/context | Supported | Design semantics and evaluator |
@@ -904,7 +897,7 @@ Zanzibar is a published design for a globally distributed relationship-based
 authorization system. It is especially useful for understanding:
 
 - relation tuples and usersets
-- object-independent policy rewrites
+- resource-independent policy rewrites
 - nested group evaluation
 - consistency under replication and caching
 - large-scale operational design

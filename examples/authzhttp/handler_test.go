@@ -15,7 +15,7 @@ import (
 
 func TestAuthzHandler_Health(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	svc := authz.New(store, authz.NewGraphEvaluator(store))
 	handler := authzhttp.NewServer(svc)
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
@@ -39,14 +39,14 @@ func TestAuthzHandler_Health(t *testing.T) {
 
 func TestAuthzHandler_Check_AllowedForEditor(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	svc := authz.New(store, authz.NewGraphEvaluator(store))
 	handler := authzhttp.NewServer(svc)
 
 	payload, err := json.Marshal(map[string]string{
-		"user":     string(fixtures.Alice),
-		"relation": string(rebac.RelationDocumentCanEdit),
-		"object":   string(fixtures.RoadmapDocument),
+		"subject":    string(fixtures.Alice),
+		"permission": string(rebac.PermissionDocumentEdit),
+		"resource":   string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal check payload: %v", err)
@@ -73,14 +73,14 @@ func TestAuthzHandler_Check_AllowedForEditor(t *testing.T) {
 
 func TestAuthzHandler_Check_DeniedForViewer(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	svc := authz.New(store, authz.NewGraphEvaluator(store))
 	handler := authzhttp.NewServer(svc)
 
 	payload, err := json.Marshal(map[string]string{
-		"user":     string(fixtures.Bob),
-		"relation": string(rebac.RelationDocumentCanEdit),
-		"object":   string(fixtures.RoadmapDocument),
+		"subject":    string(fixtures.Bob),
+		"permission": string(rebac.PermissionDocumentEdit),
+		"resource":   string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal check payload: %v", err)
@@ -107,14 +107,14 @@ func TestAuthzHandler_Check_DeniedForViewer(t *testing.T) {
 
 func TestAuthzHandler_Check_IncludesTrace(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	svc := authz.New(store, authz.NewGraphEvaluator(store))
 	handler := authzhttp.NewServer(svc)
 
 	payload, err := json.Marshal(map[string]string{
-		"user":     string(fixtures.Casey),
-		"relation": string(rebac.RelationDocumentCanRead),
-		"object":   string(fixtures.RoadmapDocument),
+		"subject":    string(fixtures.Casey),
+		"permission": string(rebac.PermissionDocumentRead),
+		"resource":   string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal check payload: %v", err)
@@ -147,23 +147,23 @@ func TestAuthzHandler_Check_IncludesTrace(t *testing.T) {
 	}
 }
 
-func TestAuthzHandler_WriteTuples_ThenCheck(t *testing.T) {
+func TestAuthzHandler_WriteRelationships_ThenCheck(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	svc := authz.New(store, authz.NewGraphEvaluator(store))
 	handler := authzhttp.NewServer(svc)
 
 	writePayload, err := json.Marshal(map[string]any{
-		"tuples": []map[string]string{{
-			"object":   string(fixtures.RoadmapDocument),
+		"relationships": []map[string]string{{
+			"subject":  string(fixtures.ProductWorkspace),
 			"relation": string(rebac.RelationDocumentWorkspace),
-			"user":     string(fixtures.ProductWorkspace),
+			"resource": string(fixtures.RoadmapDocument),
 		}},
 	})
 	if err != nil {
 		t.Fatalf("marshal write payload: %v", err)
 	}
-	writeReq := httptest.NewRequest(http.MethodPost, "/tuples", bytes.NewReader(writePayload))
+	writeReq := httptest.NewRequest(http.MethodPost, "/relationships", bytes.NewReader(writePayload))
 	writeReq.Header.Set("Content-Type", "application/json")
 	writeRec := httptest.NewRecorder()
 	// Act
@@ -171,7 +171,7 @@ func TestAuthzHandler_WriteTuples_ThenCheck(t *testing.T) {
 
 	// Assert
 	if writeRec.Code != http.StatusOK {
-		t.Fatalf("write tuples: expected 200, got %d — body: %s", writeRec.Code, writeRec.Body.String())
+		t.Fatalf("write relationships: expected 200, got %d — body: %s", writeRec.Code, writeRec.Body.String())
 	}
 	var writeResp map[string]any
 	if err := json.NewDecoder(writeRec.Body).Decode(&writeResp); err != nil {
@@ -182,7 +182,7 @@ func TestAuthzHandler_WriteTuples_ThenCheck(t *testing.T) {
 	}
 
 	checkPayload, err := json.Marshal(map[string]string{
-		"user": string(fixtures.Alice), "relation": string(rebac.RelationDocumentCanRead), "object": string(fixtures.RoadmapDocument),
+		"subject": string(fixtures.Alice), "permission": string(rebac.PermissionDocumentRead), "resource": string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal check payload: %v", err)
@@ -201,18 +201,18 @@ func TestAuthzHandler_WriteTuples_ThenCheck(t *testing.T) {
 		t.Fatalf("allowed = %T, want bool", checkResp["allowed"])
 	}
 	if !allowed {
-		t.Error("expected alice can_read=true after writing workspace tuple")
+		t.Error("expected alice can_read=true after writing workspace relationship")
 	}
 }
 
-func TestAuthzHandler_DeleteTuples_RevokesPermission(t *testing.T) {
+func TestAuthzHandler_DeleteRelationships_RevokesPermission(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	svc := authz.New(store, authz.NewGraphEvaluator(store))
 	handler := authzhttp.NewServer(svc)
 
 	beforePayload, err := json.Marshal(map[string]string{
-		"user": string(fixtures.Bob), "relation": string(rebac.RelationDocumentCanRead), "object": string(fixtures.RoadmapDocument),
+		"subject": string(fixtures.Bob), "permission": string(rebac.PermissionDocumentRead), "resource": string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal before-check payload: %v", err)
@@ -235,16 +235,16 @@ func TestAuthzHandler_DeleteTuples_RevokesPermission(t *testing.T) {
 	}
 
 	deletePayload, err := json.Marshal(map[string]any{
-		"tuples": []map[string]string{{
-			"object":   string(fixtures.RoadmapDocument),
+		"relationships": []map[string]string{{
+			"subject":  string(fixtures.ProductWorkspace),
 			"relation": string(rebac.RelationDocumentWorkspace),
-			"user":     string(fixtures.ProductWorkspace),
+			"resource": string(fixtures.RoadmapDocument),
 		}},
 	})
 	if err != nil {
 		t.Fatalf("marshal delete payload: %v", err)
 	}
-	deleteReq := httptest.NewRequest(http.MethodDelete, "/tuples", bytes.NewReader(deletePayload))
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/relationships", bytes.NewReader(deletePayload))
 	deleteReq.Header.Set("Content-Type", "application/json")
 	deleteRec := httptest.NewRecorder()
 	// Act
@@ -252,11 +252,11 @@ func TestAuthzHandler_DeleteTuples_RevokesPermission(t *testing.T) {
 
 	// Assert
 	if deleteRec.Code != http.StatusOK {
-		t.Fatalf("delete tuples: expected 200, got %d", deleteRec.Code)
+		t.Fatalf("delete relationships: expected 200, got %d", deleteRec.Code)
 	}
 
 	afterPayload, err := json.Marshal(map[string]string{
-		"user": string(fixtures.Bob), "relation": string(rebac.RelationDocumentCanRead), "object": string(fixtures.RoadmapDocument),
+		"subject": string(fixtures.Bob), "permission": string(rebac.PermissionDocumentRead), "resource": string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal after-check payload: %v", err)
@@ -275,30 +275,30 @@ func TestAuthzHandler_DeleteTuples_RevokesPermission(t *testing.T) {
 		t.Fatalf("after allowed = %T, want bool", afterResp["allowed"])
 	}
 	if afterAllowed {
-		t.Error("expected bob can_read=false after deleting workspace tuple")
+		t.Error("expected bob can_read=false after deleting workspace relationship")
 	}
 }
 
-func TestAuthzHandler_WriteTuples_InvalidTupleReturns422(t *testing.T) {
+func TestAuthzHandler_WriteRelationships_InvalidRelationshipReturns422(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	svc := authz.New(store, authz.NewGraphEvaluator(store))
 	handler := authzhttp.NewServer(svc)
 
 	// "roadmap" is non-empty (so it passes the handler's required-field check) but
-	// is not a valid "type:id" object, so domain validation rejects it. That maps
+	// is not a valid "type:id" resource, so domain validation rejects it. That maps
 	// to 422 Unprocessable Entity — the request was understood but is invalid.
 	payload, err := json.Marshal(map[string]any{
-		"tuples": []map[string]string{{
-			"object":   "roadmap",
+		"relationships": []map[string]string{{
+			"subject":  string(fixtures.Alice),
 			"relation": string(rebac.RelationDocumentOwner),
-			"user":     string(fixtures.Alice),
+			"resource": "roadmap",
 		}},
 	})
 	if err != nil {
 		t.Fatalf("marshal write payload: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/tuples", bytes.NewReader(payload))
+	req := httptest.NewRequest(http.MethodPost, "/relationships", bytes.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -311,12 +311,12 @@ func TestAuthzHandler_WriteTuples_InvalidTupleReturns422(t *testing.T) {
 	}
 }
 
-func TestAuthzHandler_ListTuples_ReturnsAllTuples(t *testing.T) {
+func TestAuthzHandler_ListRelationships_ReturnsAllRelationships(t *testing.T) {
 	// Arrange
-	store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	svc := authz.New(store, authz.NewGraphEvaluator(store))
-	handler := authzhttp.NewServer(svc) // 4 seed tuples from fixtures
-	req := httptest.NewRequest(http.MethodGet, "/tuples", nil)
+	handler := authzhttp.NewServer(svc) // 4 seed relationships from fixtures
+	req := httptest.NewRequest(http.MethodGet, "/relationships", nil)
 	rec := httptest.NewRecorder()
 
 	// Act
@@ -330,11 +330,11 @@ func TestAuthzHandler_ListTuples_ReturnsAllTuples(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	tuples, ok := resp["tuples"].([]any)
+	relationships, ok := resp["relationships"].([]any)
 	if !ok {
-		t.Fatalf("expected tuples to be an array, got %T", resp["tuples"])
+		t.Fatalf("expected relationships to be an array, got %T", resp["relationships"])
 	}
-	if len(tuples) != 4 {
-		t.Errorf("expected 4 seed tuples, got %d", len(tuples))
+	if len(relationships) != 4 {
+		t.Errorf("expected 4 seed relationships, got %d", len(relationships))
 	}
 }

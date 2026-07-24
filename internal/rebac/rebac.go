@@ -1,8 +1,9 @@
-// Package rebac defines the core ReBAC vocabulary used across the project:
+// Package rebac defines the authorization-domain vocabulary used across the project:
 //
-//	Object / Relation / Subject  →  named string types for graph references
-//	TupleKey                     →  one edge in the relationship graph
-//	CheckRequest / CheckResult   →  the question and answer for a permission check
+//	Resource / Relation / Subject  →  named types for relationship facts
+//	Permission                     →  an authority derived by policy
+//	Relationship                   →  one fact in the relationship graph
+//	CheckRequest / CheckResult     →  a permission question and its decision
 //
 // The authz and documents packages both import it; neither owns it.
 package rebac
@@ -12,27 +13,29 @@ import (
 	"strings"
 )
 
-// ── Object types ──────────────────────────────────────────────────────────────
+// ── Resource types ────────────────────────────────────────────────────────────
 
-// ObjectType is the set of recognised entity kinds in the domain.
-type ObjectType string
+// ResourceType is the set of recognised entity kinds in the domain.
+type ResourceType string
 
 const (
-	ObjectTypeUser      ObjectType = "user"
-	ObjectTypeTeam      ObjectType = "team"
-	ObjectTypeWorkspace ObjectType = "workspace"
-	ObjectTypeDocument  ObjectType = "document"
+	ResourceTypeUser      ResourceType = "user"
+	ResourceTypeTeam      ResourceType = "team"
+	ResourceTypeWorkspace ResourceType = "workspace"
+	ResourceTypeDocument  ResourceType = "document"
 )
 
-// Object is a fully-qualified entity reference in "type:id" format,
+// Resource is a fully-qualified entity reference in "type:id" format,
 // e.g. "user:alice" or "workspace:productWorkspace".
 //
 // Using a named string type (rather than plain string) makes it harder to
-// accidentally pass a raw string where an Object is expected, with the type
+// accidentally pass a raw string where a Resource is expected, with the type
 // checker enforcing it.
-type Object string
+type Resource string
 
-// Relation names a directed edge in the permission graph, e.g. "editor" or "can_read".
+// Relation names an association used as stored or derivable policy evidence,
+// such as "member", "editor", or "workspace". Relations are valid in stored
+// Relationship facts and policy hierarchy rules.
 type Relation string
 
 const (
@@ -52,43 +55,52 @@ const (
 	RelationDocumentOwner  Relation = "owner"
 	RelationDocumentEditor Relation = "editor"
 	RelationDocumentViewer Relation = "viewer"
-
-	// Document computed relations (derived by the graph evaluator)
-	RelationDocumentCanRead    Relation = "can_read"
-	RelationDocumentCanComment Relation = "can_comment"
-	RelationDocumentCanEdit    Relation = "can_edit"
-	RelationDocumentCanDelete  Relation = "can_delete"
 )
 
-// Subject is either a plain Object ("user:alice") or a subject set
+// Permission names an authority the policy can derive for a subject and
+// resource. Permissions are checked, never stored as relationship facts.
+//
+// OpenFGA represents permissions in its relation field. The OpenFGA adapter
+// performs that vocabulary translation; the application domain keeps the
+// concepts distinct.
+type Permission string
+
+const (
+	PermissionWorkspaceCreateDocument Permission = "can_create_document"
+
+	PermissionDocumentRead    Permission = "can_read"
+	PermissionDocumentComment Permission = "can_comment"
+	PermissionDocumentEdit    Permission = "can_edit"
+	PermissionDocumentDelete  Permission = "can_delete"
+)
+
+// Subject is either a plain Resource ("user:alice") or a subject set
 // ("team:platform#member"). IsSubjectSet distinguishes them.
 type Subject string
 
-// TupleKey stores one relationship tuple using this package's internal field
-// order:
+// Relationship stores one durable authorization fact:
 //
-//	(object, relation, user)  →  "team:platform has member user:alice"
+//	(subject, relation, resource)
 //
-// OpenFGA APIs conventionally present the same relationship as
-// (user, relation, object). The field order differs; the relationship does not.
-//
-// The JSON tags are the wire format used by the HTTP layer.
-type TupleKey struct {
-	Object   Object   `json:"object"`
+// For example, (user:alice, member, team:platform) reads "Alice is a member of
+// the platform team." OpenFGA calls the same fields user, relation, and object;
+// its adapter translates at the infrastructure boundary.
+type Relationship struct {
+	Subject  Subject  `json:"subject"`
 	Relation Relation `json:"relation"`
-	User     Subject  `json:"user"`
+	Resource Resource `json:"resource"`
 }
 
 // ── Check types ───────────────────────────────────────────────────────────────
 
-// CheckRequest asks "does User have Relation on Object?"
+// CheckRequest asks whether Subject has Permission on Resource.
 type CheckRequest struct {
-	User     Object   `json:"user"`
-	Relation Relation `json:"relation"`
-	Object   Object   `json:"object"`
+	Subject    Resource   `json:"subject"`
+	Permission Permission `json:"permission"`
+	Resource   Resource   `json:"resource"`
 }
 
-// CheckResult is the answer to a CheckRequest.
+// CheckResult is the decision for a CheckRequest.
 // Trace is an ordered log of the traversal steps — useful for debugging.
 type CheckResult struct {
 	Allowed bool     `json:"allowed"`
@@ -97,56 +109,57 @@ type CheckResult struct {
 
 // ── Constructor helpers ───────────────────────────────────────────────────────
 
-// User returns an Object for a user entity: "user:<id>".
-func User(id string) Object { return newObject(ObjectTypeUser, id) }
+// User returns a Resource for a user entity: "user:<id>".
+func User(id string) Resource { return newResource(ResourceTypeUser, id) }
 
-// Team returns an Object for a team entity: "team:<id>".
-func Team(id string) Object { return newObject(ObjectTypeTeam, id) }
+// Team returns a Resource for a team entity: "team:<id>".
+func Team(id string) Resource { return newResource(ResourceTypeTeam, id) }
 
-// Workspace returns an Object for a workspace entity: "workspace:<id>".
-func Workspace(id string) Object { return newObject(ObjectTypeWorkspace, id) }
+// Workspace returns a Resource for a workspace entity: "workspace:<id>".
+func Workspace(id string) Resource { return newResource(ResourceTypeWorkspace, id) }
 
-// Document returns an Object for a document entity: "document:<id>".
-func Document(id string) Object { return newObject(ObjectTypeDocument, id) }
+// Document returns a Resource for a document entity: "document:<id>".
+func Document(id string) Resource { return newResource(ResourceTypeDocument, id) }
 
 // SubjectSet returns a subject-set string like "team:platformTeam#member".
-func SubjectSet(obj Object, rel Relation) Subject {
-	return Subject(fmt.Sprintf("%s#%s", obj, rel))
+func SubjectSet(resource Resource, relation Relation) Subject {
+	return Subject(fmt.Sprintf("%s#%s", resource, relation))
 }
 
-// Tuple builds a TupleKey. Short-form constructor for use in fixture files.
-func Tuple(obj Object, rel Relation, subject Subject) TupleKey {
-	return TupleKey{Object: obj, Relation: rel, User: subject}
+// NewRelationship builds a relationship in canonical subject-relation-resource
+// order.
+func NewRelationship(subject Subject, relation Relation, resource Resource) Relationship {
+	return Relationship{Subject: subject, Relation: relation, Resource: resource}
 }
 
 // ── Parsing helpers ───────────────────────────────────────────────────────────
 
-// ParseObject splits "type:id" into its constituent parts.
+// ParseResource splits "type:id" into its constituent parts.
 // Returns an error if the format is invalid or the type is unrecognised.
-func ParseObject(s string) (ObjectType, string, error) {
+func ParseResource(s string) (ResourceType, string, error) {
 	idx := strings.IndexByte(s, ':')
 	if idx < 1 || idx == len(s)-1 {
-		return "", "", fmt.Errorf("invalid object %q: want type:id", s)
+		return "", "", fmt.Errorf("invalid resource %q: want type:id", s)
 	}
-	typ := ObjectType(s[:idx])
+	typ := ResourceType(s[:idx])
 	id := s[idx+1:]
-	if !isObjectType(typ) {
-		return "", "", fmt.Errorf("unknown object type %q in %q", typ, s)
+	if !isResourceType(typ) {
+		return "", "", fmt.Errorf("unknown resource type %q in %q", typ, s)
 	}
 	if strings.TrimSpace(id) == "" {
-		return "", "", fmt.Errorf("invalid object %q: id cannot be blank", s)
+		return "", "", fmt.Errorf("invalid resource %q: id cannot be blank", s)
 	}
 	return typ, id, nil
 }
 
-// ParseSubjectSet splits "team:platformTeam#member" into its object and relation.
-func ParseSubjectSet(s Subject) (Object, Relation, error) {
+// ParseSubjectSet splits "team:platformTeam#member" into its resource and relation.
+func ParseSubjectSet(s Subject) (Resource, Relation, error) {
 	str := string(s)
 	idx := strings.IndexByte(str, '#')
 	if idx < 1 || idx == len(str)-1 {
-		return "", "", fmt.Errorf("invalid subject set %q: want object#relation", s)
+		return "", "", fmt.Errorf("invalid subject set %q: want resource#relation", s)
 	}
-	return Object(str[:idx]), Relation(str[idx+1:]), nil
+	return Resource(str[:idx]), Relation(str[idx+1:]), nil
 }
 
 // IsSubjectSet reports whether s is a subject-set reference (contains '#').
@@ -156,16 +169,16 @@ func IsSubjectSet(s Subject) bool {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-func newObject(typ ObjectType, id string) Object {
+func newResource(typ ResourceType, id string) Resource {
 	if strings.TrimSpace(id) == "" {
 		panic(fmt.Sprintf("rebac: %s id cannot be empty", typ))
 	}
-	return Object(fmt.Sprintf("%s:%s", typ, id))
+	return Resource(fmt.Sprintf("%s:%s", typ, id))
 }
 
-func isObjectType(t ObjectType) bool {
+func isResourceType(t ResourceType) bool {
 	switch t {
-	case ObjectTypeUser, ObjectTypeTeam, ObjectTypeWorkspace, ObjectTypeDocument:
+	case ResourceTypeUser, ResourceTypeTeam, ResourceTypeWorkspace, ResourceTypeDocument:
 		return true
 	}
 	return false

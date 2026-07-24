@@ -68,8 +68,8 @@ compiler.
 Names beginning with an uppercase letter are exported from their package:
 
 ```go
-type Object string // exported
-func ParseObject(...) // exported
+type Resource string // exported
+func ParseResource(...) // exported
 
 func splitSubject(...) // package-private
 ```
@@ -107,14 +107,14 @@ Use `var` when the type or zero value matters:
 ```go
 var count int                 // 0
 var err error                 // nil
-var tuples []rebac.TupleKey   // nil slice
+var relationships []rebac.Relationship   // nil slice
 var store map[string]string   // nil map
 ```
 
 Inside a function, `:=` declares and initializes at least one new variable:
 
 ```go
-object := rebac.Document("roadmapDocument")
+resource := rebac.Document("roadmapDocument")
 result, err := evaluator.Evaluate(ctx, request)
 ```
 
@@ -140,11 +140,11 @@ const RelationDocumentOwner Relation = "owner"
 Go commonly uses named constants instead of enums:
 
 ```go
-type ObjectType string
+type ResourceType string
 
 const (
-    ObjectTypeUser      ObjectType = "user"
-    ObjectTypeDocument  ObjectType = "document"
+    ResourceTypeUser      ResourceType = "user"
+    ResourceTypeDocument  ResourceType = "document"
 )
 ```
 
@@ -163,15 +163,15 @@ float64
 Named types are distinct even when they have the same underlying representation:
 
 ```go
-type Object string
+type Resource string
 type Subject string
 ```
 
 Convert explicitly:
 
 ```go
-object := Object("document:roadmap")
-raw := string(object)
+resource := Resource("document:roadmap")
+raw := string(resource)
 ```
 
 Go does not perform broad implicit numeric or named-type conversions.
@@ -181,7 +181,7 @@ Go does not perform broad implicit numeric or named-type conversions.
 A function declares parameter and result types:
 
 ```go
-func ParseObject(s string) (ObjectType, string, error) {
+func ParseResource(s string) (ResourceType, string, error) {
     // ...
 }
 ```
@@ -189,7 +189,7 @@ func ParseObject(s string) (ObjectType, string, error) {
 Multiple returns are commonly used for a value plus an error:
 
 ```go
-typ, id, err := rebac.ParseObject("document:roadmapDocument")
+typ, id, err := rebac.ParseResource("document:roadmapDocument")
 if err != nil {
     return err
 }
@@ -198,7 +198,7 @@ if err != nil {
 Use `_` to deliberately ignore a value:
 
 ```go
-typ, _, err := rebac.ParseObject(string(object))
+typ, _, err := rebac.ParseResource(string(resource))
 ```
 
 Functions are values and can be passed as arguments:
@@ -246,12 +246,12 @@ for {
 `range` iterates over collections:
 
 ```go
-for index, tuple := range tuples {
-    fmt.Println(index, tuple)
+for index, relationship := range relationships {
+    fmt.Println(index, relationship)
 }
 
-for _, tuple := range tuples {
-    fmt.Println(tuple)
+for _, relationship := range relationships {
+    fmt.Println(relationship)
 }
 
 for key, value := range permissions {
@@ -263,9 +263,9 @@ for key, value := range permissions {
 
 ```go
 switch typ {
-case rebac.ObjectTypeUser:
+case rebac.ResourceTypeUser:
     return validateUser(id)
-case rebac.ObjectTypeDocument:
+case rebac.ResourceTypeDocument:
     return validateDocument(id)
 default:
     return fmt.Errorf("unsupported type %q", typ)
@@ -278,9 +278,9 @@ A struct groups named fields:
 
 ```go
 type CheckRequest struct {
-    User     Object
-    Relation Relation
-    Object   Object
+    Subject    Resource
+    Permission Permission
+    Resource   Resource
 }
 ```
 
@@ -288,9 +288,9 @@ Prefer keyed literals, especially outside small local types:
 
 ```go
 request := rebac.CheckRequest{
-    User:     rebac.User("alice"),
-    Relation: rebac.RelationDocumentCanEdit,
-    Object:   rebac.Document("roadmapDocument"),
+    Subject:    rebac.User("alice"),
+    Permission: rebac.PermissionDocumentEdit,
+    Resource:   rebac.Document("roadmapDocument"),
 }
 ```
 
@@ -371,9 +371,9 @@ rg ':=.*_' --glob '*.go'
 You are ready to continue when you can explain:
 
 - the difference between a module, package, and file
-- why `Object("x")` is an explicit conversion
+- why `Resource("x")` is an explicit conversion
 - when `:=` is legal
 - what `defer` guarantees
-- why `ParseObject` returns an error instead of throwing an exception
+- why `ParseResource` returns an error instead of throwing an exception
 
 Next: [Values, pointers, collections, and methods](11-go-values-pointers-and-methods.md).

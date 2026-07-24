@@ -15,7 +15,7 @@ trade-offs. If you have not completed the short first session in
 
 | Level | Goal | Read now |
 |---|---|---|
-| 1. Understand one decision | explain why Alice can edit | `START-HERE.md`, the mental model through the Alice walkthrough, then `make trace` |
+| 1. Understand one decision | explain why Alice can edit | `START-HERE.md`, the domain language, the mental model through the Alice walkthrough, then `make trace` |
 | 2. Understand the implementation | follow one HTTP request and change one rule safely | docs 04, 05, 21, 25, 27, and 28 |
 | 3. Design for work | evaluate identity, data ownership, OpenFGA, migration, and operations | docs 01, 07, 08, 26, 34, and 40 |
 
@@ -42,10 +42,11 @@ Read these in order:
 
 | Doc | Topic | Code to inspect |
 |---|---|---|
-| [mental model](rebac-mental-model.md) | sets, tuples, usersets, permissions, decision debugging | `internal/rebac/rebac.go`, `deployments/openfga/model.fga` |
+| [mental model](rebac-mental-model.md) | sets, relationships, subject sets, permissions, decision debugging | `internal/rebac/rebac.go`, `deployments/openfga/model.fga` |
+| [domain language](authorization-domain-language.md) | subject, resource, action, relation, relationship, permission, decision | `internal/rebac/rebac.go`, `internal/openfga/openfga.go` |
 | 02 | Authorization fundamentals: RBAC, ABAC, ReBAC | conceptual |
 | 03 | Graph theory needed for ReBAC | conceptual |
-| 04 | ReBAC concepts: why tuples, subject sets, checks | `internal/rebac/rebac.go` |
+| 04 | ReBAC concepts: why relationships, subject sets, checks | `internal/rebac/rebac.go` |
 | 05 | OpenFGA model DSL: why this policy is structured this way | `deployments/openfga/model.fga`, `internal/authz/model.go` |
 | 07 | Designing a ReBAC authz service: product sentences to policy | `deployments/openfga/model.fga.yaml` |
 | 08 | Policy-based authorization: engines, PEP/PDP, OPA/Cedar, where ReBAC fits | `internal/authz/model.go`, `internal/authz/evaluator.go` |

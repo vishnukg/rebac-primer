@@ -10,27 +10,27 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// erroringStore is a TupleReader whose reads always fail. It proves the
+// erroringStore is a RelationshipReader whose reads always fail. It proves the
 // evaluator surfaces a backend failure as an error instead of silently denying
 // access — a silent deny would look identical to "no permission", hiding outages.
 type erroringStore struct{ err error }
 
-func (e erroringStore) Has(context.Context, rebac.Object, rebac.Relation, rebac.Subject) (bool, error) {
+func (e erroringStore) Has(context.Context, rebac.Subject, rebac.Relation, rebac.Resource) (bool, error) {
 	return false, e.err
 }
-func (e erroringStore) FindByObjectRelation(context.Context, rebac.Object, rebac.Relation) ([]rebac.TupleKey, error) {
+func (e erroringStore) FindByResourceRelation(context.Context, rebac.Resource, rebac.Relation) ([]rebac.Relationship, error) {
 	return nil, e.err
 }
 func TestGraphEvaluator_PropagatesStoreError(t *testing.T) {
 	// Arrange
-	sentinel := errors.New("tuple store unavailable")
+	sentinel := errors.New("relationship store unavailable")
 	ev := authz.NewGraphEvaluator(erroringStore{err: sentinel})
 
 	// Act
 	_, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
-		User:     fixtures.Alice,
-		Relation: rebac.RelationDocumentCanEdit,
-		Object:   fixtures.RoadmapDocument,
+		Subject:    fixtures.Alice,
+		Permission: rebac.PermissionDocumentEdit,
+		Resource:   fixtures.RoadmapDocument,
 	})
 
 	// Assert
@@ -41,16 +41,16 @@ func TestGraphEvaluator_PropagatesStoreError(t *testing.T) {
 
 func TestGraphEvaluator_CancelledContextReturnsError(t *testing.T) {
 	// Arrange
-	ev := authz.NewGraphEvaluator(authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...))
+	ev := authz.NewGraphEvaluator(authz.NewInMemoryStore(fixtures.SeedRelationships()...))
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // already cancelled before the check starts
 
 	// Act
 	_, err := ev.Evaluate(ctx, rebac.CheckRequest{
-		User:     fixtures.Alice,
-		Relation: rebac.RelationDocumentCanEdit,
-		Object:   fixtures.RoadmapDocument,
+		Subject:    fixtures.Alice,
+		Permission: rebac.PermissionDocumentEdit,
+		Resource:   fixtures.RoadmapDocument,
 	})
 
 	// Assert

@@ -70,7 +70,7 @@ func (h *handler) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
 		Title:     body.Title,
 		Body:      body.Body,
 		Workspace: rebac.Workspace(body.WorkspaceID),
-		Actor:     user.Subject,
+		Subject:   user.Subject,
 	})
 	if err != nil {
 		h.writeError(w, err)
@@ -128,9 +128,9 @@ func (h *handler) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doc, err := h.docs.Update(r.Context(), documents.UpdateDocumentInput{
-		ID:    id,
-		Body:  body.Body,
-		Actor: user.Subject,
+		ID:      id,
+		Body:    body.Body,
+		Subject: user.Subject,
 	})
 	if err != nil {
 		h.writeError(w, err)

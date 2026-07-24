@@ -54,8 +54,8 @@ func (a *AuditEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
 		status = "denied"
 	}
 
-	a.logger.Printf("check user=%s relation=%s object=%s -> %s (%s)",
-		req.User, req.Relation, req.Object, status, elapsed)
+	a.logger.Printf("check subject=%s permission=%s resource=%s -> %s (%s)",
+		req.Subject, req.Permission, req.Resource, status, elapsed)
 
 	return result, err
 }
@@ -65,17 +65,17 @@ var _ Checker = (*AuditEvaluator)(nil)
 
 // ── ReadOnlyStore ─────────────────────────────────────────────────────────────
 
-// ReadOnlyStore embeds [authz.TupleReader]. Embedding an interface promotes the
+// ReadOnlyStore embeds [authz.RelationshipReader]. Embedding an interface promotes the
 // reader methods onto the outer struct, but not the write methods. This makes
 // read-only intent a compiler-checked capability: callers that only receive a
 // ReadOnlyStore cannot call Write or Delete through that value.
 // See docs/24-go-interfaces-embedding.md.
 type ReadOnlyStore struct {
-	authz.TupleReader
+	authz.RelationshipReader
 }
 
 // NewReadOnlyStore wraps a repository so it can be passed to code that should
-// only read tuples — for example, a read-only replica or a test spy.
-func NewReadOnlyStore(r authz.TupleReader) ReadOnlyStore {
+// only read relationships — for example, a read-only replica or a test spy.
+func NewReadOnlyStore(r authz.RelationshipReader) ReadOnlyStore {
 	return ReadOnlyStore{r}
 }

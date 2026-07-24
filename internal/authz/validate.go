@@ -6,146 +6,141 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// ValidateTuple checks that a tuple is well-formed before it is written.
+// ValidateRelationship checks that a relationship is well-formed before it is written.
 //
-// It returns a [*TupleValidationError] (which the HTTP adapter maps to HTTP 422)
+// It returns a [*RelationshipValidationError] (which the HTTP adapter maps to HTTP 422)
 // when any field is malformed:
 //
-//   - Object   must be a valid "type:id" with a known type (e.g. "document:roadmap").
+//   - Resource must be a valid "type:id" with a known type (e.g. "document:roadmap").
 //   - Relation must be non-empty.
-//   - User     must be either a valid object ("user:alice") or a valid subject
+//   - Subject  must be either a valid resource ("user:alice") or a valid subject
 //     set ("team:platform#member").
 //
-// Why this matters: the graph evaluator matches tuples by exact, parseable
-// strings. A tuple like {Object: "roadmap"} (missing "document:") would be stored
+// Why this matters: the graph evaluator matches relationships by exact, parseable
+// strings. A relationship like {Resource: "roadmap"} (missing "document:") would be stored
 // happily but never match any check — a silent authorization bug. Rejecting it at
 // write time turns that latent bug into an immediate, explicit error.
-func ValidateTuple(t rebac.TupleKey) error {
-	objectType, _, err := rebac.ParseObject(string(t.Object))
+func ValidateRelationship(relationship rebac.Relationship) error {
+	resourceType, _, err := rebac.ParseResource(string(relationship.Resource))
 	if err != nil {
-		return &TupleValidationError{Message: fmt.Sprintf("object %q is not a valid type:id (%v)", t.Object, err)}
+		return &RelationshipValidationError{Message: fmt.Sprintf(
+			"resource %q is not a valid type:id (%v)", relationship.Resource, err,
+		)}
 	}
-	if t.Relation == "" {
-		return &TupleValidationError{Message: "relation cannot be empty"}
+	if relationship.Relation == "" {
+		return &RelationshipValidationError{Message: "relation cannot be empty"}
 	}
-	if !relationDefinedFor(objectType, t.Relation) {
-		return &TupleValidationError{Message: fmt.Sprintf("relation %q is not defined for %s objects", t.Relation, objectType)}
+	if !relationDefinedFor(resourceType, relationship.Relation) {
+		return &RelationshipValidationError{Message: fmt.Sprintf(
+			"relation %q is not defined for %s resources", relationship.Relation, resourceType,
+		)}
 	}
-	if isComputedRelation(objectType, t.Relation) {
-		return &TupleValidationError{Message: fmt.Sprintf("relation %q is computed and cannot be written", t.Relation)}
-	}
-
-	subjectType, subjectRelation, err := validateSubject(t.User)
+	subjectType, subjectRelation, err := validateSubject(relationship.Subject)
 	if err != nil {
-		return &TupleValidationError{Message: fmt.Sprintf("user %q is not a valid object or subject set (%v)", t.User, err)}
+		return &RelationshipValidationError{Message: fmt.Sprintf(
+			"subject %q is not a valid resource or subject set (%v)", relationship.Subject, err,
+		)}
 	}
-	if !subjectAllowed(objectType, t.Relation, subjectType, subjectRelation) {
-		return &TupleValidationError{Message: fmt.Sprintf(
-			"user %q is not allowed for %s#%s", t.User, objectType, t.Relation,
+	if !subjectAllowed(resourceType, relationship.Relation, subjectType, subjectRelation) {
+		return &RelationshipValidationError{Message: fmt.Sprintf(
+			"subject %q is not allowed for %s#%s",
+			relationship.Subject, resourceType, relationship.Relation,
 		)}
 	}
 	return nil
 }
 
-// validateSubject accepts either a plain object ("user:alice") or a subject set
-// ("team:platform#member"), matching the two shapes the User field can take.
-func validateSubject(s rebac.Subject) (rebac.ObjectType, rebac.Relation, error) {
+// validateSubject accepts either a plain resource ("user:alice") or a subject set
+// ("team:platform#member"), matching the two shapes Relationship.Subject can take.
+func validateSubject(s rebac.Subject) (rebac.ResourceType, rebac.Relation, error) {
 	if rebac.IsSubjectSet(s) {
-		obj, relation, err := rebac.ParseSubjectSet(s)
+		resource, relation, err := rebac.ParseSubjectSet(s)
 		if err != nil {
 			return "", "", err
 		}
-		objectType, _, err := rebac.ParseObject(string(obj))
-		return objectType, relation, err
+		resourceType, _, err := rebac.ParseResource(string(resource))
+		return resourceType, relation, err
 	}
-	objectType, _, err := rebac.ParseObject(string(s))
-	return objectType, "", err
+	resourceType, _, err := rebac.ParseResource(string(s))
+	return resourceType, "", err
 }
 
 // ValidateCheckRequest rejects malformed or model-unknown checks instead of
 // silently turning caller mistakes into authorization denials.
 func ValidateCheckRequest(req rebac.CheckRequest) error {
-	userType, _, err := rebac.ParseObject(string(req.User))
-	if err != nil || userType != rebac.ObjectTypeUser {
-		return &TupleValidationError{Message: fmt.Sprintf("check user %q must be a valid user object", req.User)}
+	subjectType, _, err := rebac.ParseResource(string(req.Subject))
+	if err != nil || subjectType != rebac.ResourceTypeUser {
+		return &CheckValidationError{Message: fmt.Sprintf(
+			"check subject %q must be a valid user resource", req.Subject,
+		)}
 	}
-	objectType, _, err := rebac.ParseObject(string(req.Object))
+	resourceType, _, err := rebac.ParseResource(string(req.Resource))
 	if err != nil {
-		return &TupleValidationError{Message: fmt.Sprintf("check object %q is invalid (%v)", req.Object, err)}
+		return &CheckValidationError{Message: fmt.Sprintf(
+			"check resource %q is invalid (%v)", req.Resource, err,
+		)}
 	}
-	if !relationDefinedFor(objectType, req.Relation) {
-		return &TupleValidationError{Message: fmt.Sprintf("relation %q is not defined for %s objects", req.Relation, objectType)}
-	}
-	if !relationCheckableForUser(objectType, req.Relation) {
-		return &TupleValidationError{Message: fmt.Sprintf("relation %q on %s objects cannot be checked for a user", req.Relation, objectType)}
+	if !permissionDefinedFor(resourceType, req.Permission) {
+		return &CheckValidationError{Message: fmt.Sprintf(
+			"permission %q is not defined for %s resources", req.Permission, resourceType,
+		)}
 	}
 	return nil
 }
 
-func relationDefinedFor(objectType rebac.ObjectType, relation rebac.Relation) bool {
-	switch objectType {
-	case rebac.ObjectTypeTeam:
+func relationDefinedFor(resourceType rebac.ResourceType, relation rebac.Relation) bool {
+	switch resourceType {
+	case rebac.ResourceTypeTeam:
 		return relation == rebac.RelationTeamAdmin || relation == rebac.RelationTeamMember
-	case rebac.ObjectTypeWorkspace:
+	case rebac.ResourceTypeWorkspace:
 		return relation == rebac.RelationWorkspaceOwner ||
 			relation == rebac.RelationWorkspaceEditor ||
 			relation == rebac.RelationWorkspaceViewer
-	case rebac.ObjectTypeDocument:
+	case rebac.ResourceTypeDocument:
 		switch relation {
 		case rebac.RelationDocumentWorkspace,
 			rebac.RelationDocumentOwner,
 			rebac.RelationDocumentEditor,
-			rebac.RelationDocumentViewer,
-			rebac.RelationDocumentCanRead,
-			rebac.RelationDocumentCanComment,
-			rebac.RelationDocumentCanEdit,
-			rebac.RelationDocumentCanDelete:
+			rebac.RelationDocumentViewer:
 			return true
 		}
 	}
 	return false
 }
 
-func isComputedRelation(objectType rebac.ObjectType, relation rebac.Relation) bool {
-	if objectType != rebac.ObjectTypeDocument {
-		return false
-	}
+func permissionDefinedFor(resourceType rebac.ResourceType, permission rebac.Permission) bool {
+	return len(permissionRelationsFor(resourceType, permission)) > 0
+}
+
+func isDocumentBaseRelation(relation rebac.Relation) bool {
 	switch relation {
-	case rebac.RelationDocumentCanRead,
-		rebac.RelationDocumentCanComment,
-		rebac.RelationDocumentCanEdit,
-		rebac.RelationDocumentCanDelete:
+	case rebac.RelationDocumentOwner,
+		rebac.RelationDocumentEditor,
+		rebac.RelationDocumentViewer:
 		return true
 	}
 	return false
 }
 
-func relationCheckableForUser(objectType rebac.ObjectType, relation rebac.Relation) bool {
-	if objectType == rebac.ObjectTypeDocument && relation == rebac.RelationDocumentWorkspace {
-		return false
-	}
-	return true
-}
-
 func subjectAllowed(
-	objectType rebac.ObjectType,
+	resourceType rebac.ResourceType,
 	relation rebac.Relation,
-	subjectType rebac.ObjectType,
+	subjectType rebac.ResourceType,
 	subjectRelation rebac.Relation,
 ) bool {
 	if subjectRelation == "" {
-		if objectType == rebac.ObjectTypeDocument && relation == rebac.RelationDocumentWorkspace {
-			return subjectType == rebac.ObjectTypeWorkspace
+		if resourceType == rebac.ResourceTypeDocument && relation == rebac.RelationDocumentWorkspace {
+			return subjectType == rebac.ResourceTypeWorkspace
 		}
-		return subjectType == rebac.ObjectTypeUser
+		return subjectType == rebac.ResourceTypeUser
 	}
-	if subjectType != rebac.ObjectTypeTeam {
+	if subjectType != rebac.ResourceTypeTeam {
 		return false
 	}
 	switch {
-	case objectType == rebac.ObjectTypeWorkspace && relation == rebac.RelationWorkspaceOwner:
+	case resourceType == rebac.ResourceTypeWorkspace && relation == rebac.RelationWorkspaceOwner:
 		return subjectRelation == rebac.RelationTeamAdmin
-	case objectType == rebac.ObjectTypeWorkspace &&
+	case resourceType == rebac.ResourceTypeWorkspace &&
 		(relation == rebac.RelationWorkspaceEditor || relation == rebac.RelationWorkspaceViewer):
 		return subjectRelation == rebac.RelationTeamMember
 	}

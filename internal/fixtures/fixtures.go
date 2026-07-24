@@ -1,13 +1,13 @@
 // Package fixtures contains the shared test data used across both services.
 //
-// The tuples model this access scenario:
+// The relationships model this access scenario:
 //
 //	user:alice → member of team:platformTeam
 //	team:platformTeam#member → editor of workspace:productWorkspace
 //	user:bob → viewer of workspace:productWorkspace
 //	workspace:productWorkspace → workspace of document:roadmapDocument
 //
-// From these four tuples, the graph evaluator can derive:
+// From these four relationships, the graph evaluator can derive:
 //
 //	Alice can_edit roadmapDocument  (via team → workspace editor → document)
 //	Bob can_read roadmapDocument    (via workspace viewer → document viewer → can_read)
@@ -19,7 +19,7 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// Named objects — use these in tests instead of raw strings.
+// Named resources — use these in tests instead of raw strings.
 var (
 	Alice = rebac.User("alice")
 	Bob   = rebac.User("bob")
@@ -41,16 +41,24 @@ func DemoTokens() map[string]documents.TokenClaims {
 	}
 }
 
-// SeedRelationshipTuples returns the four base tuples for the demo scenario.
-func SeedRelationshipTuples() []rebac.TupleKey {
-	return []rebac.TupleKey{
+// SeedRelationships returns the four base relationships for the demo scenario.
+func SeedRelationships() []rebac.Relationship {
+	return []rebac.Relationship{
 		// Alice is a member of platformTeam
-		rebac.Tuple(PlatformTeam, rebac.RelationTeamMember, rebac.Subject(Alice)),
+		rebac.NewRelationship(rebac.Subject(Alice), rebac.RelationTeamMember, PlatformTeam),
 		// platformTeam#member are editors of productWorkspace
-		rebac.Tuple(ProductWorkspace, rebac.RelationWorkspaceEditor, rebac.SubjectSet(PlatformTeam, rebac.RelationTeamMember)),
+		rebac.NewRelationship(
+			rebac.SubjectSet(PlatformTeam, rebac.RelationTeamMember),
+			rebac.RelationWorkspaceEditor,
+			ProductWorkspace,
+		),
 		// Bob is a viewer of productWorkspace
-		rebac.Tuple(ProductWorkspace, rebac.RelationWorkspaceViewer, rebac.Subject(Bob)),
+		rebac.NewRelationship(rebac.Subject(Bob), rebac.RelationWorkspaceViewer, ProductWorkspace),
 		// roadmapDocument lives in productWorkspace
-		rebac.Tuple(RoadmapDocument, rebac.RelationDocumentWorkspace, rebac.Subject(ProductWorkspace)),
+		rebac.NewRelationship(
+			rebac.Subject(ProductWorkspace),
+			rebac.RelationDocumentWorkspace,
+			RoadmapDocument,
+		),
 	}
 }

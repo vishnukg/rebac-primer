@@ -71,7 +71,7 @@ This is the practical Go coverage contract for the repo.
 | Control flow, `range`, `switch`, `defer` | `10` | evaluator traversal and store locks |
 | Structs, composite literals, constructors, zero values | `10`, `11`, `14` | `internal/authz`, `internal/documents` |
 | Pointers, values, receivers, method sets | `11`, `14` | document service copy/update logic |
-| Slices, maps, strings, bytes, runes, nil | `11` | token verifier, tuple store |
+| Slices, maps, strings, bytes, runes, nil | `11` | token verifier, relationship store |
 | Errors, wrapping, sentinels, typed errors | `12`, `14` | service and HTTP error mapping |
 | `panic`, `recover`, and when not to use them | `12`, `23` | `Result.Unwrap` as a deliberate teaching example |
 | Interfaces, consumer-owned contracts, test doubles | `12`, `14`, `24` | `internal/documents`, `internal/authz` |

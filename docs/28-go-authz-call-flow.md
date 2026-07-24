@@ -94,10 +94,10 @@ user:bob can_read document:roadmapDocument
 `documents.requireAllowed` calls:
 
 ```go
-s.authzClient.Check(ctx, rebac.CheckRequest{
-    User:     actor,
-    Relation: rebac.RelationDocumentCanRead,
-    Object:   rebac.Document(id),
+s.authz.Check(ctx, rebac.CheckRequest{
+    Subject:    subject,
+    Permission: rebac.PermissionDocumentRead,
+    Resource:   rebac.Document(id),
 })
 ```
 
@@ -171,4 +171,4 @@ curl -X PATCH :4001/documents/roadmapDocument \
 Bob's PATCH is rejected at the scope gate because his demo token has only
 `documents:read`. The HTTP tests also include a Bob token with
 `documents:write` to prove that ReBAC independently denies a viewer who reaches
-the object-level check.
+the resource-level check.

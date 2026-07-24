@@ -221,7 +221,7 @@ interface      -> any value with this behavior
 Idiomatic Go normally returns `(value, error)` directly:
 
 ```go
-doc, err := service.Read(ctx, id, actor)
+doc, err := service.Read(ctx, id, subject)
 if err != nil {
     return err
 }

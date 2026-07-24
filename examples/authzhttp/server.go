@@ -5,13 +5,13 @@
 // Routes:
 //
 //	GET    /health
-//	POST   /check      { user, relation, object }           → { allowed, trace }
-//	POST   /tuples     { tuples: [{object,relation,user}] } → { written }
-//	DELETE /tuples     { tuples: [{object,relation,user}] } → { deleted }
-//	GET    /tuples     ?object=...&relation=...             → { tuples }
+//	POST   /check           { subject, permission, resource }                   → { allowed, trace }
+//	POST   /relationships   { relationships: [{subject,relation,resource}] }    → { written }
+//	DELETE /relationships   { relationships: [{subject,relation,resource}] }    → { deleted }
+//	GET    /relationships   ?resource=...&relation=...                          → { relationships }
 //
-// Product services call POST /check to ask "can this user do that?".
-// Product services call POST /tuples when relationships change.
+// Product services call POST /check to ask "can this subject do that?".
+// Product services call POST /relationships when relationships change.
 //
 // No external router framework is used — Go 1.22+ ServeMux handles
 // method+path patterns like "POST /check" natively.
@@ -29,9 +29,9 @@ import (
 // It is intentionally declared by the consumer rather than by either backend.
 type AuthorizationService interface {
 	Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
-	WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
-	DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
-	ListTuples(ctx context.Context, filter ...authz.TupleFilter) ([]rebac.TupleKey, error)
+	WriteRelationships(ctx context.Context, relationships []rebac.Relationship) error
+	DeleteRelationships(ctx context.Context, relationships []rebac.Relationship) error
+	ListRelationships(ctx context.Context, filter ...authz.RelationshipFilter) ([]rebac.Relationship, error)
 }
 
 // NewServer returns an http.Handler with all authz routes registered.
@@ -41,9 +41,9 @@ func NewServer(svc AuthorizationService) http.Handler {
 
 	mux.HandleFunc("GET /health", h.handleHealth)
 	mux.HandleFunc("POST /check", h.handleCheck)
-	mux.HandleFunc("POST /tuples", h.handleWriteTuples)
-	mux.HandleFunc("DELETE /tuples", h.handleDeleteTuples)
-	mux.HandleFunc("GET /tuples", h.handleListTuples)
+	mux.HandleFunc("POST /relationships", h.handleWriteRelationships)
+	mux.HandleFunc("DELETE /relationships", h.handleDeleteRelationships)
+	mux.HandleFunc("GET /relationships", h.handleListRelationships)
 
 	return mux
 }

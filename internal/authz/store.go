@@ -9,113 +9,113 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// InMemoryStore is a thread-safe, map-backed tuple store. Tuples are keyed by
-// their "object|relation|user" triple, so writing the same tuple twice is a
-// harmless overwrite.
+// InMemoryStore is a thread-safe, map-backed relationship store. Relationships
+// are keyed by their subject-relation-resource triple, so writing the same fact
+// twice is a harmless overwrite.
 type InMemoryStore struct {
-	mu     sync.RWMutex
-	tuples map[rebac.TupleKey]struct{}
+	mu            sync.RWMutex
+	relationships map[rebac.Relationship]struct{}
 }
 
-// NewInMemoryStore creates a store pre-seeded with the given tuples.
-func NewInMemoryStore(seed ...rebac.TupleKey) *InMemoryStore {
+// NewInMemoryStore creates a store pre-seeded with the given relationships.
+func NewInMemoryStore(seed ...rebac.Relationship) *InMemoryStore {
 	s := &InMemoryStore{
-		tuples: make(map[rebac.TupleKey]struct{}, len(seed)),
+		relationships: make(map[rebac.Relationship]struct{}, len(seed)),
 	}
 	// Populate the map directly: during construction the store is not yet shared,
 	// so we need neither a lock nor a context.
 	for _, k := range seed {
-		s.tuples[k] = struct{}{}
+		s.relationships[k] = struct{}{}
 	}
 	return s
 }
 
-// Compile-time assertion: *InMemoryStore must satisfy TupleRepository.
+// Compile-time assertion: *InMemoryStore must satisfy RelationshipRepository.
 var (
-	_ TupleReader     = (*InMemoryStore)(nil)
-	_ TupleWriter     = (*InMemoryStore)(nil)
-	_ TupleLister     = (*InMemoryStore)(nil)
-	_ TupleRepository = (*InMemoryStore)(nil)
+	_ RelationshipReader     = (*InMemoryStore)(nil)
+	_ RelationshipWriter     = (*InMemoryStore)(nil)
+	_ RelationshipLister     = (*InMemoryStore)(nil)
+	_ RelationshipRepository = (*InMemoryStore)(nil)
 )
 
 // The context argument is unused here — an in-memory map never blocks — but it is
 // part of the port so a real backend can honour cancellation and deadlines. The
 // error return is always nil for the same reason.
 
-// Write adds a tuple to the store (idempotent).
-func (s *InMemoryStore) Write(_ context.Context, key rebac.TupleKey) error {
+// Write adds a relationship to the store (idempotent).
+func (s *InMemoryStore) Write(_ context.Context, relationship rebac.Relationship) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.tuples[key] = struct{}{}
+	s.relationships[relationship] = struct{}{}
 	return nil
 }
 
-// Delete removes a tuple from the store. No-op if the tuple does not exist.
-func (s *InMemoryStore) Delete(_ context.Context, key rebac.TupleKey) error {
+// Delete removes a relationship from the store. No-op if it does not exist.
+func (s *InMemoryStore) Delete(_ context.Context, relationship rebac.Relationship) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.tuples, key)
+	delete(s.relationships, relationship)
 	return nil
 }
 
-// Has reports whether the exact tuple (object, relation, user) exists.
-func (s *InMemoryStore) Has(_ context.Context, object rebac.Object, relation rebac.Relation, user rebac.Subject) (bool, error) {
+// Has reports whether the exact (subject, relation, resource) relationship exists.
+func (s *InMemoryStore) Has(_ context.Context, subject rebac.Subject, relation rebac.Relation, resource rebac.Resource) (bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	_, ok := s.tuples[rebac.TupleKey{Object: object, Relation: relation, User: user}]
+	_, ok := s.relationships[rebac.Relationship{Subject: subject, Relation: relation, Resource: resource}]
 	return ok, nil
 }
 
-// FindByObjectRelation returns all tuples whose object and relation match.
-func (s *InMemoryStore) FindByObjectRelation(_ context.Context, object rebac.Object, relation rebac.Relation) ([]rebac.TupleKey, error) {
+// FindByResourceRelation returns all relationships whose resource and relation match.
+func (s *InMemoryStore) FindByResourceRelation(_ context.Context, resource rebac.Resource, relation rebac.Relation) ([]rebac.Relationship, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var out []rebac.TupleKey
-	for k := range s.tuples {
-		if k.Object == object && k.Relation == relation {
-			out = append(out, k)
+	var out []rebac.Relationship
+	for relationship := range s.relationships {
+		if relationship.Resource == resource && relationship.Relation == relation {
+			out = append(out, relationship)
 		}
 	}
-	sortTuples(out)
+	sortRelationships(out)
 	return out, nil
 }
 
-// FindAll returns a snapshot of tuples, optionally filtered.
-func (s *InMemoryStore) FindAll(_ context.Context, filter ...TupleFilter) ([]rebac.TupleKey, error) {
+// FindAll returns a snapshot of relationships, optionally filtered.
+func (s *InMemoryStore) FindAll(_ context.Context, filter ...RelationshipFilter) ([]rebac.Relationship, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	out := make([]rebac.TupleKey, 0, len(s.tuples))
-	for k := range s.tuples {
-		if len(filter) == 0 || matchesFilter(k, filter[0]) {
-			out = append(out, k)
+	out := make([]rebac.Relationship, 0, len(s.relationships))
+	for relationship := range s.relationships {
+		if len(filter) == 0 || matchesFilter(relationship, filter[0]) {
+			out = append(out, relationship)
 		}
 	}
-	sortTuples(out)
+	sortRelationships(out)
 	return out, nil
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-func matchesFilter(k rebac.TupleKey, f TupleFilter) bool {
-	if f.Object != "" && k.Object != f.Object {
+func matchesFilter(relationship rebac.Relationship, filter RelationshipFilter) bool {
+	if filter.Resource != "" && relationship.Resource != filter.Resource {
 		return false
 	}
-	if f.Relation != "" && k.Relation != f.Relation {
+	if filter.Relation != "" && relationship.Relation != filter.Relation {
 		return false
 	}
 	return true
 }
 
-func sortTuples(tuples []rebac.TupleKey) {
-	slices.SortFunc(tuples, func(a, b rebac.TupleKey) int {
-		if n := cmp.Compare(a.Object, b.Object); n != 0 {
+func sortRelationships(relationships []rebac.Relationship) {
+	slices.SortFunc(relationships, func(a, b rebac.Relationship) int {
+		if n := cmp.Compare(a.Resource, b.Resource); n != 0 {
 			return n
 		}
 		if n := cmp.Compare(a.Relation, b.Relation); n != 0 {
 			return n
 		}
-		return cmp.Compare(a.User, b.User)
+		return cmp.Compare(a.Subject, b.Subject)
 	})
 }

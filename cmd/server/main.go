@@ -60,7 +60,7 @@ func main() {
 		}
 		log.Printf("authz backend: openfga (%s, store=%s)", cfg.APIURL, cfg.StoreID)
 	} else {
-		store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+		store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 		authzService = authz.New(store, authz.NewGraphEvaluator(store))
 		log.Printf("authz backend: in-process graph evaluator")
 	}
@@ -70,14 +70,14 @@ func main() {
 	verifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
 
 	// Seed the demo document so GET /documents/roadmapDocument works out of the box.
-	// In OpenFGA mode this also writes the document's tuples to the store, which
-	// requires the policy tuples to be seeded first (deployments/openfga/seed.sh).
+	// In OpenFGA mode this also writes the document's relationships to the store, which
+	// requires the policy relationships to be seeded first (deployments/openfga/seed.sh).
 	if _, err := documentsService.Create(ctx, documents.CreateDocumentInput{
 		ID:        "roadmapDocument",
 		Title:     "Roadmap",
 		Body:      "Initial roadmap document",
 		Workspace: fixtures.ProductWorkspace,
-		Actor:     fixtures.Alice,
+		Subject:   fixtures.Alice,
 	}); err != nil {
 		log.Fatalf("seed demo document: %v", err)
 	}

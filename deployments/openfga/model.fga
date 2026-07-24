@@ -13,6 +13,7 @@ type workspace
     define owner: [user, team#admin]
     define editor: [user, team#member] or owner
     define viewer: [user, team#member] or editor
+    define can_create_document: editor
 
 type document
   relations

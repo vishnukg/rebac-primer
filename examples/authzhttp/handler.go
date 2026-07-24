@@ -22,27 +22,27 @@ func (h *handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 // handleCheck handles POST /check.
 //
-// Request body: { "user": "user:alice", "relation": "can_edit", "object": "document:roadmapDocument" }
+// Request body: { "subject": "user:alice", "permission": "can_edit", "resource": "document:roadmapDocument" }
 // Response:     { "allowed": true, "trace": ["Check whether ...", "Result: allowed"] }
 func (h *handler) handleCheck(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		User     string `json:"user"`
-		Relation string `json:"relation"`
-		Object   string `json:"object"`
+		Subject    string `json:"subject"`
+		Permission string `json:"permission"`
+		Resource   string `json:"resource"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorBody("invalid JSON: "+err.Error()))
 		return
 	}
-	if body.User == "" || body.Relation == "" || body.Object == "" {
-		writeJSON(w, http.StatusBadRequest, errorBody("user, relation, and object are required"))
+	if body.Subject == "" || body.Permission == "" || body.Resource == "" {
+		writeJSON(w, http.StatusBadRequest, errorBody("subject, permission, and resource are required"))
 		return
 	}
 
 	result, err := h.authz.Check(r.Context(), rebac.CheckRequest{
-		User:     rebac.Object(body.User),
-		Relation: rebac.Relation(body.Relation),
-		Object:   rebac.Object(body.Object),
+		Subject:    rebac.Resource(body.Subject),
+		Permission: rebac.Permission(body.Permission),
+		Resource:   rebac.Resource(body.Resource),
 	})
 	if err != nil {
 		h.writeError(w, err)
@@ -55,70 +55,76 @@ func (h *handler) handleCheck(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleWriteTuples handles POST /tuples.
+// handleWriteRelationships handles POST /relationships.
 //
-// Request body: { "tuples": [{ "object": "...", "relation": "...", "user": "..." }] }
+// Request body: { "relationships": [{ "subject": "...", "relation": "...", "resource": "..." }] }
 // Response:     { "written": 1 }
-func (h *handler) handleWriteTuples(w http.ResponseWriter, r *http.Request) {
-	tuples, err := parseTupleBody(r)
+func (h *handler) handleWriteRelationships(w http.ResponseWriter, r *http.Request) {
+	relationships, err := parseRelationshipBody(r)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errorBody(err.Error()))
 		return
 	}
-	if err := h.authz.WriteTuples(r.Context(), tuples); err != nil {
+	if err := h.authz.WriteRelationships(r.Context(), relationships); err != nil {
 		h.writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]int{"written": len(tuples)})
+	writeJSON(w, http.StatusOK, map[string]int{"written": len(relationships)})
 }
 
-// handleDeleteTuples handles DELETE /tuples.
+// handleDeleteRelationships handles DELETE /relationships.
 //
-// Request body: { "tuples": [{ "object": "...", "relation": "...", "user": "..." }] }
+// Request body: { "relationships": [{ "subject": "...", "relation": "...", "resource": "..." }] }
 // Response:     { "deleted": 1 }
-func (h *handler) handleDeleteTuples(w http.ResponseWriter, r *http.Request) {
-	tuples, err := parseTupleBody(r)
+func (h *handler) handleDeleteRelationships(w http.ResponseWriter, r *http.Request) {
+	relationships, err := parseRelationshipBody(r)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errorBody(err.Error()))
 		return
 	}
-	if err := h.authz.DeleteTuples(r.Context(), tuples); err != nil {
+	if err := h.authz.DeleteRelationships(r.Context(), relationships); err != nil {
 		h.writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]int{"deleted": len(tuples)})
+	writeJSON(w, http.StatusOK, map[string]int{"deleted": len(relationships)})
 }
 
-// handleListTuples handles GET /tuples.
+// handleListRelationships handles GET /relationships.
 //
-// Optional query params: ?object=workspace:productWorkspace&relation=editor
-// Response: { "tuples": [...] }
-func (h *handler) handleListTuples(w http.ResponseWriter, r *http.Request) {
+// Optional query params: ?resource=workspace:productWorkspace&relation=editor
+// Response: { "relationships": [...] }
+func (h *handler) handleListRelationships(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	// Empty strings in TupleFilter are treated as "match any" by FindAll.
-	filter := authz.TupleFilter{
-		Object:   rebac.Object(q.Get("object")),
+	// Empty strings in RelationshipFilter are treated as "match any" by FindAll.
+	filter := authz.RelationshipFilter{
+		Resource: rebac.Resource(q.Get("resource")),
 		Relation: rebac.Relation(q.Get("relation")),
 	}
 
-	tuples, err := h.authz.ListTuples(r.Context(), filter)
+	relationships, err := h.authz.ListRelationships(r.Context(), filter)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tuples": tuples})
+	writeJSON(w, http.StatusOK, map[string]any{"relationships": relationships})
 }
 
 // writeError maps a service error to an HTTP status code.
 //
-//   - [authz.TupleValidationError] → 422 Unprocessable Entity. The caller sent a
-//     well-formed request whose tuple is semantically invalid; the message names
-//     the problem and is safe to return.
+//   - [authz.RelationshipValidationError] or [authz.CheckValidationError] →
+//     422 Unprocessable Entity. The caller sent a well-formed request whose
+//     authorization terms are semantically invalid; the message names the
+//     problem and is safe to return.
 //   - Anything else is an unexpected internal failure (store outage, cancelled
 //     context, bug): log it server-side and return a generic 500.
 func (h *handler) writeError(w http.ResponseWriter, err error) {
-	var tupleValidation *authz.TupleValidationError
-	if errors.As(err, &tupleValidation) {
+	var relationshipValidation *authz.RelationshipValidationError
+	if errors.As(err, &relationshipValidation) {
+		writeJSON(w, http.StatusUnprocessableEntity, errorBody(err.Error()))
+		return
+	}
+	var checkValidation *authz.CheckValidationError
+	if errors.As(err, &checkValidation) {
 		writeJSON(w, http.StatusUnprocessableEntity, errorBody(err.Error()))
 		return
 	}
@@ -126,28 +132,31 @@ func (h *handler) writeError(w http.ResponseWriter, err error) {
 	writeJSON(w, http.StatusInternalServerError, errorBody("internal server error"))
 }
 
-// parseTupleBody reads a JSON body of shape { "tuples": [{object,relation,user}] }.
-func parseTupleBody(r *http.Request) ([]rebac.TupleKey, error) {
+// parseRelationshipBody reads
+// {"relationships":[{"subject":...,"relation":...,"resource":...}]}.
+func parseRelationshipBody(r *http.Request) ([]rebac.Relationship, error) {
 	var body struct {
-		Tuples []struct {
-			Object   string `json:"object"`
+		Relationships []struct {
+			Subject  string `json:"subject"`
 			Relation string `json:"relation"`
-			User     string `json:"user"`
-		} `json:"tuples"`
+			Resource string `json:"resource"`
+		} `json:"relationships"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
 
-	out := make([]rebac.TupleKey, 0, len(body.Tuples))
-	for i, t := range body.Tuples {
-		if t.Object == "" || t.Relation == "" || t.User == "" {
-			return nil, fmt.Errorf("tuples[%d]: object, relation, and user are required", i)
+	out := make([]rebac.Relationship, 0, len(body.Relationships))
+	for i, relationship := range body.Relationships {
+		if relationship.Subject == "" || relationship.Relation == "" || relationship.Resource == "" {
+			return nil, fmt.Errorf(
+				"relationships[%d]: subject, relation, and resource are required", i,
+			)
 		}
-		out = append(out, rebac.TupleKey{
-			Object:   rebac.Object(t.Object),
-			Relation: rebac.Relation(t.Relation),
-			User:     rebac.Subject(t.User),
+		out = append(out, rebac.Relationship{
+			Subject:  rebac.Subject(relationship.Subject),
+			Relation: rebac.Relation(relationship.Relation),
+			Resource: rebac.Resource(relationship.Resource),
 		})
 	}
 	return out, nil

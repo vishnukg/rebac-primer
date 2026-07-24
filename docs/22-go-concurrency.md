@@ -76,11 +76,11 @@ Two more facts you will rely on:
   close here because we collect an exact, known number of results.
 
 `AllPermissions` uses a **buffered channel** whose capacity equals the number of
-relations:
+permissions:
 
 ```go
 // examples/concurrency/parallel.go
-ch := make(chan outcome, len(relations))
+ch := make(chan outcome, len(permissions))
 ```
 
 Each goroutine sends exactly one value into the channel and then exits. Because
@@ -89,19 +89,21 @@ blocks waiting for the collector — the sends always succeed immediately. The
 collector runs the loop after all goroutines have been started:
 
 ```go
-for _, rel := range relations {
-    go func(rel rebac.Relation) {
-        result, err := auth.Evaluate(ctx, rebac.CheckRequest{User: user, Relation: rel, Object: object})
-        ch <- outcome{relation: rel, allowed: result.Allowed, err: err}
-    }(rel)
+for _, permission := range permissions {
+    go func(permission rebac.Permission) {
+        result, err := auth.Evaluate(ctx, rebac.CheckRequest{
+            Subject: subject, Permission: permission, Resource: resource,
+        })
+        ch <- outcome{permission: permission, allowed: result.Allowed, err: err}
+    }(permission)
 }
 
-summary := make(PermissionSummary, len(relations))
-for range len(relations) {
+summary := make(PermissionSummary, len(permissions))
+for range len(permissions) {
     select {
     case out := <-ch:
         // a result arrived
-        summary[out.relation] = out.allowed
+        summary[out.permission] = out.allowed
     case <-ctx.Done():
         // the caller cancelled or timed out
         return nil, ctx.Err()
@@ -123,20 +125,20 @@ blocking forever on a receiver that has gone away. That is the subtle reason the
 buffer matters: once a worker returns, its final send cannot leak merely because
 the collector stopped receiving.
 
-## Why The Goroutine Passes `rel` As An Argument
+## Why The Goroutine Passes `permission` As An Argument
 
 Look at this pattern:
 
 ```go
-for _, rel := range relations {
-    go func(rel Relation) {  // rel is a parameter, not a closed-over variable
-        // use rel
-    }(rel)
+for _, permission := range permissions {
+    go func(permission rebac.Permission) { // an explicit parameter
+        // use permission
+    }(permission)
 }
 ```
 
 Since Go 1.22, range variables declared by the loop are created per iteration,
-so closing over `rel` is safe in this example. Passing it explicitly is still a
+so closing over `permission` is safe in this example. Passing it explicitly is still a
 reasonable teaching style because the goroutine's inputs are visible at the call
 site. It is clarity, not a correctness requirement for this module's Go version.
 
@@ -261,7 +263,7 @@ next result, or the caller giving up.
 select {
 case out := <-ch:
     // a result arrived — record it
-    summary[out.relation] = out.allowed
+    summary[out.permission] = out.allowed
 case <-ctx.Done():
     // the caller cancelled or timed out — stop early
     return nil, ctx.Err()
@@ -273,7 +275,7 @@ wait for every check no matter what — even after they timed out. With it, the
 function returns the moment the context is cancelled.
 
 Why is returning early still leak-free? The result channel is **buffered** with
-one slot per relation, so the goroutines that are still in flight can each finish
+one slot per permission, so the goroutines that are still in flight can each finish
 their one send into the buffer and exit, even though nobody is receiving anymore.
 An *unbuffered* channel would be a bug here: those orphaned goroutines would block
 forever on a send with no receiver, leaking one goroutine per outstanding check.

@@ -27,7 +27,7 @@ documents.New(repo, checker)
 
 Avoid package names like `utils`, `helpers`, or `common`. Those names usually
 mean "I have not found the real concept yet." If a function parses a ReBAC
-object, it belongs with ReBAC vocabulary. If it maps HTTP errors, it belongs at
+resource, it belongs with ReBAC vocabulary. If it maps HTTP errors, it belongs at
 the HTTP boundary.
 
 ## Keep The Dependency Arrow Boring
@@ -51,7 +51,7 @@ global dependencies. Hidden wiring makes tests hard and surprises cheap.
 In Go, constructors are ordinary functions:
 
 ```go
-func NewGraphEvaluator(store TupleReader) *GraphEvaluator
+func NewGraphEvaluator(store RelationshipReader) *GraphEvaluator
 func NewInMemoryRepository(seed ...CollaborativeDocument) *InMemoryRepository
 ```
 
@@ -62,7 +62,7 @@ small interface it actually needs.
 This is common:
 
 ```go
-store := authz.NewInMemoryStore(tuples...)
+store := authz.NewInMemoryStore(relationships...)
 evaluator := authz.NewGraphEvaluator(store)
 ```
 
@@ -105,7 +105,7 @@ Small immutable records are usually passed by value:
 
 ```go
 rebac.CheckRequest
-rebac.TupleKey
+rebac.Relationship
 rebac.CheckResult
 ```
 
@@ -188,7 +188,7 @@ Check
 Avoid names that narrate implementation details:
 
 ```text
-DoTupleMapLookupAndMaybeExpandRules
+DoRelationshipLookupAndMaybeExpandRules
 ```
 
 The evaluator's private helpers can be more specific because they describe
@@ -196,7 +196,7 @@ steps in an algorithm:
 
 ```go
 hasRelation
-hasTuple
+hasRelationship
 subjectSetContains
 expandByRules
 ```

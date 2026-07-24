@@ -23,8 +23,9 @@ internal/authz/model.go
 Read the model as a type system plus set algebra. Type restrictions say what may
 be written directly; relation expressions say what may be derived.
 
-Each `object#relation` can be understood as a set of subjects. A Check asks
-whether one subject belongs to the effective set for the requested relation.
+Each OpenFGA `object#relation` can be understood as a set of subjects. In the
+application domain, a check asks whether one subject has a permission on a
+resource; the adapter puts that permission in OpenFGA's relation field.
 
 ## Modeling Thought Process
 
@@ -49,7 +50,7 @@ The design process is:
 3. Identify derived relationships: admin implies member, owner implies editor,
    editor implies viewer, document access can come from the parent workspace.
 4. Identify application permissions: read, comment, edit, delete.
-5. Keep action permissions as computed relations so callers ask for intent
+5. Represent permissions as computed relations in OpenFGA so callers ask for intent
    (`can_edit`) rather than implementation detail (`editor from workspace`).
 6. Write contract tests before trusting the model.
 
@@ -96,12 +97,13 @@ type workspace
     define owner: [user, team#admin]
     define editor: [user, team#member] or owner
     define viewer: [user, team#member] or editor
+    define can_create_document: editor
 ```
 
 An owner is also an editor. An editor is also a viewer. A team subject set can
 grant workspace access to everyone in that team relation.
 
-Why: workspace permissions are role-like, but scoped to one workspace. Direct
+Why: workspace relations are role-like, but scoped to one workspace. Direct
 users can be owners/editors/viewers, and teams can be granted access through
 subject sets:
 
@@ -137,10 +139,11 @@ editor from workspace
 That means: follow the document's `workspace` relation to a workspace object,
 then check whether the user is an editor there.
 
-`workspace` is a structural relation, not a user permission. The application
+`workspace` is a structural relation, not a permission. The application
 writes `document#workspace` tuples so inheritance can work, but user-facing
-permission checks ask for relations such as `can_read`, `can_edit`, `owner`,
-`editor`, or `viewer`.
+checks ask for permissions such as `can_read`, `can_edit`, or `can_delete`.
+Relationship queries involving `owner`, `editor`, or `viewer` are a separate
+concern and are not exposed through the domain `CheckRequest`.
 
 Why: documents are children of workspaces. The document's `workspace` tuple is
 the bridge that lets a workspace relationship affect a document:
@@ -154,7 +157,8 @@ editor of the workspace this document points to." The parent object must be in
 the tuple's subject/user field because `from workspace` follows the document's
 `workspace` relation to that subject.
 
-The `can_*` relations are action permissions. They are not writable facts:
+The `can_*` names are permissions in the domain and computed relations in
+OpenFGA. They are not writable facts:
 
 ```text
 can_read    = viewer
@@ -177,7 +181,7 @@ This is the central schema/data split:
 
 ```text
 relationship tuples  → changing product facts
-authorization model  → reusable rules for deriving effective relationships
+authorization model  → reusable rules for deriving permissions
 ```
 
 The DSL constructs used here are:
@@ -211,10 +215,9 @@ define can_archive: owner
 To keep both backends aligned, update:
 
 1. `deployments/openfga/model.fga`
-2. the relation constant in `internal/rebac/rebac.go`
-3. `documentRules` in `internal/authz/model.go`
-4. `relationDefinedFor` and computed-relation validation in
-   `internal/authz/validate.go`
+2. a `Permission` constant in `internal/rebac/rebac.go`
+3. `permissionRules` in `internal/authz/model.go`
+4. `permissionDefinedFor` validation in `internal/authz/validate.go`
 5. the shared authorization contract and evaluator tests
 
 The traversal algorithm itself should not change. If adding a simple permission

@@ -8,7 +8,7 @@ The relevant source files are:
 
 - `internal/authz/evaluator.go` — the traversal algorithm
 - `internal/authz/model.go` — the rule tables
-- `internal/authz/store.go` — the in-memory tuple store
+- `internal/authz/store.go` — the in-memory relationship store
 
 ---
 
@@ -19,9 +19,9 @@ A **graph** is a set of **nodes** connected by **edges**.
 That is the whole definition.  In our system:
 
 - **Nodes** are entities: a user, a team, a workspace, a document.
-- **Edges** are relationship tuples: a named connection between two nodes.
+- **Edges** are relationships: named connections between two nodes.
 
-A tuple like:
+A relationship like:
 
 ```
 user:alice  member  team:platformTeam
@@ -29,25 +29,25 @@ user:alice  member  team:platformTeam
 
 reads: "`user:alice` is a `member` of `team:platformTeam`."
 
-Learner-facing diagrams use OpenFGA's `(subject, relation, object)` convention:
+Domain diagrams use `(subject, relation, resource)`:
 
 ```text
 user:alice --member of--> team:platformTeam
 ```
 
-The evaluator implementation searches from the requested object toward matching
-subjects. That reverse lookup direction is an algorithm detail, not a second
-tuple convention.
+The evaluator searches from the requested resource toward matching subjects.
+That reverse lookup direction is an algorithm detail, not a second relationship
+convention.
 
 ---
 
-## The four fixture tuples as a graph
+## The four fixture relationships as a graph
 
-The project seeds four tuples. Written in OpenFGA's
-`(subject, relation, object)` order:
+The project seeds four relationships in
+`(subject, relation, resource)` order:
 
 ```
-Subject                       Relation   Object
+Subject                       Relation   Resource
 ─────────────────────────────────────────────────────────────────────
 user:alice                    member     team:platformTeam
 team:platformTeam#member      editor     workspace:productWorkspace
@@ -66,18 +66,18 @@ team:platformTeam#member
                   └─workspace of─► document:roadmapDocument
 ```
 
-The second tuple is special. Its subject is
+The second relationship is special. Its subject is
 `team:platformTeam#member`—a **subject set**—instead of one concrete user. It
 means "everyone who has the `member` relation on `team:platformTeam`". Right
 now, that is just Alice. If you added Carol to the team, she would automatically
-get workspace editor access without any new workspace tuple.
+get workspace editor access without any new workspace relationship.
 
 ---
 
 ## What a permission check is asking
 
-A check question is: **"does `<user>` belong to the effective userset
-`<object>#<relation>`?"**
+A check question is: **"does `<subject>` have `<permission>` on
+`<resource>`?"**
 
 Concretely:
 
@@ -99,12 +99,14 @@ team:platformTeam#member
   ──[workspace of]──► document:roadmapDocument
 ```
 
-The evaluator proves this relationship chain by searching in reverse from the
-requested document relation toward candidate subjects.
+The evaluator maps `can_edit` to the `editor` relation required by policy, then
+proves the relationship chain by searching in reverse from the requested
+document toward candidate subjects.
 
 More precisely, it evaluates whether Alice belongs to
-`document:roadmapDocument#can_edit`. It does not perform unrestricted graph
-reachability: every recursive branch comes from the requested relation's model.
+the `can_edit` permission on `document:roadmapDocument`. It does not perform
+unrestricted graph reachability: every recursive branch comes from the
+permission mapping and relation model.
 
 ---
 
@@ -113,19 +115,18 @@ reachability: every recursive branch comes from the requested relation's model.
 The evaluator uses **depth-first search (DFS)**: it picks one branch and follows
 it all the way to the end before trying another.
 
-For each writable `(object, relation)` pair it visits, it tries four things.
-Computed `can_*` permissions cannot be stored, so they skip tuple lookup and
-start at rule expansion:
+Before traversal, the evaluator maps the checked permission to a relation. For
+each `(resource, relation)` pair it visits, it tries four things:
 
 | Step | Name | What it does |
 |---|---|---|
-| 1 | Direct lookup | For a writable relation, is there a tuple `(object, relation, user)` in the store? |
-| 2 | Subject-set | For a writable relation, is there a tuple `(object, relation, group#rel)` where user is a member of that group? |
-| 3 | Rule expansion | Does the permission model say this relation is implied by a stronger one? Recurse. |
+| 1 | Direct lookup | Is there a relationship `(subject, relation, resource)` in the store? |
+| 2 | Subject-set | Is there a relationship `(group#rel, relation, resource)` where the subject is a member of that group? |
+| 3 | Rule expansion | Does the policy model say this relation is implied by a stronger one? Recurse. |
 | 4 | Workspace inherit | (documents only) Follow the `workspace` pointer to the parent and check there. |
 
-The table above describes the internal lookup algorithm. Stored relationships
-remain externally represented as `(subject, relation, object)`.
+Stored relationships use `(subject, relation, resource)` throughout the domain.
+The OpenFGA adapter alone translates them to `user/relation/object`.
 
 If any step returns `true`, the whole branch is `true`.  If all four are
 exhausted, backtrack and try a different branch.  If every branch is exhausted,
@@ -139,22 +140,18 @@ Let's trace every step the evaluator takes.
 
 ### Starting point
 
-```
-hasRelation(alice, document:roadmapDocument, can_edit)
-```
-
-**Steps 1 and 2 — skipped:** `can_edit` is a computed permission. The model does
-not permit direct or subject-set `can_edit` tuples, so the evaluator must derive
-it from writable relations instead of consulting the tuple store.
-
-**Step 3 — rule expansion:** Consult `documentRules`:
-
-```go
-documentRules["can_edit"] = ["editor"]
+```text
+Check(alice, can_edit, document:roadmapDocument)
 ```
 
-This says: "`can_edit` is satisfied by anyone who has `editor`".  So recurse
-with `editor` instead:
+**Permission mapping:** `permissionRelationsFor` maps the `can_edit` permission
+to the document's `editor` relation:
+
+```text
+can_edit -> editor
+```
+
+Traversal therefore begins at:
 
 ---
 
@@ -164,7 +161,8 @@ with `editor` instead:
 hasRelation(alice, document:roadmapDocument, editor)
 ```
 
-**Step 1:** Is there a tuple `(document:roadmapDocument, editor, user:alice)`? No.
+**Step 1:** Is there a relationship
+`(user:alice, editor, document:roadmapDocument)`? No.
 
 **Step 3:** Consult `documentRules`:
 
@@ -182,12 +180,12 @@ Recurse with `owner`:
 hasRelation(alice, document:roadmapDocument, owner)
 ```
 
-**Step 1:** No tuple. **Step 3:** `documentRules["owner"]` is not in the table →
+**Step 1:** No relationship. **Step 3:** `documentRules["owner"]` is not in the table →
 nothing to expand.
 
 **Step 4 — workspace inheritance:** The relation is `owner`, which is one of the
 inheritable base relations (`owner`, `editor`, `viewer`).  Follow the
-`workspace` tuple on `document:roadmapDocument`:
+`workspace` relationship on `document:roadmapDocument`:
 
 ```text
 workspace:productWorkspace  workspace  document:roadmapDocument
@@ -199,7 +197,7 @@ Now check: does alice have `owner` on `workspace:productWorkspace`?
 hasRelation(alice, workspace:productWorkspace, owner)
 ```
 
-**Step 1:** No tuple. **Step 3:** `workspaceRules["owner"]` is not in the table.
+**Step 1:** No relationship. **Step 3:** `workspaceRules["owner"]` is not in the table.
 Dead end — return `false`.
 
 Back up to recursion 1 (`editor` on `roadmapDocument`).  The `owner` branch
@@ -209,17 +207,18 @@ failed.  Try step 4 for `editor`.
 
 ### Recursion 3: alice / editor / workspace:productWorkspace (success)
 
-**Step 4 — workspace inheritance for `editor`:** Follow the `workspace` tuple
+**Step 4 — workspace inheritance for `editor`:** Follow the `workspace` relationship
 again.  Check: does alice have `editor` on `workspace:productWorkspace`?
 
 ```
 hasRelation(alice, workspace:productWorkspace, editor)
 ```
 
-**Step 1 — direct:** Is there a tuple `(workspace:productWorkspace, editor, user:alice)`?
-No direct alice tuple.
+**Step 1 — direct:** Is there a relationship
+`(user:alice, editor, workspace:productWorkspace)`?
+No direct Alice relationship.
 
-**Step 2 — subject-set:** Scan all tuples for `(workspace:productWorkspace, editor, *)`:
+**Step 2 — subject-set:** Scan relationships for the requested resource and relation:
 
 ```text
 team:platformTeam#member  editor  workspace:productWorkspace
@@ -230,11 +229,11 @@ Found one.  The subject is `team:platformTeam#member` — that is a subject set
 
 ```
 subjectSetContains(alice, team:platformTeam#member)
-  → split: object=team:platformTeam, relation=member
+  → split: resource=team:platformTeam, relation=member
   → hasRelation(alice, team:platformTeam, member)
 ```
 
-**Step 1 — direct:** Is this OpenFGA tuple present?
+**Step 1 — direct:** Is this relationship present?
 
 ```text
 YES — user:alice  member  team:platformTeam  ✓
@@ -249,12 +248,11 @@ Return `true` all the way back up the call stack.
 ```text
 user:alice member team:platformTeam                → true ✓
   subjectSetContains → true ✓
-    hasTuple on workspace:productWorkspace/editor  → true ✓
+    hasRelationship on workspace:productWorkspace/editor  → true ✓
       hasRelation on workspace:productWorkspace/editor → true ✓
         workspace inheritance for document/editor  → true ✓
           hasRelation on document:roadmapDocument/editor → true ✓
-            expandByRules: can_edit includes editor → true ✓
-              hasRelation on document:roadmapDocument/can_edit → true ✓
+            permission can_edit requires editor → true ✓
 ```
 
 **Result: allowed.**
@@ -263,19 +261,18 @@ user:alice member team:platformTeam                → true ✓
 
 ## The trace output
 
-The evaluator records every step it takes in a `Trace` slice. Its trace prints
-the repository's internal `(object, relation, user)` field order. For the Alice /
+The evaluator records every step it takes in a `Trace` slice. For the Alice /
 `can_edit` / `roadmapDocument` check, the trace looks like this:
 
 ```
-Check whether user:alice has can_edit on document:roadmapDocument
-document:roadmapDocument can_edit includes editor
+Check whether user:alice has permission can_edit on document:roadmapDocument
+Permission can_edit requires relation editor
 document:roadmapDocument editor includes owner
 document:roadmapDocument owner can inherit owner from workspace:productWorkspace
 document:roadmapDocument editor can inherit editor from workspace:productWorkspace
 Resolve subject set team:platformTeam#member: does it contain user:alice?
-Found direct tuple (team:platformTeam, member, user:alice)
-Found subject-set tuple (workspace:productWorkspace, editor, team:platformTeam#member)
+Found direct relationship (user:alice, member, team:platformTeam)
+Found subject-set relationship (team:platformTeam#member, editor, workspace:productWorkspace)
 Result: allowed
 ```
 
@@ -288,9 +285,9 @@ You can print the trace yourself from a test:
 
 ```go
 result, _ := evaluator.Evaluate(ctx, rebac.CheckRequest{
-    User:     fixtures.Alice,
-    Relation: rebac.RelationDocumentCanEdit,
-    Object:   fixtures.RoadmapDocument,
+    Subject:    fixtures.Alice,
+    Permission: rebac.PermissionDocumentEdit,
+    Resource:   fixtures.RoadmapDocument,
 })
 for _, line := range result.Trace {
     fmt.Println(line)
@@ -301,23 +298,19 @@ for _, line := range result.Trace {
 
 ## Walkthrough: casey / can_read / roadmapDocument (denied)
 
-Casey has no tuples.  The evaluator exhausts every branch and finds nothing.
+Casey has no relationships. The evaluator exhausts every branch and finds nothing.
 
 ```
-hasRelation(casey, document:roadmapDocument, can_read)
-  steps 1–2: skipped because can_read is computed
-  step 3: can_read → viewer (documentRules)
-    hasRelation(casey, document:roadmapDocument, viewer)
-      step 1: no direct tuple
-      step 3: viewer → editor → owner (documentRules, chained)
-        ... all return false (no tuples for casey on roadmapDocument)
-      step 4: workspace inherit for viewer
-        hasRelation(casey, workspace:productWorkspace, viewer)
-          step 1: no direct tuple
-          step 3: viewer → editor → owner (workspaceRules, chained)
-            ... all return false
-          → false
-        → false
+permission can_read requires relation viewer
+hasRelation(casey, document:roadmapDocument, viewer)
+  step 1: no direct relationship
+  step 3: viewer → editor → owner (documentRules, chained)
+    ... all return false (no relationships for Casey on roadmapDocument)
+  step 4: workspace inherit for viewer
+    hasRelation(casey, workspace:productWorkspace, viewer)
+      step 1: no direct relationship
+      step 3: viewer → editor → owner (workspaceRules, chained)
+        ... all return false
       → false
     → false
   → false
@@ -330,7 +323,7 @@ The last trace line is: `Result: denied`.
 
 ## Subject sets explained
 
-A **subject set** is a tuple whose subject is `object#relation` instead of
+A **subject set** is a relationship whose subject is `resource#relation` instead of
 `user:someone`.  Example:
 
 ```text
@@ -344,9 +337,9 @@ When the evaluator sees a subject set in step 2, it splits the string at `#` and
 asks: "does the user hold `member` on `team:platformTeam`?"  That is just
 another call to `hasRelation` — the same algorithm, applied to the team.
 
-This is powerful because a single tuple grants access to a whole group.  Add a
+This is powerful because a single relationship grants access to a whole group. Add a
 new member to the team and they instantly have workspace editor access — no new
-workspace tuple needed.
+workspace relationship needed.
 
 ---
 
@@ -359,8 +352,8 @@ What happens if the graph has a loop?  For example:
 (team:b, member, team:a#member)   ← points back to the first userset
 ```
 
-Those tuples are intentionally invalid for this repository's model—team
-membership accepts users, not nested team usersets—and `ValidateTuple` would
+Those relationships are intentionally invalid for this repository's model—team
+membership accepts users, not nested team usersets—and `ValidateRelationship` would
 reject them. The cycle test inserts them directly into the low-level store to
 prove the traversal remains safe even if corrupted data bypasses normal writes
 or a future model introduces recursion.
@@ -375,11 +368,11 @@ hasRelation(casey, team:a, member)
 ```
 
 The **active-path set** prevents this. At the start of every `hasRelation` call,
-the evaluator checks whether the `(object, relation)` pair is already in the
+the evaluator checks whether the `(resource, relation)` pair is already in the
 current recursion chain:
 
 ```go
-visitKey := relationVisit{object: object, relation: relation}
+visitKey := relationVisit{resource: resource, relation: relation}
 if r.visiting[visitKey] {
     // This pair is already active — stop the cycle.
     return false
@@ -397,15 +390,16 @@ revisit the same graph node without being incorrectly denied.
 
 ## The permission model rules
 
-`internal/authz/model.go` holds three tables—one per object type. Each table maps
-a relation to the *stronger* relations that imply it.
+`internal/authz/model.go` holds a permission-to-relation mapping and three
+relation-hierarchy tables—one per resource type. Each hierarchy table maps a
+relation to the *stronger* relations that imply it.
 
 ```
 workspaceRules["viewer"] = ["editor"]   → viewer is satisfied by editor
 workspaceRules["editor"] = ["owner"]    → editor is satisfied by owner
 ```
 
-These are not tuples — they are schema rules.  Tuples say "alice is an editor
+These are not relationships—they are schema rules. Relationships say "Alice is an editor
 of productWorkspace".  Rules say "editors are also viewers".
 
 The evaluator consults the rules in step 3.  It looks up the current relation,
@@ -418,8 +412,8 @@ Check "viewer" on workspace:productWorkspace for alice:
   → check "editor" instead
     workspaceRules["editor"] = ["owner"]
     → check "owner" instead
-      (no tuple, no rules) → false
-    hasTuple "editor": found via team subject-set → true ✓
+      (no relationship, no rules) → false
+    hasRelationship "editor": found via team subject-set → true ✓
   → true ✓ (editor satisfies viewer)
 ```
 
@@ -431,9 +425,9 @@ Check "viewer" on workspace:productWorkspace for alice:
 |---|---|
 | Entry point for a check | `GraphEvaluator.Evaluate()` (builds a per-request `resolution`) |
 | The recursive traversal | `resolution.hasRelation()` |
-| Writable-relation gate | `hasRelation()` — skips `hasTuple()` for computed permissions |
-| Step 1: direct lookup | `hasTuple()` — first `if` block |
-| Step 2: subject-set | `hasTuple()` — the `for` loop |
+| Permission-to-relation mapping | `permissionRelationsFor()` |
+| Step 1: direct lookup | `hasRelationship()` — direct `store.Has` lookup |
+| Step 2: subject-set | `hasRelationship()` — the candidate loop |
 | Subject-set recursion | `subjectSetContains()` |
 | Step 3: rule expansion | `expandByRules()` |
 | The rule tables | `internal/authz/model.go` |
@@ -448,52 +442,52 @@ Check "viewer" on workspace:productWorkspace for alice:
 
 Add a `can_share` permission: only document owners can share.
 
-**1. Add the relation constant** in `internal/rebac/rebac.go`:
+**1. Add the permission constant** in `internal/rebac/rebac.go`:
 
 ```go
-RelationDocumentCanShare Relation = "can_share"
+PermissionDocumentShare Permission = "can_share"
 ```
 
-**2. Add the rule** in `internal/authz/model.go`:
+**2. Add the permission mapping** in `internal/authz/model.go`:
 
 ```go
-var documentRules = impliedBy{
+var permissionRules = map[rebac.ResourceType]map[rebac.Permission][]rebac.Relation{
     // ... existing rules ...
-    rebac.RelationDocumentCanShare: {rebac.RelationDocumentOwner},
+    rebac.ResourceTypeDocument: {
+        rebac.PermissionDocumentShare: {rebac.RelationDocumentOwner},
+    },
 }
 ```
 
-**3. Add the relation to model validation** in `internal/authz/validate.go`.
-`relationDefinedFor` is the in-process guard that rejects unknown checks and
-tuple writes. Computed permissions such as `can_share` belong in
-`relationDefinedFor`, but remain unwritable through `isComputedRelation`.
+`permissionDefinedFor` reads this mapping, while relationship validation accepts
+only relations, so `can_share` remains unwritable by construction.
 
-**4. Mirror the rule in OpenFGA** in `deployments/openfga/model.fga`:
+**3. Mirror the rule in OpenFGA** in `deployments/openfga/model.fga`:
 
 ```text
 define can_share: owner
 ```
 
-**5. Add a test** in `internal/authz/evaluator_test.go`:
+**4. Add a test** in `internal/authz/evaluator_test.go`:
 
 ```go
 func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
     // Make alice a direct owner of the document
-    extra := rebac.Tuple(
-        fixtures.RoadmapDocument,
-        rebac.RelationDocumentOwner,
+    extra := rebac.NewRelationship(
         rebac.Subject(fixtures.Alice),
+        rebac.RelationDocumentOwner,
+        fixtures.RoadmapDocument,
     )
-    tuples := append(fixtures.SeedRelationshipTuples(), extra)
-    store := authz.NewInMemoryStore(tuples...)
+    relationships := append(fixtures.SeedRelationships(), extra)
+    store := authz.NewInMemoryStore(relationships...)
     ev := authz.NewGraphEvaluator(store)
     ctx := t.Context()
 
     // alice (owner) can share
     got, err := ev.Evaluate(ctx, rebac.CheckRequest{
-        User:     fixtures.Alice,
-        Relation: rebac.RelationDocumentCanShare,
-        Object:   fixtures.RoadmapDocument,
+        Subject:    fixtures.Alice,
+        Permission: rebac.PermissionDocumentShare,
+        Resource:   fixtures.RoadmapDocument,
     })
     if err != nil {
         t.Fatalf("owner check: %v", err)
@@ -504,9 +498,9 @@ func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
 
     // bob (viewer) cannot share
     got, err = ev.Evaluate(ctx, rebac.CheckRequest{
-        User:     fixtures.Bob,
-        Relation: rebac.RelationDocumentCanShare,
-        Object:   fixtures.RoadmapDocument,
+        Subject:    fixtures.Bob,
+        Permission: rebac.PermissionDocumentShare,
+        Resource:   fixtures.RoadmapDocument,
     })
     if err != nil {
         t.Fatalf("viewer check: %v", err)
@@ -517,8 +511,8 @@ func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
 }
 ```
 
-No changes to the traversal algorithm are needed—the rule tables drive it. The
-extra model and validation edits are important because this repository keeps a
+No changes to the traversal algorithm are needed—the permission mapping and
+relation tables drive it. The model and validation edits are important because this repository keeps a
 teaching evaluator and an OpenFGA model intentionally aligned.
 
 Next: choose `20-go-language-guide.md` and `21-go-rebac-implementation.md` to

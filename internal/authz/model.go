@@ -2,15 +2,15 @@ package authz
 
 import "rebac-primer/internal/rebac"
 
-// This file defines the permission hierarchy for each object type.
+// This file defines the relation hierarchy for each resource type.
 //
 // # What this file is for
 //
-// These tables answer one question: "if a user has relation X on an object,
-// which weaker relations do they automatically also have on that same object?"
+// These tables answer one question: "if a subject has relation X on a resource,
+// which weaker relations do they automatically also have on that resource?"
 //
 // For example: a workspace editor can also do everything a viewer can do.
-// Rather than writing that rule into every tuple, we declare it once here:
+// Rather than writing that rule into every relationship, we declare it once here:
 //
 //	workspaceRules["viewer"] = ["editor"]
 //	→ "the viewer relation is satisfied by anyone who has the editor relation"
@@ -26,33 +26,56 @@ import "rebac-primer/internal/rebac"
 //	rules["editor"] = ["owner"]      → editor is satisfied by owner
 //
 // Chained: owner satisfies editor (via the second rule) which satisfies viewer
-// (via the first rule), so owner ⊆ editor ⊆ viewer as sets of users.
+// (via the first rule), so owner ⊆ editor ⊆ viewer as sets of subjects.
 //
-// # Why this is separate from tuples
+// # Why this is separate from relationships
 //
-// Tuples store runtime facts: "alice is an editor of productWorkspace".
+// Relationships store runtime facts: "alice is an editor of productWorkspace".
 // These rules store the schema: "editors are also viewers".
 //
-// Mixing them would mean writing a separate "viewer" tuple for every user who
-// is already an editor — duplicating data that is really a schema rule.
+// Mixing them would mean writing a separate "viewer" relationship for every
+// subject who is already an editor — duplicating data that is really a schema
+// rule.
 // Keeping them apart is the same split OpenFGA makes between its DSL model and
-// its tuple store.
+// its relationship store.
 
 // impliedBy maps a relation to the stronger relations that satisfy it.
 // "Key relation is implied by any of the value relations."
 type impliedBy map[rebac.Relation][]rebac.Relation
 
-// teamRules — the team permission hierarchy.
+// permissionRules maps each application permission to the base relation that
+// satisfies it. Permissions are policy results; relations are the durable facts
+// and derived role-like sets used to prove those results.
+var permissionRules = map[rebac.ResourceType]map[rebac.Permission][]rebac.Relation{
+	rebac.ResourceTypeWorkspace: {
+		rebac.PermissionWorkspaceCreateDocument: {rebac.RelationWorkspaceEditor},
+	},
+	rebac.ResourceTypeDocument: {
+		rebac.PermissionDocumentRead:    {rebac.RelationDocumentViewer},
+		rebac.PermissionDocumentComment: {rebac.RelationDocumentViewer},
+		rebac.PermissionDocumentEdit:    {rebac.RelationDocumentEditor},
+		rebac.PermissionDocumentDelete:  {rebac.RelationDocumentOwner},
+	},
+}
+
+func permissionRelationsFor(
+	resourceType rebac.ResourceType,
+	permission rebac.Permission,
+) []rebac.Relation {
+	return permissionRules[resourceType][permission]
+}
+
+// teamRules — the team relation hierarchy.
 //
 // The team type has two relations:
 //
 //	admin  — full control over the team
 //	member — read/participate access
 //
-// Hierarchy: admin ⊆ member as sets of users
+// Hierarchy: admin ⊆ member as sets of subjects
 //
-//	(team, member, user:alice) satisfies "is alice a team member?" — direct.
-//	(team, admin,  user:alice) also satisfies "is alice a team member?" — via this rule.
+//	(user:alice, member, team:platform) satisfies team membership directly.
+//	(user:alice, admin, team:platform) also satisfies membership via this rule.
 //
 // In OpenFGA DSL this is:
 //
@@ -65,7 +88,7 @@ var teamRules = impliedBy{
 	rebac.RelationTeamMember: {rebac.RelationTeamAdmin},
 }
 
-// workspaceRules — the workspace permission hierarchy.
+// workspaceRules — the workspace relation hierarchy.
 //
 // The workspace type has three relations:
 //
@@ -73,7 +96,7 @@ var teamRules = impliedBy{
 //	editor — can create and edit content
 //	viewer — can read content
 //
-// Hierarchy: owner ⊆ editor ⊆ viewer as sets of users
+// Hierarchy: owner ⊆ editor ⊆ viewer as sets of subjects
 //
 // In OpenFGA DSL:
 //
@@ -89,21 +112,18 @@ var workspaceRules = impliedBy{
 	rebac.RelationWorkspaceViewer: {rebac.RelationWorkspaceEditor},
 }
 
-// documentRules — the document permission hierarchy.
+// documentRules — the document relation hierarchy.
 //
-// Documents have two kinds of relations:
+// Documents have stored base and structural relations:
 //
-//	Base relations — stored in tuples, can be granted directly or inherited
+//	Base relations — stored in relationships, can be granted directly or inherited
 //	  from the parent workspace (see expandDocument in evaluator.go):
 //	    owner, editor, viewer
 //
-//	Computed permissions — derived from base relations by these rules, never
-//	  stored in tuples:
-//	    can_read, can_comment, can_edit, can_delete
+// Hierarchy of base relations: owner ⊆ editor ⊆ viewer as sets of subjects
 //
-// Hierarchy of base relations: owner ⊆ editor ⊆ viewer as sets of users
-//
-// Derived permissions:
+// Permissions are deliberately a separate domain type. ValidateCheckRequest
+// maps each permission to its required base relation:
 //
 //	can_read    ← viewer (and therefore editor and owner)
 //	can_comment ← viewer (and therefore editor and owner)
@@ -125,14 +145,8 @@ var workspaceRules = impliedBy{
 //
 // Note: the "from workspace" part of the DSL (workspace inheritance) is handled
 // in expandDocument in evaluator.go, not in this table.  These rules only cover
-// the same-object hierarchy.
+// the same-resource hierarchy.
 var documentRules = impliedBy{
-	// Computed permissions resolved from base roles:
-	rebac.RelationDocumentCanRead:    {rebac.RelationDocumentViewer},
-	rebac.RelationDocumentCanComment: {rebac.RelationDocumentViewer},
-	rebac.RelationDocumentCanEdit:    {rebac.RelationDocumentEditor},
-	rebac.RelationDocumentCanDelete:  {rebac.RelationDocumentOwner},
-
 	// Base role hierarchy:
 	rebac.RelationDocumentViewer: {rebac.RelationDocumentEditor},
 	rebac.RelationDocumentEditor: {rebac.RelationDocumentOwner},

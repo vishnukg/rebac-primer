@@ -21,28 +21,28 @@ import (
 // line-by-line explanation of the alice/can_edit trace.
 func TestTrace(t *testing.T) {
 	cases := []struct {
-		name     string
-		user     rebac.Object
-		relation rebac.Relation
-		object   rebac.Object
+		name       string
+		subject    rebac.Resource
+		permission rebac.Permission
+		resource   rebac.Resource
 	}{
-		{"alice can_edit roadmap (allowed via team->workspace)", fixtures.Alice, rebac.RelationDocumentCanEdit, fixtures.RoadmapDocument},
-		{"bob can_read roadmap (allowed via direct viewer)", fixtures.Bob, rebac.RelationDocumentCanRead, fixtures.RoadmapDocument},
-		{"bob can_edit roadmap (denied: viewer is not editor)", fixtures.Bob, rebac.RelationDocumentCanEdit, fixtures.RoadmapDocument},
-		{"casey can_read roadmap (denied: no path)", fixtures.Casey, rebac.RelationDocumentCanRead, fixtures.RoadmapDocument},
+		{"alice can_edit roadmap (allowed via team->workspace)", fixtures.Alice, rebac.PermissionDocumentEdit, fixtures.RoadmapDocument},
+		{"bob can_read roadmap (allowed via direct viewer)", fixtures.Bob, rebac.PermissionDocumentRead, fixtures.RoadmapDocument},
+		{"bob can_edit roadmap (denied: viewer is not editor)", fixtures.Bob, rebac.PermissionDocumentEdit, fixtures.RoadmapDocument},
+		{"casey can_read roadmap (denied: no path)", fixtures.Casey, rebac.PermissionDocumentRead, fixtures.RoadmapDocument},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			store := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+			store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 			ev := authz.NewGraphEvaluator(store)
 
 			// Act
 			result, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
-				User:     tc.user,
-				Relation: tc.relation,
-				Object:   tc.object,
+				Subject:    tc.subject,
+				Permission: tc.permission,
+				Resource:   tc.resource,
 			})
 
 			// Assert and report the trace.

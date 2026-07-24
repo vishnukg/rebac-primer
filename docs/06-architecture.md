@@ -13,10 +13,10 @@ documents.Service -> documents.AuthorizationService port -> authz.Service
                                                        or -> openfga.Service
                   -> documents.DocumentRepository port   -> document store
 
-authz.Service -> authz.Evaluator port              -> graph evaluator
-              -> authz.TupleWriter/TupleLister     -> tuple store
+authz.Service -> authz.Evaluator port                         -> graph evaluator
+              -> authz.RelationshipWriter/RelationshipLister -> relationship store
 
-GraphEvaluator -> authz.TupleReader port           -> tuple store
+GraphEvaluator -> authz.RelationshipReader port -> relationship store
 
 cmd/server/main.go wires the concrete implementations.
 ```
@@ -33,12 +33,12 @@ cmd/server/main.go chooses adapters
 
 | Package | Role |
 |---|---|
-| `internal/rebac` | shared ReBAC vocabulary: objects, relations, tuples, checks |
-| `internal/authz` | concrete authorization service plus the evaluator and tuple repository interfaces it consumes |
+| `internal/rebac` | shared domain vocabulary: subjects, resources, relations, relationships, permissions, decisions |
+| `internal/authz` | concrete authorization service plus the evaluator and relationship repository interfaces it consumes |
 | `internal/documents` | document use cases and the ports they need |
 | `internal/api` | HTTP adapter and the narrow interfaces it consumes |
 | `internal/openfga` | concrete OpenFGA authorization adapter |
-| `internal/fixtures` | demo users, tuples, and tokens |
+| `internal/fixtures` | demo subjects, relationships, and tokens |
 | `cmd/server` | composition root |
 
 ## Narrow Ports
@@ -48,15 +48,15 @@ cmd/server/main.go chooses adapters
 ```go
 type AuthorizationService interface {
     Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
-    WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
-    DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+    WriteRelationships(ctx context.Context, relationships []rebac.Relationship) error
+    DeleteRelationships(ctx context.Context, relationships []rebac.Relationship) error
 }
 ```
 
 Both `*authz.Service` and `*openfga.Service` satisfy that interface implicitly,
 but the document domain depends only on the three methods it actually uses.
 Delete is used only for
-compensating cleanup if document creation cannot write its authorization tuples.
+compensating cleanup if document creation cannot write its relationships.
 
 The HTTP adapter follows the same rule. `internal/api` declares
 `DocumentService` and `Authenticator`; the documents package exports concrete

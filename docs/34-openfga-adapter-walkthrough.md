@@ -26,13 +26,13 @@ The documents service still calls the same methods:
 
 ```text
 Check
-WriteTuples
-DeleteTuples
+WriteRelationships
+DeleteRelationships
 ```
 
 Those methods form `documents.AuthorizationService`, an interface owned by the
 consumer. The authz HTTP example has a separate interface that also includes
-`ListTuples`.
+`ListRelationships`.
 
 ## Check
 
@@ -40,21 +40,23 @@ consumer. The authz HTTP example has a separate interface that also includes
 
 ```go
 resp, err := s.client.Check(ctx).Body(openfga.ClientCheckRequest{
-    User:     string(req.User),
-    Relation: string(req.Relation),
-    Object:   string(req.Object),
+    User:     string(req.Subject),
+    Relation: string(req.Permission),
+    Object:   string(req.Resource),
 }).Execute()
 ```
 
-OpenFGA evaluates `model.fga` plus stored tuples and returns allow/deny.
+This is the explicit domain-to-OpenFGA translation:
+`subject/permission/resource` becomes `user/relation/object`. OpenFGA evaluates
+`model.fga` plus stored tuples and returns allow/deny.
 
 The adapter validates the check shape before making the network call, matching
 the in-process service's behavior.
 
-## WriteTuples
+## WriteRelationships
 
 When a document is created, the documents service writes document-level
-relationship facts. In OpenFGA mode, `WriteTuples` sends those facts to the
+relationship facts. In OpenFGA mode, `WriteRelationships` sends those facts to the
 OpenFGA Write API.
 
 That is why a later `can_delete` check can see that Alice owns the document.
@@ -68,12 +70,12 @@ larger business workflow.
 
 ## Read and Pagination
 
-OpenFGA's Read API is paginated. `ListTuples` follows continuation tokens until
+OpenFGA's Read API is paginated. `ListRelationships` follows continuation tokens until
 all matching pages are collected. Missing this loop would silently return a
 partial tuple set to administrative consumers.
 
-One filter shape is rejected up front: relation without object. The OpenFGA
-Read API requires at least an object type alongside a relation, so the adapter
+One domain filter shape is rejected up front: relation without resource. The
+OpenFGA Read API requires at least an object type alongside a relation, so the adapter
 returns a clear error instead of forwarding a request the server would refuse.
 The in-memory store does support relation-only filtering — a small reminder
 that two backends satisfying the same interface can still differ at the edges.
@@ -86,13 +88,14 @@ questions and avoid treating tuple reads as a general listing/search API.
 the authorization model. OpenFGA separates effective-access queries:
 
 ```text
-Check        one subject, relation, and object
+Check        one subject, permission (relation field), and resource (object field)
 ListObjects  objects of a type related to one subject
 ListUsers    subjects of a selected type related to one object
 Expand       userset expression tree for one relation and object
 ```
 
-This adapter intentionally exposes only Check and tuple administration. Adding
+This adapter intentionally exposes only permission checks and relationship
+administration. Adding
 listing requires product-specific pagination, result limits, latency budgets,
 and search integration.
 

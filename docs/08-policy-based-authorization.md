@@ -144,7 +144,7 @@ In this repository:
 |---|---|---|
 | PEP | `documents.Service` calling `Authorizer.Check`; HTTP layer maps deny to 403 | same |
 | PDP | `authz.GraphEvaluator` | the OpenFGA server's Check API |
-| PIP | `authz.TupleStore` | OpenFGA's tuple storage |
+| PIP | `authz.InMemoryStore` through relationship ports | OpenFGA's tuple storage |
 | PAP | rule tables in `internal/authz/model.go`, changed via code review | `model.fga` plus `deployments/openfga/seed.sh` and model IDs |
 
 Two practical notes that matter more than the acronyms:
@@ -577,7 +577,7 @@ Map the anatomy from earlier onto the code:
 | policy language | four constructs: direct grant, subject set, implied-by rule, workspace inheritance |
 | compiled policy | the `impliedBy` tables in `internal/authz/model.go` |
 | PAP | editing those tables in a reviewed Go change |
-| PIP / facts | `TupleStore` (`internal/authz/store.go`) |
+| PIP / facts | `InMemoryStore` through `RelationshipReader` (`internal/authz/store.go`) |
 | decision request | `rebac.CheckRequest` |
 | evaluation | `hasRelation` in `internal/authz/evaluator.go` — backward chaining with short-circuit union |
 | combining algorithm | permit-overrides: any successful branch allows |

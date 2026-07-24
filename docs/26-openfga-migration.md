@@ -62,7 +62,7 @@ The teaching backend is not throwaway work. These parts should carry into a
 production integration:
 
 ```text
-typed object IDs and relation vocabulary
+typed resource IDs plus relation and permission vocabulary
 product-facing can_* permission names
 model rules and relationship semantics
 application enforcement points
@@ -92,8 +92,9 @@ only when a small teaching example needs to expose a concept.
 
 | Go concept | OpenFGA concept |
 |---|---|
-| `rebac.TupleKey` | relationship tuple |
-| `rebac.Object` | object ID, e.g. `document:roadmapDocument` |
+| `rebac.Relationship` | relationship tuple |
+| `rebac.Resource` | object ID, e.g. `document:roadmapDocument` |
+| `rebac.Permission` | computed relation used in an OpenFGA Check |
 | `rebac.Subject` with `#` | subject set, e.g. `team:platformTeam#member` |
 | `internal/authz/model.go` | authorization model DSL |
 | `authz.InMemoryStore` | OpenFGA tuple store |
@@ -153,10 +154,10 @@ make server-openfga
 4. writes generated IDs to `deployments/openfga/.ids.env`
 
 The Go server creates the demo document at startup. That writes the document's
-runtime tuples through the selected service's `WriteTuples`, so in OpenFGA mode
+runtime tuples through the selected service's `WriteRelationships`, so in OpenFGA mode
 they land in the OpenFGA tuple store.
 
-## Tuple Split
+## OpenFGA Tuple Split
 
 Bootstrap tuples:
 
@@ -236,7 +237,7 @@ the production decision maker.”
 
 Write down:
 
-- stable principal, object, relation, and permission names
+- stable subject, resource, relation, and permission names
 - which business operation checks each `can_*` permission
 - representative direct and inherited allows
 - near-miss, unrelated-user, revocation, and cross-tenant denies
@@ -253,7 +254,8 @@ Exit gate: reviewers can predict every contract result from product sentences.
 Model two or three real workflows, including a difficult one. Include tenant
 boundaries, nested groups, resource inheritance, custom sharing, or contextual
 rules if the product needs them. Decide which relations are writable facts and
-which `can_*` relations are computed permissions.
+which `can_*` names are domain permissions represented as computed relations in
+OpenFGA.
 
 Run OpenFGA model tests for allows and denies. Check the required listing and
 search flows too; a fast `Check` does not prove `ListObjects` or `ListUsers`
@@ -267,9 +269,9 @@ its derivation rules.
 Application use cases should depend on a small capability such as:
 
 ```text
-Check(subject, permission, object)
-WriteTuples(...)
-DeleteTuples(...)
+Check(subject, permission, resource)
+WriteRelationships(...)
+DeleteRelationships(...)
 ```
 
 The documents service already does this. A larger organization may place a
@@ -344,7 +346,7 @@ Keep the existing authorization path authoritative. Send a sampled copy of
 real checks to OpenFGA asynchronously and compare:
 
 ```text
-subject, permission, object
+subject, permission, resource
 old decision and error
 OpenFGA decision and error
 old and new policy/model identity

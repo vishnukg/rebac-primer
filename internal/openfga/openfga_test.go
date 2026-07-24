@@ -74,13 +74,13 @@ func TestNew_GivenMissingConfig_WhenCalled_ThenReturnsError(t *testing.T) {
 	}
 }
 
-func TestListTuples_GivenRelationOnlyFilter_WhenCalled_ThenReturnsError(t *testing.T) {
+func TestListRelationships_GivenRelationOnlyFilter_WhenCalled_ThenReturnsError(t *testing.T) {
 	// Arrange
 	// The guard rejects the filter before any network call, so no client is needed.
 	svc := &openfga.Service{}
 
 	// Act
-	_, err := svc.ListTuples(t.Context(), authz.TupleFilter{
+	_, err := svc.ListRelationships(t.Context(), authz.RelationshipFilter{
 		Relation: rebac.RelationWorkspaceEditor,
 	})
 
@@ -93,52 +93,52 @@ func TestListTuples_GivenRelationOnlyFilter_WhenCalled_ThenReturnsError(t *testi
 	}
 }
 
-func TestWriteTuples_GivenInvalidTuple_WhenCalled_ThenReturnsValidationError(t *testing.T) {
+func TestWriteRelationships_GivenInvalidRelationship_WhenCalled_ThenReturnsValidationError(t *testing.T) {
 	// Arrange
 	svc := &openfga.Service{}
 
 	// Act
-	err := svc.WriteTuples(t.Context(), []rebac.TupleKey{{
-		Object:   "roadmap",
+	err := svc.WriteRelationships(t.Context(), []rebac.Relationship{{
+		Resource: "roadmap",
 		Relation: rebac.RelationDocumentOwner,
-		User:     rebac.Subject(rebac.User("alice")),
+		Subject:  rebac.Subject(rebac.User("alice")),
 	}})
 
 	// Assert
-	var validationErr *authz.TupleValidationError
+	var validationErr *authz.RelationshipValidationError
 	if !errors.As(err, &validationErr) {
-		t.Fatalf("expected *authz.TupleValidationError, got %v", err)
+		t.Fatalf("expected *authz.RelationshipValidationError, got %v", err)
 	}
 }
 
-func TestDeleteTuples_GivenInvalidTuple_WhenCalled_ThenReturnsValidationError(t *testing.T) {
+func TestDeleteRelationships_GivenInvalidRelationship_WhenCalled_ThenReturnsValidationError(t *testing.T) {
 	// Arrange
 	svc := &openfga.Service{}
 
 	// Act
-	err := svc.DeleteTuples(t.Context(), []rebac.TupleKey{{
-		Object:   "roadmap",
+	err := svc.DeleteRelationships(t.Context(), []rebac.Relationship{{
+		Resource: "roadmap",
 		Relation: rebac.RelationDocumentOwner,
-		User:     rebac.Subject(rebac.User("alice")),
+		Subject:  rebac.Subject(rebac.User("alice")),
 	}})
 
 	// Assert
-	var validationErr *authz.TupleValidationError
+	var validationErr *authz.RelationshipValidationError
 	if !errors.As(err, &validationErr) {
-		t.Fatalf("expected *authz.TupleValidationError, got %v", err)
+		t.Fatalf("expected *authz.RelationshipValidationError, got %v", err)
 	}
 }
 
-func TestWriteTuples_UsesAtomicDuplicateIgnore(t *testing.T) {
+func TestWriteRelationships_UsesAtomicDuplicateIgnore(t *testing.T) {
 	// Arrange
 	const (
 		storeID = "01H00000000000000000000000"
 		modelID = "01H00000000000000000000001"
 	)
-	want := rebac.Tuple(
-		rebac.Workspace("productWorkspace"),
-		rebac.RelationWorkspaceEditor,
+	want := rebac.NewRelationship(
 		rebac.Subject(rebac.User("alice")),
+		rebac.RelationWorkspaceEditor,
+		rebac.Workspace("productWorkspace"),
 	)
 	requests := 0
 	var gotPath string
@@ -162,8 +162,8 @@ func TestWriteTuples_UsesAtomicDuplicateIgnore(t *testing.T) {
 	}
 
 	// Act
-	if err := svc.WriteTuples(t.Context(), []rebac.TupleKey{want}); err != nil {
-		t.Fatalf("WriteTuples() returned unexpected error: %v", err)
+	if err := svc.WriteRelationships(t.Context(), []rebac.Relationship{want}); err != nil {
+		t.Fatalf("WriteRelationships() returned unexpected error: %v", err)
 	}
 
 	// Assert
@@ -182,7 +182,9 @@ func TestWriteTuples_UsesAtomicDuplicateIgnore(t *testing.T) {
 	if gotBody.Writes.OnDuplicate != "ignore" {
 		t.Errorf("on_duplicate = %q, want ignore", gotBody.Writes.OnDuplicate)
 	}
-	wantTuple := openfgaTuple{User: string(want.User), Relation: string(want.Relation), Object: string(want.Object)}
+	wantTuple := openfgaTuple{
+		User: string(want.Subject), Relation: string(want.Relation), Object: string(want.Resource),
+	}
 	if len(gotBody.Writes.TupleKeys) != 1 || gotBody.Writes.TupleKeys[0] != wantTuple {
 		t.Errorf("tuple_keys = %+v, want [%+v]", gotBody.Writes.TupleKeys, wantTuple)
 	}
@@ -195,9 +197,9 @@ func TestCheck_MapsRequestAndAllowedResponse(t *testing.T) {
 		modelID = "01H00000000000000000000001"
 	)
 	want := rebac.CheckRequest{
-		User:     rebac.User("alice"),
-		Relation: rebac.RelationDocumentCanEdit,
-		Object:   rebac.Document("roadmap"),
+		Subject:    rebac.User("alice"),
+		Permission: rebac.PermissionDocumentEdit,
+		Resource:   rebac.Document("roadmap"),
 	}
 	var gotPath string
 	var gotBody checkRequestBody
@@ -234,7 +236,9 @@ func TestCheck_MapsRequestAndAllowedResponse(t *testing.T) {
 	if gotBody.AuthorizationModelID != modelID {
 		t.Errorf("authorization_model_id = %q, want %q", gotBody.AuthorizationModelID, modelID)
 	}
-	wantTuple := openfgaTuple{User: string(want.User), Relation: string(want.Relation), Object: string(want.Object)}
+	wantTuple := openfgaTuple{
+		User: string(want.Subject), Relation: string(want.Permission), Object: string(want.Resource),
+	}
 	if gotBody.TupleKey != wantTuple {
 		t.Errorf("tuple_key = %+v, want %+v", gotBody.TupleKey, wantTuple)
 	}
@@ -243,19 +247,19 @@ func TestCheck_MapsRequestAndAllowedResponse(t *testing.T) {
 	}
 }
 
-func TestListTuples_FollowsPaginationAndMapsTuples(t *testing.T) {
+func TestListRelationships_FollowsPaginationAndMapsTuples(t *testing.T) {
 	// Arrange
 	const (
 		storeID = "01H00000000000000000000000"
 		modelID = "01H00000000000000000000001"
 	)
-	filter := authz.TupleFilter{
-		Object:   rebac.Workspace("productWorkspace"),
+	filter := authz.RelationshipFilter{
+		Resource: rebac.Workspace("productWorkspace"),
 		Relation: rebac.RelationWorkspaceEditor,
 	}
-	want := []rebac.TupleKey{
-		rebac.Tuple(filter.Object, filter.Relation, rebac.Subject(rebac.User("alice"))),
-		rebac.Tuple(filter.Object, filter.Relation, rebac.SubjectSet(rebac.Team("platform"), rebac.RelationTeamMember)),
+	want := []rebac.Relationship{
+		rebac.NewRelationship(rebac.Subject(rebac.User("alice")), filter.Relation, filter.Resource),
+		rebac.NewRelationship(rebac.SubjectSet(rebac.Team("platform"), rebac.RelationTeamMember), filter.Relation, filter.Resource),
 	}
 	requests := 0
 	var gotBodies []readRequestBody
@@ -284,11 +288,11 @@ func TestListTuples_FollowsPaginationAndMapsTuples(t *testing.T) {
 	}
 
 	// Act
-	got, err := svc.ListTuples(t.Context(), filter)
+	got, err := svc.ListRelationships(t.Context(), filter)
 
 	// Assert
 	if err != nil {
-		t.Fatalf("ListTuples() returned unexpected error: %v", err)
+		t.Fatalf("ListRelationships() returned unexpected error: %v", err)
 	}
 	if requests != 2 {
 		t.Fatalf("OpenFGA requests = %d, want 2", requests)
@@ -296,7 +300,7 @@ func TestListTuples_FollowsPaginationAndMapsTuples(t *testing.T) {
 	if len(gotBodies) != 2 {
 		t.Fatalf("captured request bodies = %d, want 2", len(gotBodies))
 	}
-	wantFilter := openfgaTuple{Relation: string(filter.Relation), Object: string(filter.Object)}
+	wantFilter := openfgaTuple{Relation: string(filter.Relation), Object: string(filter.Resource)}
 	if gotBodies[0].TupleKey == nil || *gotBodies[0].TupleKey != wantFilter {
 		t.Errorf("first tuple_key = %+v, want %+v", gotBodies[0].TupleKey, wantFilter)
 	}
@@ -313,16 +317,16 @@ func TestListTuples_FollowsPaginationAndMapsTuples(t *testing.T) {
 	}
 }
 
-func TestDeleteTuples_UsesAtomicMissingIgnore(t *testing.T) {
+func TestDeleteRelationships_UsesAtomicMissingIgnore(t *testing.T) {
 	// Arrange
 	const (
 		storeID = "01H00000000000000000000000"
 		modelID = "01H00000000000000000000001"
 	)
-	want := rebac.Tuple(
-		rebac.Workspace("productWorkspace"),
-		rebac.RelationWorkspaceViewer,
+	want := rebac.NewRelationship(
 		rebac.Subject(rebac.User("bob")),
+		rebac.RelationWorkspaceViewer,
+		rebac.Workspace("productWorkspace"),
 	)
 	var gotBody writeRequestBody
 	httpClient := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
@@ -342,8 +346,8 @@ func TestDeleteTuples_UsesAtomicMissingIgnore(t *testing.T) {
 	}
 
 	// Act
-	if err := svc.DeleteTuples(t.Context(), []rebac.TupleKey{want}); err != nil {
-		t.Fatalf("DeleteTuples() returned unexpected error: %v", err)
+	if err := svc.DeleteRelationships(t.Context(), []rebac.Relationship{want}); err != nil {
+		t.Fatalf("DeleteRelationships() returned unexpected error: %v", err)
 	}
 
 	// Assert
@@ -353,7 +357,9 @@ func TestDeleteTuples_UsesAtomicMissingIgnore(t *testing.T) {
 	if gotBody.Deletes.OnMissing != "ignore" {
 		t.Errorf("on_missing = %q, want ignore", gotBody.Deletes.OnMissing)
 	}
-	wantTuple := openfgaTuple{User: string(want.User), Relation: string(want.Relation), Object: string(want.Object)}
+	wantTuple := openfgaTuple{
+		User: string(want.Subject), Relation: string(want.Relation), Object: string(want.Resource),
+	}
 	if len(gotBody.Deletes.TupleKeys) != 1 || gotBody.Deletes.TupleKeys[0] != wantTuple {
 		t.Errorf("tuple_keys = %+v, want [%+v]", gotBody.Deletes.TupleKeys, wantTuple)
 	}

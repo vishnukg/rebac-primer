@@ -21,11 +21,11 @@ import (
 // service, so the repository and the service share one type with no conversion
 // or alias. The JSON tags are the wire format the HTTP layer emits.
 type CollaborativeDocument struct {
-	ID        string       `json:"id"`
-	Title     string       `json:"title"`
-	Body      string       `json:"body"`
-	Workspace rebac.Object `json:"workspace"`
-	UpdatedBy rebac.Object `json:"updatedBy"`
+	ID        string         `json:"id"`
+	Title     string         `json:"title"`
+	Body      string         `json:"body"`
+	Workspace rebac.Resource `json:"workspace"`
+	UpdatedBy rebac.Resource `json:"updatedBy"`
 }
 
 // CreateDocumentInput carries the data needed to create a new document.
@@ -33,15 +33,15 @@ type CreateDocumentInput struct {
 	ID        string
 	Title     string
 	Body      string
-	Workspace rebac.Object
-	Actor     rebac.Object
+	Workspace rebac.Resource
+	Subject   rebac.Resource
 }
 
 // UpdateDocumentInput carries the data needed to update an existing document.
 type UpdateDocumentInput struct {
-	ID    string
-	Body  string
-	Actor rebac.Object
+	ID      string
+	Body    string
+	Subject rebac.Resource
 }
 
 // DocumentRepository stores documents. NewInMemoryRepository is the default
@@ -54,21 +54,20 @@ type DocumentRepository interface {
 }
 
 // AuthorizationService is what the document service needs from authorization:
-// check a permission
-// and write the relationship tuples a new document implies.
+// check a permission and write the relationships a new document implies.
 //
 // Both the in-process service and the OpenFGA adapter satisfy this interface
 // implicitly, as could an HTTP client to a standalone authorization server.
 type AuthorizationService interface {
 	Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
-	WriteTuples(ctx context.Context, tuples []rebac.TupleKey) error
-	DeleteTuples(ctx context.Context, tuples []rebac.TupleKey) error
+	WriteRelationships(ctx context.Context, relationships []rebac.Relationship) error
+	DeleteRelationships(ctx context.Context, relationships []rebac.Relationship) error
 }
 
 // AuthenticatedUser is the verified identity returned after a successful token check.
 type AuthenticatedUser struct {
-	Subject rebac.Object // e.g. "user:alice"
-	Scopes  []string     // OAuth scopes granted to this token
+	Subject rebac.Resource // e.g. "user:alice"
+	Scopes  []string       // OAuth scopes granted to this token
 }
 
 // AuthenticationError is returned when a token is missing or invalid. The HTTP
@@ -89,7 +88,7 @@ func IsAuthenticationError(err error) bool {
 
 // InsufficientScopeError is returned when a valid access token does not grant
 // the coarse API scope required by an endpoint. ReBAC still performs the
-// separate object-level decision after this check passes.
+// separate resource-level decision after this check passes.
 type InsufficientScopeError struct {
 	Required string
 }
@@ -123,7 +122,7 @@ func (e *DocumentNotFoundError) Error() string {
 	return fmt.Sprintf("document not found: %s", e.ID)
 }
 
-// ForbiddenError is returned when an actor lacks the required permission. The
+// ForbiddenError is returned when a subject lacks the required permission. The
 // HTTP layer maps it to 403 Forbidden.
 type ForbiddenError struct {
 	Message string

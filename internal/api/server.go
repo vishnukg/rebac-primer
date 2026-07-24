@@ -24,7 +24,7 @@ type Authenticator interface {
 // a concrete implementation without owning its consumers' abstractions.
 type DocumentService interface {
 	Create(ctx context.Context, input documents.CreateDocumentInput) (*documents.CollaborativeDocument, error)
-	Read(ctx context.Context, id string, actor rebac.Object) (*documents.CollaborativeDocument, error)
+	Read(ctx context.Context, id string, subject rebac.Resource) (*documents.CollaborativeDocument, error)
 	Update(ctx context.Context, input documents.UpdateDocumentInput) (*documents.CollaborativeDocument, error)
 }
 

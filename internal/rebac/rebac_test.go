@@ -7,48 +7,48 @@ import (
 )
 
 // These tests cover the ReBAC vocabulary primitives in the shared package:
-// object/subject construction, parsing, and the subject-set predicate.
+// resource/subject construction, parsing, and the subject-set predicate.
 //
 // The units under test are pure functions with no collaborators, so there are
 // no test doubles here — stubs and mocks only earn their keep when a unit talks
 // to a port (see internal/authz/authz_test.go for that distinction).
 
-func TestParseObject_GivenWellFormedReference_WhenParsed_ThenReturnsTypeAndID(t *testing.T) {
+func TestParseResource_GivenWellFormedReference_WhenParsed_ThenReturnsTypeAndID(t *testing.T) {
 	// Arrange
 	const input = "workspace:productWorkspace"
 
 	// Act
-	typ, id, err := rebac.ParseObject(input)
+	typ, id, err := rebac.ParseResource(input)
 
 	// Assert
 	if err != nil {
-		t.Fatalf("ParseObject(%q) returned unexpected error: %v", input, err)
+		t.Fatalf("ParseResource(%q) returned unexpected error: %v", input, err)
 	}
-	if typ != rebac.ObjectTypeWorkspace {
-		t.Errorf("type = %q, want %q", typ, rebac.ObjectTypeWorkspace)
+	if typ != rebac.ResourceTypeWorkspace {
+		t.Errorf("type = %q, want %q", typ, rebac.ResourceTypeWorkspace)
 	}
 	if id != "productWorkspace" {
 		t.Errorf("id = %q, want %q", id, "productWorkspace")
 	}
 }
 
-func TestParseObject_GivenIDContainingColon_WhenParsed_ThenSplitsOnFirstColonOnly(t *testing.T) {
+func TestParseResource_GivenIDContainingColon_WhenParsed_ThenSplitsOnFirstColonOnly(t *testing.T) {
 	// Arrange: only the first colon separates type from id.
 	const input = "document:a:b:c"
 
 	// Act
-	typ, id, err := rebac.ParseObject(input)
+	typ, id, err := rebac.ParseResource(input)
 
 	// Assert
 	if err != nil {
-		t.Fatalf("ParseObject(%q) returned unexpected error: %v", input, err)
+		t.Fatalf("ParseResource(%q) returned unexpected error: %v", input, err)
 	}
-	if typ != rebac.ObjectTypeDocument || id != "a:b:c" {
+	if typ != rebac.ResourceTypeDocument || id != "a:b:c" {
 		t.Errorf("got (type=%q, id=%q), want (document, a:b:c)", typ, id)
 	}
 }
 
-func TestParseObject_GivenMalformedReference_WhenParsed_ThenReturnsError(t *testing.T) {
+func TestParseResource_GivenMalformedReference_WhenParsed_ThenReturnsError(t *testing.T) {
 	// Arrange
 	cases := map[string]string{
 		"empty string":      "",
@@ -63,11 +63,11 @@ func TestParseObject_GivenMalformedReference_WhenParsed_ThenReturnsError(t *test
 	for name, input := range cases {
 		t.Run(name, func(t *testing.T) {
 			// Act
-			_, _, err := rebac.ParseObject(input)
+			_, _, err := rebac.ParseResource(input)
 
 			// Assert
 			if err == nil {
-				t.Errorf("ParseObject(%q) = nil error, want an error", input)
+				t.Errorf("ParseResource(%q) = nil error, want an error", input)
 			}
 		})
 	}
@@ -75,10 +75,10 @@ func TestParseObject_GivenMalformedReference_WhenParsed_ThenReturnsError(t *test
 
 func TestSubjectSet_GivenObjectAndRelation_WhenBuilt_ThenFormatsAsObjectHashRelation(t *testing.T) {
 	// Arrange
-	obj := rebac.Team("platformTeam")
+	resource := rebac.Team("platformTeam")
 
 	// Act
-	got := rebac.SubjectSet(obj, rebac.RelationTeamMember)
+	got := rebac.SubjectSet(resource, rebac.RelationTeamMember)
 
 	// Assert
 	if want := rebac.Subject("team:platformTeam#member"); got != want {
@@ -91,14 +91,14 @@ func TestParseSubjectSet_GivenSubjectSet_WhenParsed_ThenSplitsObjectAndRelation(
 	input := rebac.SubjectSet(rebac.Team("platformTeam"), rebac.RelationTeamMember)
 
 	// Act
-	obj, rel, err := rebac.ParseSubjectSet(input)
+	resource, rel, err := rebac.ParseSubjectSet(input)
 
 	// Assert
 	if err != nil {
 		t.Fatalf("ParseSubjectSet(%q) returned unexpected error: %v", input, err)
 	}
-	if obj != rebac.Team("platformTeam") {
-		t.Errorf("object = %q, want %q", obj, rebac.Team("platformTeam"))
+	if resource != rebac.Team("platformTeam") {
+		t.Errorf("resource = %q, want %q", resource, rebac.Team("platformTeam"))
 	}
 	if rel != rebac.RelationTeamMember {
 		t.Errorf("relation = %q, want %q", rel, rebac.RelationTeamMember)
@@ -109,7 +109,7 @@ func TestParseSubjectSet_GivenMalformedSubjectSet_WhenParsed_ThenReturnsError(t 
 	// Arrange
 	cases := map[string]rebac.Subject{
 		"no hash":        "team:platformTeam",
-		"empty object":   "#member",
+		"empty resource": "#member",
 		"empty relation": "team:platformTeam#",
 	}
 
@@ -166,28 +166,28 @@ func TestObjectConstructor_GivenEmptyID_WhenBuilt_ThenPanics(t *testing.T) {
 	_ = rebac.User("")
 }
 
-func TestTuple_GivenParts_WhenBuilt_ThenPopulatesAllFields(t *testing.T) {
+func TestNewRelationship_GivenParts_WhenBuilt_ThenPopulatesAllFields(t *testing.T) {
 	// Arrange
-	object := rebac.Workspace("productWorkspace")
+	resource := rebac.Workspace("productWorkspace")
 	subject := rebac.SubjectSet(rebac.Team("platformTeam"), rebac.RelationTeamMember)
 
 	// Act
-	got := rebac.Tuple(object, rebac.RelationWorkspaceEditor, subject)
+	got := rebac.NewRelationship(subject, rebac.RelationWorkspaceEditor, resource)
 
 	// Assert
-	want := rebac.TupleKey{
-		Object:   object,
+	want := rebac.Relationship{
+		Subject:  subject,
 		Relation: rebac.RelationWorkspaceEditor,
-		User:     subject,
+		Resource: resource,
 	}
 	if got != want {
-		t.Errorf("Tuple() = %+v, want %+v", got, want)
+		t.Errorf("NewRelationship() = %+v, want %+v", got, want)
 	}
 }
 
-// FuzzParseObject exercises the parser in the package that owns it.
-// Run with: go test -fuzz=FuzzParseObject -fuzztime=30s ./internal/rebac
-func FuzzParseObject(f *testing.F) {
+// FuzzParseResource exercises the parser in the package that owns it.
+// Run with: go test -fuzz=FuzzParseResource -fuzztime=30s ./internal/rebac
+func FuzzParseResource(f *testing.F) {
 	f.Add("user:alice")
 	f.Add("team:platformTeam")
 	f.Add("workspace:productWorkspace")
@@ -200,25 +200,25 @@ func FuzzParseObject(f *testing.F) {
 	f.Add("unknown:something")
 
 	f.Fuzz(func(t *testing.T, s string) {
-		typ, id, err := rebac.ParseObject(s)
+		typ, id, err := rebac.ParseResource(s)
 		if err != nil {
 			return
 		}
-		var obj rebac.Object
+		var resource rebac.Resource
 		switch typ {
-		case rebac.ObjectTypeUser:
-			obj = rebac.User(id)
-		case rebac.ObjectTypeTeam:
-			obj = rebac.Team(id)
-		case rebac.ObjectTypeWorkspace:
-			obj = rebac.Workspace(id)
-		case rebac.ObjectTypeDocument:
-			obj = rebac.Document(id)
+		case rebac.ResourceTypeUser:
+			resource = rebac.User(id)
+		case rebac.ResourceTypeTeam:
+			resource = rebac.Team(id)
+		case rebac.ResourceTypeWorkspace:
+			resource = rebac.Workspace(id)
+		case rebac.ResourceTypeDocument:
+			resource = rebac.Document(id)
 		default:
-			t.Fatalf("ParseObject returned unrecognised type %q", typ)
+			t.Fatalf("ParseResource returned unrecognised type %q", typ)
 		}
-		if string(obj) != s {
-			t.Errorf("round-trip failed: ParseObject(%q) -> type=%s id=%s -> Object=%q", s, typ, id, obj)
+		if string(resource) != s {
+			t.Errorf("round-trip failed: ParseResource(%q) -> type=%s id=%s -> Resource=%q", s, typ, id, resource)
 		}
 	})
 }

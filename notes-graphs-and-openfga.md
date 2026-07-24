@@ -22,8 +22,8 @@ user:alice  ──────►  team:platformTeam
 
 ### 2. Edges have a direction and a label
 
-- **Directed**: the arrow points one way. These notes use OpenFGA's
-  subject-to-object tuple direction.
+- **Directed**: the arrow points one way. These notes use the domain's
+  subject-to-resource relationship direction.
 - **Label** = the *kind* of connection. In ReBAC the label is the **relation**: `member`, `editor`, `viewer`, `workspace`.
 
 ```
@@ -31,11 +31,11 @@ user:alice ──member of──► team:platformTeam
 user:bob ──viewer of──► workspace:productWorkspace
 ```
 
-A stored fact (a **tuple**) is exactly one labeled edge.
+A stored **relationship** is exactly one labeled edge.
 
 ### 3. Our whole graph is 4 edges
 
-These are the four fixture tuples (`internal/fixtures/fixtures.go`):
+These are the four fixture relationships (`internal/fixtures/fixtures.go`):
 
 ```
 user:alice ─[member]─► team:platformTeam
@@ -73,19 +73,19 @@ workspace:productWorkspace ─[workspace]─► document:roadmapDocument
 Your gut says *"the document belongs to the workspace, so surely it's document →
 workspace."* That gut is reading the arrow as **containment** ("is inside").
 **The arrows are not containment.** Every arrow in these notes is the same one
-thing: the **subject → object** of a single tuple. Nothing more.
+thing: the **subject → resource** of a single relationship. Nothing more.
 
-So stop picturing a box-inside-a-box and just decode the tuple
+So stop picturing a box-inside-a-box and just decode the relationship
 (`internal/fixtures/fixtures.go`):
 
 ```
-object   = document:roadmapDocument      ← the `workspace` relation is defined ON the document type
+resource = document:roadmapDocument      ← the `workspace` relation is defined ON the document type
 relation = workspace
 subject  = workspace:productWorkspace     ← the value that pointer holds
 ```
 
-Read it **object-first** (the Go struct's field order) and it says exactly
-what your intuition wanted all along:
+Read it as “subject is a relation of resource,” and it says exactly what your
+intuition wanted all along:
 
 ```
 document:roadmapDocument's  workspace  is  workspace:productWorkspace
@@ -93,9 +93,9 @@ document:roadmapDocument's  workspace  is  workspace:productWorkspace
 
 "The roadmap document's workspace is the product workspace." The document *does*
 belong to the workspace — that fact is just stored with the **document as the
-object** and the **workspace as the subject**.
+resource** and the **workspace as the subject**.
 
-**Why the workspace has to be the subject, not the object.** Look at the rule
+**Why the workspace has to be the subject, not the resource.** Look at the rule
 that actually uses this edge (from `model.fga`):
 
 ```
@@ -104,18 +104,18 @@ define editor: [user] or editor from workspace or owner
 
 `editor from workspace` means: *start at the document, follow its `workspace`
 edge to whatever it points at, then check `editor` over there.* The thing you
-follow **to** — the parent you inherit from — is the **subject** of the tuple.
+follow **to** — the parent you inherit from — is the **subject** of the relationship.
 That subject slot is the only field `from` can land on. Put the workspace in the
-object slot instead and inheritance has nothing to follow to; the traversal
+resource slot instead and inheritance has nothing to follow to; the traversal
 breaks.
 
 So the direction isn't a style choice — **it's forced by inheritance.**
-Permission flows parent → child, and for that to work the parent (workspace) must
-sit in the subject position of the document's `workspace` tuple.
+Authority is inherited parent → child, and for that to work the parent (workspace) must
+sit in the subject position of the document's `workspace` relationship.
 
 One line to memorize:
 
-> The arrows are tuple **subject → object**, never "contains." The
+> The arrows are relationship **subject → resource**, never "contains." The
 > `member`/`viewer` edges happen to match a containment reading; the `workspace`
 > edge doesn't — and that mismatch is the entire reason it feels tricky.
 
@@ -130,11 +130,12 @@ team#member ─editor of─► workspace ─workspace of─► document
 
 **Reachability** is the core question behind a ReBAC permission check:
 
-> Does the user belong to the requested relation on the document through an
+> Does the subject have the requested permission on the resource through an
 > allowed relationship chain?
 
-`Can alice edit the roadmap?` = `Does user:alice belong to
-document:roadmapDocument#can_edit?` Yes → allowed. No → denied.
+`Can Alice edit the roadmap?` =
+`Check(user:alice, can_edit, document:roadmapDocument)`. Yes → allowed.
+No → denied.
 **That is the entire mental model.**
 
 ### 5. Traversal = walking the graph to find a path (DFS)
@@ -147,9 +148,9 @@ branch succeeds. That explore-and-backtrack *is* traversal.
 ### 6. Cycles, and why there is an active-path set
 
 A **cycle** is a path that loops back on itself (A → B → A). The test uses two
-malformed team usersets that contain each other. Normal tuple validation rejects
+malformed team usersets that contain each other. Normal relationship validation rejects
 them, but the evaluator still defends itself in case corrupt data bypasses that
-boundary. The guard remembers every `(object, relation)` pair in the current
+boundary. The guard remembers every `(resource, relation)` pair in the current
 recursion chain. If it sees the same pair before the earlier call returns, it
 stops that cycle:
 
@@ -164,8 +165,8 @@ branch evaluate the same node without causing a false denial.
 
 | Graph | ReBAC |
 |-------|-------|
-| node | object (`user:alice`, `document:x`) |
-| edge | tuple |
+| node | resource (`user:alice`, `document:x`) |
+| edge | relationship |
 | label | relation (`member`, `editor`) |
 | path | chain of relationships that proves access |
 | reachability | "is access provable?" |
@@ -178,7 +179,7 @@ branch evaluate the same node without causing a false denial.
 ### What OpenFGA is
 
 A dedicated **authorization service**. Instead of scattering `if` checks across
-your app, you ask one service: *"can user X do Y on object Z?"* It is open
+your app, you ask one service: *"can subject X do Y on resource Z?"* It is open
 source and inspired by Google's **Zanzibar** authorization-system paper.
 This repo first *builds the idea from scratch* (the graph evaluator) so OpenFGA
 stops looking like magic — `evaluator.go` does in-process what OpenFGA does as a
@@ -206,10 +207,9 @@ team:platformTeam#member editor   workspace:productWorkspace
 workspace:productWorkspace workspace document:roadmapDocument
 ```
 
-This repository's Go `TupleKey` struct orders the fields as
-`(object, relation, user)`. The values mean the same thing; only the display
-order differs. This is an internal struct layout, not another tuple convention.
-Always read the field names rather than relying on position.
+This repository's Go `Relationship` uses the domain fields `Subject`,
+`Relation`, and `Resource`. The OpenFGA adapter translates them to `user`,
+`relation`, and `object`; product code does not adopt transport terminology.
 
 The `team:platformTeam#member` form is a **subject set**: "everyone who has
 `member` on `team:platformTeam`," not one person. One tuple grants a whole group —
@@ -246,12 +246,15 @@ type workspace
     define owner:  [user, team#admin]
     define editor: [user, team#member] or owner
     define viewer: [user, team#member] or editor
+    define can_create_document: editor
 ```
 - `[user, team#admin]` — two kinds of subject may be written directly: a literal
   `user:*`, **or** a subject set `team:*#admin` (all admins of some team).
 - `or owner` / `or editor` builds the hierarchy:
   **owner ⊆ editor ⊆ viewer** as sets of users.
   Owners can do anything editors can; editors anything viewers can.
+- `can_create_document` is the permission application code checks before
+  creating a document in the workspace.
 
 ```
 type document
@@ -276,10 +279,10 @@ Three new things here:
   `editor from workspace` means: *follow this document's `workspace` edge to the
   workspace object, then check `editor` there.* This is how permission flows from
   parent to child. It is graph traversal expressed in one line.
-- **Computed relations** — `define can_edit: editor` means `can_edit` is not
-  stored anywhere; it's *computed* as "whoever is `editor`." This separates
-  **permissions** (`can_edit`, action words) from **relations** (`editor`,
-  fact words), so you can rename actions without touching the tuples.
+- **Computed relations in OpenFGA** — `define can_edit: editor` means
+  `can_edit` is not stored anywhere; it is computed as "whoever is `editor`."
+  The application domain calls `can_edit` a **permission** and `editor` a
+  **relation**; only the adapter maps both to OpenFGA's relation namespace.
 
 DSL constructs you'll see, summarized:
 
@@ -295,7 +298,8 @@ DSL constructs you'll see, summarized:
 ### The Check API = asking the reachability question
 
 ```
-Check(user:alice, can_edit, document:roadmapDocument)  ->  allowed / denied
+Check(subject=user:alice, permission=can_edit, resource=document:roadmapDocument)
+  -> allowed / denied
 ```
 
 OpenFGA does the graph traversal (Part 1) over the model + tuples and returns a
@@ -307,7 +311,7 @@ read?"), `BatchCheck` (many checks at once), `Expand` (debug a relation).
 | Concept | From-scratch code | OpenFGA |
 |---------|-------------------|---------|
 | the rules | `internal/authz/model.go` tables | `model.fga` DSL |
-| the facts | in-memory tuple store (`internal/authz/store.go`) | OpenFGA's datastore |
+| the facts | in-memory relationship store (`internal/authz/store.go`) | OpenFGA's tuple datastore |
 | `X from Y` inheritance | `expandDocument` in `internal/authz/evaluator.go` | the `from` keyword |
 | computed permission | `documentRules[can_edit] = {editor}` | `define can_edit: editor` |
 | the Check | `GraphEvaluator.Evaluate` | OpenFGA `/check` |
@@ -327,9 +331,11 @@ in your process, one is a real service.
 
 ## Glossary
 
-- **Object / node** — a typed thing, `type:id`.
-- **Relation / label** — a named edge: `member`, `editor`, `can_edit`.
-- **Tuple / edge / fact** — one stored relationship `(user, relation, object)`.
+- **Resource / node** — a typed thing, `type:id`; OpenFGA calls it an object.
+- **Relation / label** — a named edge: `member`, `editor`, `workspace`.
+- **Permission** — an authority checked by application code, such as `can_edit`.
+- **Relationship / edge / fact** — one stored fact
+  `(subject, relation, resource)`; OpenFGA stores it as a tuple.
 - **Subject set** — `team:x#member`, "everyone with `member` on `team:x`."
 - **Model / schema** — the rules: types, relations, how they imply each other.
 - **Check** — the allow/deny question; under the hood, graph reachability.

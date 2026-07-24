@@ -17,15 +17,15 @@ type error interface {
 Return an error alongside the normal result:
 
 ```go
-func ParseObject(s string) (ObjectType, string, error)
+func ParseResource(s string) (ResourceType, string, error)
 ```
 
 Handle it near the call:
 
 ```go
-typ, id, err := rebac.ParseObject(raw)
+typ, id, err := rebac.ParseResource(raw)
 if err != nil {
-    return fmt.Errorf("parse object %q: %w", raw, err)
+    return fmt.Errorf("parse resource %q: %w", raw, err)
 }
 ```
 
@@ -127,7 +127,7 @@ Struct embedding promotes fields and methods:
 
 ```go
 type AuditedStore struct {
-    TupleReader
+    RelationshipReader
     Logger *log.Logger
 }
 ```
@@ -168,13 +168,13 @@ boundary. Do not create a generic `util` package as a dumping ground.
 Tests live in files ending `_test.go`:
 
 ```go
-func TestParseObject(t *testing.T) {
-    typ, id, err := ParseObject("document:roadmap")
+func TestParseResource(t *testing.T) {
+    typ, id, err := ParseResource("document:roadmap")
     if err != nil {
-        t.Fatalf("ParseObject returned error: %v", err)
+        t.Fatalf("ParseResource returned error: %v", err)
     }
-    if typ != ObjectTypeDocument {
-        t.Errorf("type = %q, want %q", typ, ObjectTypeDocument)
+    if typ != ResourceTypeDocument {
+        t.Errorf("type = %q, want %q", typ, ResourceTypeDocument)
     }
     if id != "roadmap" {
         t.Errorf("id = %q, want roadmap", id)
@@ -189,7 +189,7 @@ Run one package, test, or subtest:
 
 ```bash
 go test ./internal/rebac
-go test -run TestParseObject ./internal/rebac
+go test -run TestParseResource ./internal/rebac
 go test -run 'TestName/subtest name' ./path/to/package
 ```
 
@@ -198,7 +198,7 @@ go test -run 'TestName/subtest name' ./path/to/package
 Table tests make input/output rules visible:
 
 ```go
-func TestParseObject(t *testing.T) {
+func TestParseResource(t *testing.T) {
     tests := []struct {
         name    string
         input   string
@@ -210,7 +210,7 @@ func TestParseObject(t *testing.T) {
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            _, _, err := ParseObject(tt.input)
+            _, _, err := ParseResource(tt.input)
             if (err != nil) != tt.wantErr {
                 t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
             }
@@ -274,7 +274,7 @@ Open `internal/documents/service_test.go` and identify:
 3. where `errors.Is` or `errors.As` preserves error meaning
 4. which assertions describe behavior rather than implementation
 
-Then add a table row for an invalid object to an existing parser or validation
+Then add a table row for an invalid resource to an existing parser or validation
 test and run only that test before running the entire suite.
 
 ## Checkpoint

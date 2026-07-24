@@ -3,7 +3,7 @@
 Relationship-based access control answers:
 
 ```text
-does user U have relation R on object O?
+does subject S have permission P on resource R?
 ```
 
 In this repo:
@@ -29,28 +29,28 @@ Editors can edit documents in that workspace.
 ```
 
 The first three sentences are facts that can change at runtime. They become
-tuples. The last sentence is a rule about how facts imply permission. It belongs
+relationships. The last sentence is a rule about how facts imply permission. It belongs
 in the model.
 
 That split is the main design move:
 
 ```text
-tuple  -> a durable product fact
-model  -> a reusable rule for deriving access from facts
-check  -> one authorization question at request time
+relationship -> a durable product fact
+model        -> a reusable rule for deriving access from facts
+check        -> one authorization question at request time
 ```
 
 When you model another domain, ask this first:
 
-- Is this a business relationship that can be created or removed? Store a tuple.
+- Is this a business relationship that can be created or removed? Store a relationship.
 - Is this an action the application wants to allow or deny? Define a permission.
-- Is this a rule that should apply to many objects? Put it in the model.
+- Is this a rule that should apply to many resources? Put it in the model.
 - Is this true only for one request, such as time or device state? Treat it as
-  context, not as a long-lived tuple.
+  context, not as a long-lived relationship.
 
-## Objects
+## Resources
 
-Objects are typed IDs:
+Resources are typed IDs:
 
 ```text
 user:alice
@@ -62,31 +62,41 @@ document:roadmapDocument
 Go models them in `internal/rebac/rebac.go`:
 
 ```go
-type Object string
+type Resource string
 ```
 
 ## Relations
 
-Relations name edges or permissions:
+Relations name durable or structural connections:
 
 ```text
 member
 editor
 viewer
 workspace
-can_read
-can_edit
 ```
 
-## Tuples
+## Permissions
 
-A tuple is one relationship fact:
+Permissions name policy-derived authority:
 
 ```text
-subject + relation + object
+can_read
+can_edit
+can_delete
 ```
 
-OpenFGA API/CLI examples:
+They are checked but never stored as relationship facts.
+
+## Relationships
+
+A relationship is one durable fact:
+
+```text
+subject + relation + resource
+```
+
+Domain examples:
 
 ```text
 user:alice                  member     team:platformTeam
@@ -102,71 +112,67 @@ Platform Team members are editors of Product Workspace.
 Product Workspace is the workspace of Roadmap Document.
 ```
 
-This repository's Go type deliberately lists the same three values in a
-different field order:
+The Go type uses the same field names:
 
 ```go
-type TupleKey struct {
-    Object   Object
+type Relationship struct {
+    Subject  Subject
     Relation Relation
-    User     Subject
+    Resource Resource
 }
 ```
 
-Therefore the second OpenFGA tuple becomes:
+Therefore the second relationship becomes:
 
 ```go
-rebac.TupleKey{
-    Object:   rebac.Workspace("productWorkspace"),
-    Relation: rebac.RelationWorkspaceEditor,
-    User:     rebac.SubjectSet(
+rebac.NewRelationship(
+    rebac.SubjectSet(
         rebac.Team("platformTeam"),
         rebac.RelationTeamMember,
     ),
-}
+    rebac.RelationWorkspaceEditor,
+    rebac.Workspace("productWorkspace"),
+)
 ```
 
-Remember:
+OpenFGA translates the same values at its adapter boundary:
 
 ```text
-OpenFGA representation: subject, relation, object
-Go TupleKey fields:      Object, Relation, User
+domain:  subject, relation, resource
+OpenFGA: user,    relation, object
 ```
 
-They encode the same relationship. Always read the field names rather than
-inferring meaning from position.
+A relationship is a stored fact, not the complete effective policy. The model
+derives permissions from several relationships. Alice has the `can_edit`
+permission on the roadmap document even though no `can_edit` relationship is
+stored.
 
-A tuple is a stored fact, not the complete effective policy. The model can
-derive implied relationships from several tuples. Alice has an implied
-`can_edit` relationship to the roadmap document even though no `can_edit` tuple
-is stored.
+## Why Relationships
 
-## Why Tuples
-
-Tuples work well for ReBAC because they are small, independent facts. One tuple
+Relationships work well for ReBAC because they are small, independent facts. One fact
 can be added, removed, replicated, audited, or replayed without rewriting the
 authorization model.
 
-| Product change | Tuple change | Model change |
+| Product change | Relationship change | Model change |
 |---|---|---|
 | Alice joins a team | write `user:alice member team:platformTeam` | none |
 | Bob loses workspace access | delete `user:bob viewer workspace:productWorkspace` | none |
-| a document moves workspace | replace its `workspace` tuple | none |
+| a document moves workspace | replace its `workspace` relationship | none |
 | editors gain a new permission | none | update the model rule |
 
-This is why the repo does not store `can_edit` or `can_read` tuples. Those are
+This is why the repo does not store `can_edit` or `can_read` relationships. Those are
 derived permissions. Storing derived permissions would duplicate the model's
 work and make revocation harder: removing Alice from the team would also require
 finding and deleting every materialized permission she inherited from that team.
 
-Good tuple candidates usually answer one of these questions:
+Good relationship candidates usually answer one of these questions:
 
 - Who belongs to this group?
 - Which group has a relation to this resource?
 - Who directly owns or shares this resource?
-- Which parent object does this object inherit from?
+- Which parent resource does this resource inherit from?
 
-Poor tuple candidates are usually computed outcomes:
+Poor relationship candidates are usually computed outcomes:
 
 - `user:alice can_edit document:roadmapDocument`
 - `user:bob can_read document:roadmapDocument`
@@ -181,7 +187,7 @@ Those are answers to checks, not source-of-truth facts.
 everyone who has member on team:platformTeam
 ```
 
-One tuple can grant access to a whole team:
+One relationship can grant access to a whole team:
 
 ```text
 team:platformTeam#member  editor  workspace:productWorkspace
@@ -193,13 +199,13 @@ A check asks whether a subject belongs to the effective set for a permission:
 
 ```go
 rebac.CheckRequest{
-    User:     rebac.User("alice"),
-    Relation: rebac.RelationDocumentCanEdit,
-    Object:   rebac.Document("roadmapDocument"),
+    Subject:    rebac.User("alice"),
+    Permission: rebac.PermissionDocumentEdit,
+    Resource:   rebac.Document("roadmapDocument"),
 }
 ```
 
-The evaluator tries to prove that request by following only the tuples and
+The evaluator tries to prove that request by following only the relationships and
 model rules admitted by `can_edit`. An arbitrary graph connection is not
 enough.
 
@@ -210,14 +216,14 @@ proof of an allowed path exists  -> allow
 no allowed path can be proved    -> deny
 ```
 
-There are no stored `deny` tuples in this primer and no “deny overrides allow”
+There are no stored deny relationships in this primer and no “deny overrides allow”
 rule. OpenFGA can model exclusions, but explicit-deny semantics add policy and
 debugging complexity and should be introduced only for a real requirement.
-Removing the last tuple that supports a path revokes the derived access, subject
+Removing the last relationship that supports a path revokes the derived access, subject
 to the consistency behavior of the authorization backend.
 
 In OpenFGA API terminology, the subject field is named `user`, but it can
-represent a human, workload, another object, userset, or typed wildcard when the
+represent a human, workload, another resource, userset, or typed wildcard when the
 model permits it.
 
 ## The Demo Story
@@ -242,7 +248,7 @@ Casey has no path through the graph, so Casey is denied.
 go test -v -run TestTrace ./internal/authz
 ```
 
-Then edit `internal/fixtures/fixtures.go`, change one tuple, and predict which
+Then edit `internal/fixtures/fixtures.go`, change one relationship, and predict which
 checks change before rerunning the test.
 
 ## Checkpoint
@@ -255,7 +261,7 @@ team:platformTeam#member
 ```
 
 The first is one subject. The second is a set of subjects defined by a relation
-on another object.
+on another resource.
 
 Next: [OpenFGA model](05-openfga-model.md) shows how the schema decides which
-tuple paths count for a permission.
+relationship paths count for a permission.

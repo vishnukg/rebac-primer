@@ -10,14 +10,14 @@ remaining sections are a reference for modeling and debugging later.
 ## The One Equation
 
 ```text
-model + relationship tuples + check request = decision
-rules   current facts          question        allow, deny, or error
+model + relationships + check request = decision
+rules   current facts   question        allow, deny, or error
 ```
 
 Those parts change on different clocks:
 
 - The **model** changes when product policy changes.
-- **Tuples** change when users join teams, resources move, or sharing changes.
+- **Relationships** change when users join teams, resources move, or sharing changes.
 - A **check** happens for each protected operation.
 
 Do not mix them. In particular, do not store the result of a check as if it
@@ -44,7 +44,7 @@ A check asks whether one subject is in that set:
 Is user:alice a member of document:roadmapDocument#can_edit?
 ```
 
-The model defines how to construct the set. Tuples provide its current members
+The model defines how to construct the set. Relationships provide its current members
 and links to other sets. Graph traversal is the engine's way of answering the
 set-membership question.
 
@@ -54,9 +54,9 @@ authorization model.
 
 ## The Five Things In Every Decision
 
-### 1. Principal
+### 1. Subject
 
-The principal is the already-authenticated identity making the request:
+The subject is the already-authenticated identity whose permission is checked:
 
 ```text
 user:alice
@@ -66,9 +66,9 @@ Authentication must establish this value before ReBAC runs. Use a stable,
 internal identifier derived from a validated identity—not an unverified JWT
 claim, email address, display name, or caller-controlled header.
 
-### 2. Object
+### 2. Resource
 
-An object is a typed resource or grouping concept:
+A resource is a typed entity being protected or related:
 
 ```text
 user:alice
@@ -80,26 +80,26 @@ document:roadmapDocument
 The type is part of the identifier. It tells the model which relations and
 rules are valid.
 
-### 3. Relation
+### 3. Relation and permission
 
-A relation names a set on an object:
+A relation names a durable or structural set on a resource:
 
 ```text
 team:platformTeam#member
 workspace:productWorkspace#editor
-document:roadmapDocument#can_edit
 ```
 
-Some relations represent durable roles or structure, such as `member`,
-`owner`, or `workspace`. Others represent application actions, such as
-`can_read` or `can_edit`.
+Permissions name policy-derived authority, such as
+`document:roadmapDocument#can_read` or
+`document:roadmapDocument#can_edit`. OpenFGA places both concepts in its
+relation namespace; the application domain keeps them distinct.
 
-### 4. Tuple
+### 4. Relationship
 
-A tuple is one stored fact. Read it as:
+A relationship is one stored fact. Read it as:
 
 ```text
-<subject> is a <relation> of <object>
+<subject> is a <relation> of <resource>
 ```
 
 For example:
@@ -108,9 +108,9 @@ For example:
 user:alice member team:platformTeam
 ```
 
-means “Alice is a member of Platform Team.” OpenFGA writes tuples in
-subject–relation–object order. The Go `TupleKey` uses named fields in
-object–relation–user order; the meaning is identical.
+means “Alice is a member of Platform Team.” The Go `Relationship` uses
+`Subject`, `Relation`, and `Resource`. The OpenFGA adapter translates them to
+its `user`, `relation`, and `object` tuple fields.
 
 ### 5. Permission check
 
@@ -145,7 +145,7 @@ team:platformTeam#member editor workspace:productWorkspace
 The subject is a userset, not one user. It places every member of Platform Team
 in `workspace:productWorkspace#editor`.
 
-The `#` is best read as “the set defined by this relation on this object.”
+The `#` is best read as “the set defined by this relation on this resource.”
 
 ### Membership derived by the model
 
@@ -155,7 +155,7 @@ define can_edit: editor
 ```
 
 These rules say that workspace editors are also viewers and that the effective
-document `can_edit` set equals its effective `editor` set. No `can_edit` tuple
+document `can_edit` set equals its effective `editor` set. No `can_edit` relationship
 is written.
 
 Parent inheritance is another model derivation:
@@ -185,7 +185,7 @@ document#can_edit
     OR editor from document#workspace
 ```
 
-The stored document-to-workspace tuple selects `productWorkspace`, so continue:
+The stored document-to-workspace relationship selects `productWorkspace`, so continue:
 
 ```text
 Is Alice in workspace:productWorkspace#editor?
@@ -197,7 +197,7 @@ That set contains `team:platformTeam#member`, so continue:
 Is Alice in team:platformTeam#member?
 ```
 
-The direct membership tuple proves yes. The proof returns through the chain:
+The direct membership relationship proves yes. The proof returns through the chain:
 
 ```text
 Alice is a team member
@@ -213,16 +213,16 @@ does not begin at Alice and wander across every edge in the store.
 
 Use these distinctions when modeling:
 
-| Kind | Examples | Usually written as a tuple? |
+| Kind | Examples | Usually written as a relationship? |
 |---|---|---:|
 | identity | `user:alice` | no; supplied by authentication |
 | structural fact | document belongs to workspace | yes |
 | membership | Alice belongs to team | yes |
 | scoped role | team edits workspace | yes |
 | computed permission | Alice can edit document | no |
-| request context | current time, device risk | no long-lived tuple |
+| request context | current time, device risk | no long-lived relationship |
 
-Roles are relationships scoped to an object. Permissions are the operations
+Roles are relationships scoped to a resource. Permissions are the authorities
 application code enforces. Keeping `editor` separate from `can_edit` allows the
 meaning of `can_edit` to evolve without changing every call site.
 
@@ -240,7 +240,7 @@ An outage is not a policy denial, even if the application fails closed and
 returns a non-successful response for both. Keep deny and error separate in
 logs, metrics, retries, and incident handling.
 
-This model has no stored deny tuples and no deny-overrides-allow rule.
+This model has no stored deny relationships and no deny-overrides-allow rule.
 Exclusions can be modeled when a real requirement needs them, but they make
 reasoning, migration, and debugging more complex.
 
@@ -251,25 +251,25 @@ The running application has three separate gates:
 ```text
 1. access-token validation  -> may this credential be trusted for this API?
 2. OAuth scope              -> may this client call this class of endpoint?
-3. ReBAC check              -> may this principal act on this exact object?
+3. ReBAC check              -> does this subject have permission on this resource?
 ```
 
 Passing one gate does not imply passing another. A test rejected by the scope
-gate does not prove the ReBAC model would deny the same actor.
+gate does not prove the ReBAC model would deny the same subject.
 
 ## How To Debug A Decision
 
 When a check surprises you, use this order:
 
-1. Write the exact subject, permission, and object.
+1. Write the exact subject, permission, and resource.
 2. Confirm the subject came from validated authentication.
 3. Open the model and expand only the requested permission.
-4. List the tuples needed by each permitted branch.
+4. List the relationships needed by each permitted branch.
 5. Confirm those facts exist in the authorization store.
 6. Check model ID, tenant boundary, consistency mode, and recent writes.
 7. Distinguish a real deny from an evaluation error.
 
-Do not begin by dumping every tuple. Goal-directed reasoning is easier and is
+Do not begin by dumping every relationship. Goal-directed reasoning is easier and is
 closer to how the evaluator works.
 
 ## How To Model A New Product Rule
@@ -284,14 +284,14 @@ Blocked users must not archive projects.
 
 Then classify each noun and statement:
 
-1. Which nouns are typed objects?
-2. Which changing facts become tuples?
+1. Which nouns are typed resources?
+2. Which changing facts become relationships?
 3. Which reusable implications belong in the model?
 4. Which `can_*` permission should application code check?
 5. Which allow, near-miss deny, revocation, and cross-tenant cases prove it?
-6. Which service owns each tuple and how is it synchronized?
+6. Which service owns each relationship and how is it synchronized?
 
-If you cannot name the source of truth for a tuple, the production design is
+If you cannot name the source of truth for a relationship, the production design is
 not finished.
 
 ## Mapping The Model To This Repository
@@ -300,13 +300,13 @@ not finished.
 |---|---|---|
 | vocabulary | `internal/rebac` | model types and relation names |
 | rules | `internal/authz/model.go` | `deployments/openfga/model.fga` |
-| facts | `authz.InMemoryStore` | OpenFGA relationship store |
+| facts | `authz.InMemoryStore` | OpenFGA tuple store |
 | decision engine | `authz.GraphEvaluator` | OpenFGA Check API |
 | application boundary | `documents.AuthorizationService` | same interface |
 | policy specification | shared contract cases | `.fga.yaml` model tests and contract checks |
 
 The in-process evaluator exists to make the proof visible. In production, keep
-the vocabulary, model, tuples, checks, enforcement points, and contract tests;
+the vocabulary, model, relationships, checks, enforcement points, and contract tests;
 replace the educational evaluator and in-memory store with an operated engine
 and durable relationship data path.
 
@@ -316,10 +316,10 @@ If you retain only seven lines, retain these:
 
 ```text
 Authenticate first; authorize second.
-An object#relation is a set of subjects.
-A tuple is one current product fact.
+A resource relation defines a set of subjects.
+A relationship is one current product fact.
 The model says how effective sets are derived.
-A check asks whether one principal belongs to one permission set.
+A check asks whether one subject belongs to one permission set.
 Only model-valid paths count; no proof means deny.
 Deny and engine failure are different outcomes.
 ```

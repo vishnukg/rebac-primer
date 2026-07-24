@@ -19,7 +19,7 @@ import (
 
 func TestHandler_Health(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -49,7 +49,7 @@ func TestHandler_Health(t *testing.T) {
 
 func TestHandler_Whoami_Returns200WithValidToken(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -80,7 +80,7 @@ func TestHandler_Whoami_Returns200WithValidToken(t *testing.T) {
 
 func TestHandler_Whoami_Returns401WithMissingToken(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -103,7 +103,7 @@ func TestHandler_Whoami_Returns401WithMissingToken(t *testing.T) {
 
 func TestHandler_CreateDocument_Returns201ForEditor(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -145,7 +145,7 @@ func TestHandler_CreateDocument_Returns201ForEditor(t *testing.T) {
 
 func TestHandler_CreateDocument_Returns409ForExistingID(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -189,7 +189,7 @@ func TestHandler_CreateDocument_Returns400ForBlankFields(t *testing.T) {
 
 	for name, payload := range cases {
 		t.Run(name, func(t *testing.T) {
-			tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+			tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 			authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 			docRepo := documents.NewInMemoryRepository()
 			if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -219,7 +219,7 @@ func TestHandler_CreateDocument_Returns400ForBlankFields(t *testing.T) {
 
 func TestHandler_CreateDocument_Returns401WhenTokenMissing(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -250,7 +250,7 @@ func TestHandler_CreateDocument_Returns401WhenTokenMissing(t *testing.T) {
 
 func TestHandler_CreateDocument_Returns400ForUnknownJSONField(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -276,7 +276,7 @@ func TestHandler_CreateDocument_Returns400ForUnknownJSONField(t *testing.T) {
 
 func TestHandler_CreateDocument_Returns415ForUnsupportedMediaType(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -301,7 +301,7 @@ func TestHandler_CreateDocument_Returns415ForUnsupportedMediaType(t *testing.T) 
 
 func TestHandler_CreateDocument_Returns413ForOversizedBody(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -328,7 +328,7 @@ func TestHandler_CreateDocument_Returns413ForOversizedBody(t *testing.T) {
 
 func TestHandler_PatchDocument_Returns400ForMultipleJSONValues(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -353,7 +353,7 @@ func TestHandler_PatchDocument_Returns400ForMultipleJSONValues(t *testing.T) {
 
 func TestHandler_PatchDocument_Returns400ForBlankBody(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -378,7 +378,7 @@ func TestHandler_PatchDocument_Returns400ForBlankBody(t *testing.T) {
 
 func TestHandler_GetDocument_Returns200ForViewer(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -413,7 +413,7 @@ func TestHandler_GetDocument_Returns200ForViewer(t *testing.T) {
 
 func TestHandler_GetDocument_Returns401WhenTokenMissing(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -436,7 +436,7 @@ func TestHandler_GetDocument_Returns401WhenTokenMissing(t *testing.T) {
 
 func TestHandler_GetDocument_Returns403ForOutsider(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -460,7 +460,7 @@ func TestHandler_GetDocument_Returns403ForOutsider(t *testing.T) {
 
 func TestHandler_PatchDocument_Returns403WhenWriteScopeMissing(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -498,7 +498,7 @@ func TestHandler_PatchDocument_Returns403WhenReBACDeniesViewerWithWriteScope(t *
 		Sub:    "bob",
 		Scopes: []string{"documents:read", "documents:write"},
 	}
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {
@@ -531,12 +531,12 @@ func TestHandler_PatchDocument_Returns403WhenReBACDeniesViewerWithWriteScope(t *
 
 func TestHandler_GetDocument_Returns403WhenReadScopeMissing(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docsSvc := documents.New(documents.NewInMemoryRepository(), authzSvc)
 	_, err := docsSvc.Create(t.Context(), documents.CreateDocumentInput{
 		ID: "roadmapDocument", Title: "Roadmap", Body: "body",
-		Workspace: fixtures.ProductWorkspace, Actor: fixtures.Alice,
+		Workspace: fixtures.ProductWorkspace, Subject: fixtures.Alice,
 	})
 	if err != nil {
 		t.Fatalf("seed document: %v", err)
@@ -560,7 +560,7 @@ func TestHandler_GetDocument_Returns403WhenReadScopeMissing(t *testing.T) {
 
 func TestHandler_PatchDocument_Returns200ForEditor(t *testing.T) {
 	// Arrange
-	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationshipTuples()...)
+	tupleStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	authzSvc := authz.New(tupleStore, authz.NewGraphEvaluator(tupleStore))
 	docRepo := documents.NewInMemoryRepository()
 	if err := docRepo.Create(t.Context(), documents.CollaborativeDocument{ID: "roadmapDocument", Title: "Roadmap", Body: "Initial roadmap document", Workspace: fixtures.ProductWorkspace, UpdatedBy: fixtures.Alice}); err != nil {

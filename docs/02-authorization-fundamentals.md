@@ -1,10 +1,10 @@
 # Authorization fundamentals
 
 Authorization is the part of the system that decides whether an authenticated
-subject can perform an action on an object.
+subject can perform an action on a resource.
 
 ```text
-subject + action + object -> allow or deny
+subject + action + resource -> allow or deny
 ```
 
 Before ReBAC makes sense, you need to understand the common authorization models
@@ -13,7 +13,7 @@ and where they break.
 By the end, you should be able to turn a product sentence into:
 
 ```text
-Check(subject, relation, object)
+Check(subject, permission, resource)
 ```
 
 The core path ends after "Authorization architecture in this repo." The agentic
@@ -44,15 +44,16 @@ Now global roles are not enough.
 Every authorization check needs the same three pieces:
 
 ```text
-subject + action + object -> allow or deny
+subject + action + resource -> allow or deny
 ```
 
 For this repo:
 
 ```text
-subject = user:alice
-action  = can_edit
-object  = document:roadmapDocument
+subject             = user:alice
+action              = edit
+required permission = can_edit
+resource            = document:roadmapDocument
 ```
 
 The check becomes:
@@ -61,16 +62,18 @@ The check becomes:
 Can user:alice edit document:roadmapDocument?
 ```
 
-That sentence sounds strange at first because `can_edit` is written as a
-relation. OpenFGA and this repo use relation names for both relationships and
-computed permissions:
+The application attempts the `edit` action and asks the authorization domain
+for the `can_edit` permission. Relations are the durable facts used to derive
+that permission:
 
 ```text
-relationship: user is member of team
-permission:   user can_edit document
+relationship: Alice is a member of Platform Team
+permission:   Alice can_edit Roadmap Document
 ```
 
-Both are graph questions.
+OpenFGA represents both in its relation namespace, but the application domain
+keeps their meanings distinct. See
+[Authorization Domain Language](authorization-domain-language.md).
 
 ## A Request Timeline
 
@@ -114,7 +117,7 @@ The names are historical and slightly confusing. For learning:
 
 Before thinking about graphs, write the desired outcomes:
 
-| Actor | ReBAC subject | Read roadmap? | Edit roadmap? | Why |
+| Person | Subject | Read roadmap? | Edit roadmap? | Why |
 |-------|---------------|---------------|---------------|-----|
 | Alice | `user:alice` | yes | yes | team membership grants workspace editor |
 | Bob | `user:bob` | yes | no | viewer grants read, not edit |
@@ -233,7 +236,7 @@ billing_admin can manage billing
 support_agent can view support tickets
 ```
 
-RBAC struggles when permissions are object-specific:
+RBAC struggles when permissions are resource-specific:
 
 ```text
 The workspace editor can edit this document but not that document.
@@ -241,7 +244,7 @@ The workspace editor can edit this document but not that document.
 
 ## Role explosion
 
-To make RBAC object-specific, teams often create more roles:
+To make RBAC resource-specific, teams often create more roles:
 
 ```text
 workspace_acme_editor
@@ -307,7 +310,7 @@ workspace:productWorkspace  workspace  document:roadmapDocument
 Each line is one tuple in OpenFGA's `subject relation object` order. The middle
 line uses
 the subject set `team:platformTeam#member` so editor access flows from team
-membership rather than being attached to the team object itself. Subject sets
+membership rather than being attached to the team resource itself. Subject sets
 are introduced in detail in `04-rebac-concepts.md`; for now read the line as
 "members of the platform team are editors of the product workspace."
 
@@ -342,9 +345,9 @@ That is why ReBAC maps well to collaborative apps.
 
 | Model | Best at | Weak spot |
 |-------|---------|-----------|
-| RBAC | broad job permissions | object-specific sharing |
+| RBAC | broad job permissions | resource-specific sharing |
 | ABAC | contextual policy decisions | policies can become opaque |
-| ReBAC | object-specific relationships | model design requires care |
+| ReBAC | resource-specific relationships | model design requires care |
 
 Most serious systems use a combination.
 
@@ -353,7 +356,7 @@ Example:
 ```text
 OIDC authenticates the user; OAuth access tokens authorize API access.
 RBAC may grant broad admin capability.
-ReBAC grants object-specific access.
+ReBAC grants resource-specific access.
 ABAC may add context checks like tenant or risk.
 ```
 
@@ -389,13 +392,13 @@ Now team membership is the source of truth.
 ┌──────────────┐
 │ HTTP handler │ parses request
 └──────┬───────┘
-       │ actor + action + object
+       │ subject + action + resource
        ▼
 ┌──────────────┐
 │ Document     │ enforces business rule
 │ Service      │
 └──────┬───────┘
-       │ Check(user, relation, object)
+       │ Check(subject, permission, resource)
        ▼
 ┌──────────────┐
 │ Authorizer   │ graph authorizer or OpenFGA adapter
@@ -403,7 +406,8 @@ Now team membership is the source of truth.
        │ relationship graph
        ▼
 ┌──────────────┐
-│ Tuple Store  │ facts: subject relation object
+│ Relationship │ facts: subject relation resource
+│ Store        │
 └──────────────┘
 ```
 
@@ -413,7 +417,7 @@ The important separation:
 HTTP parses.
 Domain decides when authz is required.
 Authorizer answers allow/deny.
-Tuple store holds facts.
+Relationship store holds facts.
 ```
 
 ## Optional: Agentic Systems
@@ -441,7 +445,7 @@ The core questions do not change:
 ```text
 Who is acting?
 What action is being attempted?
-Which object is the action targeting?
+Which resource is the action targeting?
 Is the action allowed right now?
 ```
 
@@ -486,10 +490,10 @@ Diagram:
 ┌──────────────┐
 │ Agent runtime│ plans tool calls
 └──────┬───────┘
-       │ wants to read/edit object
+       │ wants to read/edit resource
        ▼
 ┌──────────────┐
-│ Authz layer  │ Check(user, relation, object)
+│ Authz layer  │ Check(subject, permission, resource)
 └──────┬───────┘
        │ allow/deny
        ▼
@@ -517,7 +521,7 @@ agent can call only tools the app permits for this workflow
 That gives you two checks:
 
 ```text
-1. Can the user perform this action on this object?
+1. Does the subject have the required permission on this resource?
 2. Is this agent/tool allowed to perform this kind of action?
 ```
 
@@ -605,8 +609,8 @@ Casey creates a document in workspace:productWorkspace.
 Format:
 
 ```text
-Can <subject> <action> <object>?
-Check(<user>, <relation>, <object>)
+Can <subject> <action> <resource>?
+Check(<subject>, <permission>, <resource>)
 ```
 
 Example:
@@ -620,7 +624,7 @@ Check(user:alice, can_edit, document:roadmapDocument)
 
 Why does ReBAC fit collaborative documents better than global RBAC?
 
-Good answer: collaborative documents need object-specific permissions that
+Good answer: collaborative documents need resource-specific permissions that
 follow relationships between users, teams, workspaces, and documents. ReBAC
 models those relationships directly.
 

@@ -12,11 +12,11 @@ import (
 // canonical model contract (internal/authz/contract). It is the drift guard: if
 // internal/authz/model.go ever diverges from the intended model — the same model
 // that deployments/openfga/model.fga encodes — this test fails, pointing at the
-// exact (user, relation, object) that changed.
+// exact (subject, relation, resource) relationship that changed.
 func TestContract_FromScratchEvaluator(t *testing.T) {
 	// Arrange
-	tuples := append(fixtures.SeedRelationshipTuples(), contract.ExtraTuples()...)
-	store := authz.NewInMemoryStore(tuples...)
+	relationships := append(fixtures.SeedRelationships(), contract.ExtraRelationships()...)
+	store := authz.NewInMemoryStore(relationships...)
 	ev := authz.NewGraphEvaluator(store)
 
 	// Act: the contract runs each check as an independent subtest.

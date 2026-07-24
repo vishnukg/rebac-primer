@@ -35,92 +35,91 @@ type CheckFunc func(context.Context, rebac.CheckRequest) (rebac.CheckResult, err
 
 // Case is one row of the truth table: a question and its required answer.
 type Case struct {
-	Name     string
-	User     rebac.Object
-	Relation rebac.Relation
-	Object   rebac.Object
-	Allowed  bool
+	Name       string
+	Subject    rebac.Resource
+	Permission rebac.Permission
+	Resource   rebac.Resource
+	Allowed    bool
 }
 
-// ExtraTuples returns contract-only tuples that exercise policy paths not
+// ExtraRelationships returns contract-only relationships that exercise policy paths not
 // covered by the demo story alone. They are deliberately kept out of
-// fixtures.SeedRelationshipTuples so the public demo remains small, but both
+// fixtures.SeedRelationships so the public demo remains small, but both
 // backends write them before running this contract.
-func ExtraTuples() []rebac.TupleKey {
-	return []rebac.TupleKey{
+func ExtraRelationships() []rebac.Relationship {
+	return []rebac.Relationship{
 		// Direct document ownership: proves owner -> can_delete and owner ->
 		// editor -> viewer -> can_read/can_comment.
-		rebac.Tuple(fixtures.RoadmapDocument, rebac.RelationDocumentOwner, rebac.Subject(fixtures.Dana)),
+		rebac.NewRelationship(
+			rebac.Subject(fixtures.Dana),
+			rebac.RelationDocumentOwner,
+			fixtures.RoadmapDocument,
+		),
 		// Team admin path: proves admin implies member, and team#admin can own a
 		// workspace.
-		rebac.Tuple(fixtures.PlatformTeam, rebac.RelationTeamAdmin, rebac.Subject(fixtures.Erin)),
-		rebac.Tuple(fixtures.ProductWorkspace, rebac.RelationWorkspaceOwner, rebac.SubjectSet(fixtures.PlatformTeam, rebac.RelationTeamAdmin)),
+		rebac.NewRelationship(
+			rebac.Subject(fixtures.Erin),
+			rebac.RelationTeamAdmin,
+			fixtures.PlatformTeam,
+		),
+		rebac.NewRelationship(
+			rebac.SubjectSet(fixtures.PlatformTeam, rebac.RelationTeamAdmin),
+			rebac.RelationWorkspaceOwner,
+			fixtures.ProductWorkspace,
+		),
 	}
 }
 
 // Cases returns the canonical allow/deny matrix for the standard fixture
-// scenario plus ExtraTuples: alice is a platform-team member, the team edits the
+// scenario plus ExtraRelationships: alice is a platform-team member, the team edits the
 // product workspace, bob is a direct workspace viewer, casey has no
 // relationships, dana directly owns the roadmap document, erin is a platform
 // team admin, and the roadmap document lives in the workspace.
 //
 // Every backend must produce these exact answers. The OpenFGA contract test
-// writes SeedRelationshipTuples and ExtraTuples itself. The store must hold no
-// unrelated tuples—in particular, starting the application seeds a demo document
-// owned by alice, and that owner tuple changes the can_delete answers this
+// writes SeedRelationships and ExtraRelationships itself. The store must hold no
+// unrelated relationships—in particular, starting the application seeds a demo document
+// owned by alice, and that owner relationship changes the can_delete answers this
 // contract pins down.
 func Cases() []Case {
 	doc := fixtures.RoadmapDocument
 	ws := fixtures.ProductWorkspace
-	team := fixtures.PlatformTeam
 
 	return []Case{
 		// ── Document computed permissions ─────────────────────────────────────
 		// alice: team member → workspace editor → document editor (inherited).
-		{"alice can_read roadmap", fixtures.Alice, rebac.RelationDocumentCanRead, doc, true},
-		{"alice can_comment roadmap", fixtures.Alice, rebac.RelationDocumentCanComment, doc, true},
-		{"alice can_edit roadmap", fixtures.Alice, rebac.RelationDocumentCanEdit, doc, true},
-		{"alice cannot can_delete roadmap (not owner)", fixtures.Alice, rebac.RelationDocumentCanDelete, doc, false},
+		{"alice can_read roadmap", fixtures.Alice, rebac.PermissionDocumentRead, doc, true},
+		{"alice can_comment roadmap", fixtures.Alice, rebac.PermissionDocumentComment, doc, true},
+		{"alice can_edit roadmap", fixtures.Alice, rebac.PermissionDocumentEdit, doc, true},
+		{"alice lacks can_delete on roadmap (not owner)", fixtures.Alice, rebac.PermissionDocumentDelete, doc, false},
 
 		// dana: direct document owner.
-		{"dana can_read roadmap (direct owner)", fixtures.Dana, rebac.RelationDocumentCanRead, doc, true},
-		{"dana can_comment roadmap (direct owner)", fixtures.Dana, rebac.RelationDocumentCanComment, doc, true},
-		{"dana can_edit roadmap (direct owner)", fixtures.Dana, rebac.RelationDocumentCanEdit, doc, true},
-		{"dana can_delete roadmap (direct owner)", fixtures.Dana, rebac.RelationDocumentCanDelete, doc, true},
+		{"dana can_read roadmap (direct owner)", fixtures.Dana, rebac.PermissionDocumentRead, doc, true},
+		{"dana can_comment roadmap (direct owner)", fixtures.Dana, rebac.PermissionDocumentComment, doc, true},
+		{"dana can_edit roadmap (direct owner)", fixtures.Dana, rebac.PermissionDocumentEdit, doc, true},
+		{"dana can_delete roadmap (direct owner)", fixtures.Dana, rebac.PermissionDocumentDelete, doc, true},
 
 		// erin: team admin -> workspace owner via team#admin -> document owner.
-		{"erin can_read roadmap (workspace owner)", fixtures.Erin, rebac.RelationDocumentCanRead, doc, true},
-		{"erin can_edit roadmap (workspace owner)", fixtures.Erin, rebac.RelationDocumentCanEdit, doc, true},
-		{"erin can_delete roadmap (workspace owner)", fixtures.Erin, rebac.RelationDocumentCanDelete, doc, true},
+		{"erin can_read roadmap (workspace owner)", fixtures.Erin, rebac.PermissionDocumentRead, doc, true},
+		{"erin can_edit roadmap (workspace owner)", fixtures.Erin, rebac.PermissionDocumentEdit, doc, true},
+		{"erin can_delete roadmap (workspace owner)", fixtures.Erin, rebac.PermissionDocumentDelete, doc, true},
 
 		// bob: direct workspace viewer → document viewer (inherited).
-		{"bob can_read roadmap", fixtures.Bob, rebac.RelationDocumentCanRead, doc, true},
-		{"bob can_comment roadmap", fixtures.Bob, rebac.RelationDocumentCanComment, doc, true},
-		{"bob cannot can_edit roadmap (viewer only)", fixtures.Bob, rebac.RelationDocumentCanEdit, doc, false},
-		{"bob cannot can_delete roadmap", fixtures.Bob, rebac.RelationDocumentCanDelete, doc, false},
+		{"bob can_read roadmap", fixtures.Bob, rebac.PermissionDocumentRead, doc, true},
+		{"bob can_comment roadmap", fixtures.Bob, rebac.PermissionDocumentComment, doc, true},
+		{"bob lacks can_edit on roadmap (viewer only)", fixtures.Bob, rebac.PermissionDocumentEdit, doc, false},
+		{"bob lacks can_delete on roadmap", fixtures.Bob, rebac.PermissionDocumentDelete, doc, false},
 
 		// casey: no relationships → no access.
-		{"casey cannot can_read roadmap", fixtures.Casey, rebac.RelationDocumentCanRead, doc, false},
-		{"casey cannot can_edit roadmap", fixtures.Casey, rebac.RelationDocumentCanEdit, doc, false},
-		{"casey cannot can_delete roadmap", fixtures.Casey, rebac.RelationDocumentCanDelete, doc, false},
+		{"casey lacks can_read on roadmap", fixtures.Casey, rebac.PermissionDocumentRead, doc, false},
+		{"casey lacks can_edit on roadmap", fixtures.Casey, rebac.PermissionDocumentEdit, doc, false},
+		{"casey lacks can_delete on roadmap", fixtures.Casey, rebac.PermissionDocumentDelete, doc, false},
 
-		// ── Workspace base relations ──────────────────────────────────────────
-		{"alice is workspace editor (via team#member)", fixtures.Alice, rebac.RelationWorkspaceEditor, ws, true},
-		{"alice is workspace viewer (editor implies viewer)", fixtures.Alice, rebac.RelationWorkspaceViewer, ws, true},
-		{"alice is not workspace owner", fixtures.Alice, rebac.RelationWorkspaceOwner, ws, false},
-		{"erin is workspace owner (via team#admin)", fixtures.Erin, rebac.RelationWorkspaceOwner, ws, true},
-		{"erin is workspace editor (owner implies editor)", fixtures.Erin, rebac.RelationWorkspaceEditor, ws, true},
-		{"erin is workspace viewer (owner implies viewer)", fixtures.Erin, rebac.RelationWorkspaceViewer, ws, true},
-		{"bob is workspace viewer (direct)", fixtures.Bob, rebac.RelationWorkspaceViewer, ws, true},
-		{"bob is not workspace editor", fixtures.Bob, rebac.RelationWorkspaceEditor, ws, false},
-		{"casey is not workspace viewer", fixtures.Casey, rebac.RelationWorkspaceViewer, ws, false},
-
-		// ── Team relations ────────────────────────────────────────────────────
-		{"alice is team member (direct)", fixtures.Alice, rebac.RelationTeamMember, team, true},
-		{"erin is team admin (direct)", fixtures.Erin, rebac.RelationTeamAdmin, team, true},
-		{"erin is team member (admin implies member)", fixtures.Erin, rebac.RelationTeamMember, team, true},
-		{"bob is not team member", fixtures.Bob, rebac.RelationTeamMember, team, false},
-		{"casey is not team member", fixtures.Casey, rebac.RelationTeamMember, team, false},
+		// ── Workspace permission ──────────────────────────────────────────────
+		{"alice can create documents in workspace", fixtures.Alice, rebac.PermissionWorkspaceCreateDocument, ws, true},
+		{"erin can create documents in workspace", fixtures.Erin, rebac.PermissionWorkspaceCreateDocument, ws, true},
+		{"bob cannot create documents in workspace", fixtures.Bob, rebac.PermissionWorkspaceCreateDocument, ws, false},
+		{"casey cannot create documents in workspace", fixtures.Casey, rebac.PermissionWorkspaceCreateDocument, ws, false},
 	}
 }
 
@@ -134,9 +133,9 @@ func Run(t *testing.T, check CheckFunc) {
 			// Arrange
 			ctx := t.Context()
 			req := rebac.CheckRequest{
-				User:     c.User,
-				Relation: c.Relation,
-				Object:   c.Object,
+				Subject:    c.Subject,
+				Permission: c.Permission,
+				Resource:   c.Resource,
 			}
 
 			// Act
@@ -148,7 +147,7 @@ func Run(t *testing.T, check CheckFunc) {
 			}
 			if result.Allowed != c.Allowed {
 				t.Errorf("Check(%s, %s, %s) = allowed:%v, want allowed:%v",
-					c.User, c.Relation, c.Object, result.Allowed, c.Allowed)
+					c.Subject, c.Permission, c.Resource, result.Allowed, c.Allowed)
 			}
 		})
 	}

@@ -35,13 +35,14 @@ packages. `cmd/server` is `package main`; its `main` function starts the program
 Go uses small named types to prevent accidental mixing:
 
 ```go
-type Object string
+type Resource string
 type Relation string
+type Permission string
 
-type TupleKey struct {
-    Object   Object
+type Relationship struct {
+    Subject  Subject
     Relation Relation
-    User     Subject
+    Resource Resource
 }
 ```
 
@@ -55,13 +56,13 @@ constructed as a zero value.
 A function has no receiver:
 
 ```go
-func ParseObject(s string) (ObjectType, string, error)
+func ParseResource(s string) (ResourceType, string, error)
 ```
 
 A method has a receiver before its name:
 
 ```go
-func (s *Service) Read(ctx context.Context, id string, actor rebac.Object) (...)
+func (s *Service) Read(ctx context.Context, id string, subject rebac.Resource) (...)
 ```
 
 Go returns errors as values. Check them immediately and add context with `%w`
@@ -69,7 +70,7 @@ when crossing a useful boundary:
 
 ```go
 if err != nil {
-    return fmt.Errorf("write tuple: %w", err)
+    return fmt.Errorf("write relationship: %w", err)
 }
 ```
 
@@ -83,8 +84,8 @@ Interfaces describe behavior:
 ```go
 type AuthorizationService interface {
     Check(context.Context, rebac.CheckRequest) (rebac.CheckResult, error)
-    WriteTuples(context.Context, []rebac.TupleKey) error
-    DeleteTuples(context.Context, []rebac.TupleKey) error
+    WriteRelationships(context.Context, []rebac.Relationship) error
+    DeleteRelationships(context.Context, []rebac.Relationship) error
 }
 ```
 
@@ -113,9 +114,9 @@ A slice is a view over an array; a map is a reference-like hash table. Both can
 be mutated by code that receives them. The demo token verifier copies input and
 output scope slices so callers cannot mutate its internal state.
 
-The tuple store uses a map keyed by `TupleKey`. Struct values containing
-comparable fields are valid map keys, which keeps exact tuple lookup simple.
-`FindByObjectRelation` scans the small teaching store linearly. A production
+The relationship store uses a map keyed by `Relationship`. Struct values containing
+comparable fields are valid map keys, which keeps exact relationship lookup simple.
+`FindByResourceRelation` scans the small teaching store linearly. A production
 datastore would use indexes; adding an in-memory secondary index here would make
 the learning implementation harder to follow without changing the lesson.
 

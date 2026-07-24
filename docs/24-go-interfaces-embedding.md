@@ -133,7 +133,7 @@ func (a *AuditEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
     result, err := a.inner.Evaluate(ctx, req)
     elapsed := time.Since(start)
 
-    a.logger.Printf("check user=%s relation=%s object=%s ...", ...)
+    a.logger.Printf("check subject=%s permission=%s resource=%s ...", ...)
     return result, err
 }
 ```
@@ -152,11 +152,11 @@ Struct embedding promotes fields and methods from an embedded value:
 
 ```go
 type ReadOnlyStore struct {
-    authz.TupleReader
+    authz.RelationshipReader
 }
 ```
 
-`ReadOnlyStore` now exposes the methods of `TupleReader`. It does not expose
+`ReadOnlyStore` now exposes the methods of `RelationshipReader`. It does not expose
 write methods because it embeds only the read interface, not the full repository
 interface.
 
@@ -164,8 +164,8 @@ That makes a capability boundary visible to the compiler:
 
 ```go
 ro := middleware.NewReadOnlyStore(store)
-ro.Has(ctx, object, relation, user) // ok
-ro.Write(ctx, tuples)               // does not compile
+ro.Has(ctx, subject, relation, resource) // ok
+ro.Write(ctx, relationships)              // does not compile
 ```
 
 Embedding is not inheritance. The outer type can add methods, override promoted
@@ -177,13 +177,13 @@ capability entirely.
 Interfaces can embed other interfaces:
 
 ```go
-type TupleRepository interface {
-    TupleReader
-    TupleWriter
+type RelationshipRepository interface {
+    RelationshipReader
+    RelationshipWriter
 }
 ```
 
-This means `TupleRepository` includes every method from both embedded
+This means `RelationshipRepository` includes every method from both embedded
 interfaces. Use this to build larger capabilities from small ones.
 
 Be careful when embedding broad interfaces. Embedding `io.ReadWriter` is often
@@ -266,7 +266,7 @@ go test -v ./examples/middleware
 Then try these experiments:
 
 1. Call `Write` on `ReadOnlyStore`. It should not compile.
-2. Change `ReadOnlyStore` to embed `authz.TupleRepository`. `Write` becomes
+2. Change `ReadOnlyStore` to embed `authz.RelationshipRepository`. `Write` becomes
    available. Decide whether that is a better contract.
 3. Add a second decorator that counts checks instead of logging them.
 4. Wrap an `AuditEvaluator` around another `AuditEvaluator`. It works because

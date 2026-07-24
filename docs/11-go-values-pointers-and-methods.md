@@ -21,7 +21,7 @@ The document service deliberately uses this pattern:
 ```go
 updated := *existing
 updated.Body = input.Body
-updated.UpdatedBy = input.Actor
+updated.UpdatedBy = input.Subject
 ```
 
 `existing` is a pointer. `*existing` dereferences it and copies the document
@@ -69,7 +69,7 @@ Use a pointer when at least one of these is true:
 
 Use a value when it is small, immutable in practice, and naturally copied.
 
-This repository passes `rebac.CheckRequest` and `rebac.TupleKey` by value because
+This repository passes `rebac.CheckRequest` and `rebac.Relationship` by value because
 they are small data records. Services and stores use pointers because they have
 identity, internal state, or mutexes.
 
@@ -80,7 +80,7 @@ Do not choose pointers merely to imitate reference-oriented languages.
 A method is a function with a receiver:
 
 ```go
-func (s *Service) Read(ctx context.Context, id string, actor rebac.Object) (
+func (s *Service) Read(ctx context.Context, id string, subject rebac.Resource) (
     *CollaborativeDocument,
     error,
 ) {
@@ -92,8 +92,8 @@ A pointer receiver can mutate the receiver and belongs to the method set of
 `*Service`. A value receiver receives a copy:
 
 ```go
-func (o Object) String() string {
-    return string(o)
+func (r Resource) String() string {
+    return string(r)
 }
 ```
 
@@ -141,9 +141,9 @@ var fixed [3]string
 Most Go code uses slices:
 
 ```go
-relations := []rebac.Relation{
-    rebac.RelationDocumentCanRead,
-    rebac.RelationDocumentCanEdit,
+permissions := []rebac.Permission{
+    rebac.PermissionDocumentRead,
+    rebac.PermissionDocumentEdit,
 }
 ```
 
@@ -151,14 +151,14 @@ A slice is a small descriptor pointing at an underlying array. It has a length
 and capacity:
 
 ```go
-len(relations)
-cap(relations)
+len(permissions)
+cap(permissions)
 ```
 
 Append may reuse the existing array or allocate a new one:
 
 ```go
-relations = append(relations, rebac.RelationDocumentCanDelete)
+permissions = append(permissions, rebac.PermissionDocumentDelete)
 ```
 
 Always assign the result of `append`.
@@ -181,29 +181,29 @@ encodes as `[]`.
 Create a writable map with `make` or a literal:
 
 ```go
-permissions := make(map[rebac.Relation]bool)
+permissions := make(map[rebac.Permission]bool)
 
-permissions := map[rebac.Relation]bool{
-    rebac.RelationDocumentCanRead: true,
+permissions := map[rebac.Permission]bool{
+    rebac.PermissionDocumentRead: true,
 }
 ```
 
 Reading a missing key returns the value type's zero value:
 
 ```go
-allowed := permissions[relation]
+allowed := permissions[permission]
 ```
 
 Use the comma-ok form when absence differs from a stored zero value:
 
 ```go
-allowed, exists := permissions[relation]
+allowed, exists := permissions[permission]
 ```
 
 Delete is safe even when the key is absent:
 
 ```go
-delete(permissions, relation)
+delete(permissions, permission)
 ```
 
 A nil map can be read but writing to it panics. Maps are reference-like runtime

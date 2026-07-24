@@ -13,8 +13,8 @@ to show the important ReBAC ideas.
 ## Repository Map
 
 ```text
-internal/rebac/          ReBAC primitives: Object, Relation, TupleKey, CheckRequest
-internal/authz/          AuthZ service, tuple store, graph evaluator, model rules
+internal/rebac/          Domain vocabulary: Subject, Resource, Relation, Permission
+internal/authz/          AuthZ service, relationship store, graph evaluator, policy rules
 internal/openfga/        OpenFGA-backed authorization service
 internal/documents/      Documents service, repository, demo token verifier
 internal/api/            HTTP server for the documents service
@@ -51,12 +51,13 @@ New to Go:
 Core ReBAC reading order:
 
 1. [Reusable ReBAC mental model](docs/rebac-mental-model.md)
-2. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
-3. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
-4. [ReBAC concepts](docs/04-rebac-concepts.md)
-5. [OpenFGA model](docs/05-openfga-model.md)
-6. [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md)
-7. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
+2. [Authorization domain language](docs/authorization-domain-language.md)
+3. [Authorization fundamentals](docs/02-authorization-fundamentals.md)
+4. [Graph theory for ReBAC](docs/03-graph-theory-for-rebac.md)
+5. [ReBAC concepts](docs/04-rebac-concepts.md)
+6. [OpenFGA model](docs/05-openfga-model.md)
+7. [Designing a ReBAC authorization service](docs/07-rebac-authorization-service-design.md)
+8. [Graph evaluator walkthrough](docs/27-graph-evaluator-walkthrough.md)
 
 Then choose the Go implementation or production path from the course map.
 Finish the Go path with the
@@ -110,7 +111,7 @@ Bob can read but not edit.
 Casey has no path through the graph, so access is denied.
 ```
 
-| Person or object | ReBAC ID | Role |
+| Subject or resource | ReBAC ID | Role |
 |---|---|---|
 | Alice | `user:alice` | platform team member; can edit |
 | Bob | `user:bob` | workspace viewer; can read only |

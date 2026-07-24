@@ -14,24 +14,38 @@ func TestGraphEvaluator_ExceedingMaxDepthReturnsError(t *testing.T) {
 	// Arrange
 	// Build an acyclic chain of subject-sets: team:t0#member is satisfied by
 	// team:t1#member, which is satisfied by team:t2#member, and so on. Each hop is
-	// a distinct (object, relation) pair, so the cycle guard never fires — only the
+	// a distinct (resource, relation) pair, so the cycle guard never fires — only the
 	// depth guard can stop it.
-	var seed []rebac.TupleKey
+	var seed []rebac.Relationship
 	const chain = 6
 	for i := range chain {
-		obj := rebac.Team(fmt.Sprintf("t%d", i))
+		resource := rebac.Team(fmt.Sprintf("t%d", i))
 		next := rebac.SubjectSet(rebac.Team(fmt.Sprintf("t%d", i+1)), rebac.RelationTeamMember)
-		seed = append(seed, rebac.Tuple(obj, rebac.RelationTeamMember, next))
+		seed = append(seed, rebac.NewRelationship(next, rebac.RelationTeamMember, resource))
 	}
+	workspace := rebac.Workspace("deep")
+	document := rebac.Document("deep")
+	seed = append(seed,
+		rebac.NewRelationship(
+			rebac.SubjectSet(rebac.Team("t0"), rebac.RelationTeamMember),
+			rebac.RelationWorkspaceEditor,
+			workspace,
+		),
+		rebac.NewRelationship(
+			rebac.Subject(workspace),
+			rebac.RelationDocumentWorkspace,
+			document,
+		),
+	)
 
 	ev := NewGraphEvaluator(NewInMemoryStore(seed...))
 	ev.maxDepth = 2 // force the guard to trip well before the chain ends
 
 	// Act
 	_, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
-		User:     rebac.User("nobody"),
-		Relation: rebac.RelationTeamMember,
-		Object:   rebac.Team("t0"),
+		Subject:    rebac.User("nobody"),
+		Permission: rebac.PermissionDocumentEdit,
+		Resource:   document,
 	})
 
 	// Assert
