@@ -58,7 +58,7 @@ When you read ReBAC code, keep asking:
 
 ```text
 What node am I on?
-What permission was requested?
+What action was requested?
 Which relation is the policy currently resolving?
 Which edge can I follow next?
 Is this place already on my current recursion path?
@@ -198,7 +198,7 @@ viewer
 workspace
 ```
 
-`can_edit` is a permission, not a relation in the repository's domain
+`can_edit` is an action, not a relation in the repository's domain
 language. OpenFGA represents both in its relation namespace, but the adapter
 owns that vocabulary translation.
 
@@ -301,7 +301,7 @@ The authorization evaluator starts with a question:
 Check(user:alice, can_edit, document:roadmapDocument)
 ```
 
-First it maps the permission to a relation, then expands that relation using
+First it maps the action to a relation, then expands that relation using
 the model:
 
 ```text
@@ -518,7 +518,7 @@ If the explanation takes a paragraph, simplify the model.
 Every ReBAC check is this:
 
 ```text
-Does the subject have the requested permission on the resource through valid
+May the subject perform the requested action on the resource through valid
 model expansions and stored relationships?
 ```
 
@@ -575,11 +575,11 @@ Explain ReBAC using graph words:
 
 ```text
 ReBAC stores authorization facts as labeled edges between nodes. A check asks
-whether a subject has a permission on a resource through a policy-valid chain
+whether a subject may perform an action on a resource through a policy-valid chain
 of relationships.
 ```
 
 If that sentence makes sense, you have enough graph theory to continue.
 
 Next: [ReBAC concepts](04-rebac-concepts.md) gives the graph pieces their ReBAC
-names: subject, resource, relation, relationship, permission, and decision.
+names: subject, resource, relation, relationship, action, and decision.

@@ -7,18 +7,18 @@ can run right now.
 ## The Problem Concurrency Solves Here
 
 When a UI renders a permissions panel it needs to know all four computed
-permissions for a document at once: can_read, can_comment, can_edit, can_delete.
+actions for a document at once: can_read, can_comment, can_edit, can_delete.
 
 If checks are independent network calls, sequential execution roughly adds
 their latencies, while concurrent execution can approach the latency of the
 slowest call. That can matter for an OpenFGA-backed UI.
 
 For this repository's tiny in-memory evaluator, concurrency is likely slower
-because goroutine and channel overhead dominates. This chapter uses permission
+because goroutine and channel overhead dominates. This chapter uses action
 checks because they are familiar—not because every authorization check should
 be parallelized. Measure before choosing concurrency.
 
-`AllPermissions` and `BulkCheck` in `parallel.go` solve this with two different
+`AllActions` and `BulkCheck` in `parallel.go` solve this with two different
 Go concurrency primitives. Read both, because each one teaches something the
 other does not.
 
@@ -75,12 +75,12 @@ Two more facts you will rely on:
   over a channel (`for v := range ch`) stops when it is closed. We do not need
   close here because we collect an exact, known number of results.
 
-`AllPermissions` uses a **buffered channel** whose capacity equals the number of
-permissions:
+`AllActions` uses a **buffered channel** whose capacity equals the number of
+actions:
 
 ```go
 // examples/concurrency/parallel.go
-ch := make(chan outcome, len(permissions))
+ch := make(chan outcome, len(actions))
 ```
 
 Each goroutine sends exactly one value into the channel and then exits. Because
@@ -89,21 +89,21 @@ blocks waiting for the collector — the sends always succeed immediately. The
 collector runs the loop after all goroutines have been started:
 
 ```go
-for _, permission := range permissions {
-    go func(permission rebac.Permission) {
+for _, action := range actions {
+    go func(action rebac.Action) {
         result, err := auth.Evaluate(ctx, rebac.CheckRequest{
-            Subject: subject, Permission: permission, Resource: resource,
+            Subject: subject, Action: action, Resource: resource,
         })
-        ch <- outcome{permission: permission, allowed: result.Allowed, err: err}
-    }(permission)
+        ch <- outcome{action: action, allowed: result.Allowed, err: err}
+    }(action)
 }
 
-summary := make(PermissionSummary, len(permissions))
-for range len(permissions) {
+summary := make(ActionSummary, len(actions))
+for range len(actions) {
     select {
     case out := <-ch:
         // a result arrived
-        summary[out.permission] = out.allowed
+        summary[out.action] = out.allowed
     case <-ctx.Done():
         // the caller cancelled or timed out
         return nil, ctx.Err()
@@ -125,20 +125,20 @@ blocking forever on a receiver that has gone away. That is the subtle reason the
 buffer matters: once a worker returns, its final send cannot leak merely because
 the collector stopped receiving.
 
-## Why The Goroutine Passes `permission` As An Argument
+## Why The Goroutine Passes `action` As An Argument
 
 Look at this pattern:
 
 ```go
-for _, permission := range permissions {
-    go func(permission rebac.Permission) { // an explicit parameter
-        // use permission
-    }(permission)
+for _, action := range actions {
+    go func(action rebac.Action) { // an explicit parameter
+        // use action
+    }(action)
 }
 ```
 
 Since Go 1.22, range variables declared by the loop are created per iteration,
-so closing over `permission` is safe in this example. Passing it explicitly is still a
+so closing over `action` is safe in this example. Passing it explicitly is still a
 reasonable teaching style because the goroutine's inputs are visible at the call
 site. It is clarity, not a correctness requirement for this module's Go version.
 
@@ -212,7 +212,7 @@ uses Go 1.26.5, so the example uses `WaitGroup.Go`.
 | **Signals first error** | Natural — send an error result and cancel remaining work | Awkward — needs shared state or an extra channel |
 | **Use when** | results are all the same shape and order does not matter | you need to wait for known work, often with results written by index |
 
-`AllPermissions` uses channels because results come back unordered and we build
+`AllActions` uses channels because results come back unordered and we build
 a map.
 
 `BulkCheck` uses WaitGroup because callers need results in the same position as
@@ -247,7 +247,7 @@ client, which aborts the request in flight.
 result, err := ev.Evaluate(t.Context(), req)
 ```
 
-`AllPermissions` acts on the context at its own level too — it stops collecting
+`AllActions` acts on the context at its own level too — it stops collecting
 and returns as soon as the caller cancels. It does that with `select`.
 
 ## `select`: Waiting On Multiple Channels
@@ -256,14 +256,14 @@ and returns as soon as the caller cancels. It does that with `select`.
 proceed; if several are ready at once it picks one at random. This is how a
 goroutine waits on more than one channel at the same time.
 
-`AllPermissions` uses it in the collector loop to wait on two things at once: the
+`AllActions` uses it in the collector loop to wait on two things at once: the
 next result, or the caller giving up.
 
 ```go
 select {
 case out := <-ch:
     // a result arrived — record it
-    summary[out.permission] = out.allowed
+    summary[out.action] = out.allowed
 case <-ctx.Done():
     // the caller cancelled or timed out — stop early
     return nil, ctx.Err()
@@ -275,7 +275,7 @@ wait for every check no matter what — even after they timed out. With it, the
 function returns the moment the context is cancelled.
 
 Why is returning early still leak-free? The result channel is **buffered** with
-one slot per permission, so the goroutines that are still in flight can each finish
+one slot per action, so the goroutines that are still in flight can each finish
 their one send into the buffer and exit, even though nobody is receiving anymore.
 An *unbuffered* channel would be a bug here: those orphaned goroutines would block
 forever on a send with no receiver, leaking one goroutine per outstanding check.
@@ -304,7 +304,7 @@ and reports violations immediately. Run it on every PR.
 **Measure instead of guessing:**
 
 Add a benchmark that compares four sequential in-memory checks with
-`AllPermissions`. The sequential version should usually win at this scale.
+`AllActions`. The sequential version should usually win at this scale.
 Then replace the evaluator with a fake that sleeps for 20 ms per check; the
 concurrent version should finish much closer to 20 ms than 80 ms.
 
@@ -318,7 +318,7 @@ sorted by input index.
 
 Two questions. Both require reading `parallel.go`.
 
-1. Why is the channel in `AllPermissions` buffered? What would happen if it were
+1. Why is the channel in `AllActions` buffered? What would happen if it were
    unbuffered?
 2. `BulkCheck` writes `results[i]` from a goroutine. Why is that safe without a
    mutex?

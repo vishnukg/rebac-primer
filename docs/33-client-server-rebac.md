@@ -96,7 +96,7 @@ go test -v ./examples/authzhttp
 ```
 
 Those tests exercise HTTP decoding, relationship validation, writes, revocation, and
-permission checks over the real in-process authorization service.
+action checks over the real in-process authorization service.
 
 In production, exposing relationship mutation is a privileged administrative API. It
 requires strong service authentication, authorization, audit logging, request

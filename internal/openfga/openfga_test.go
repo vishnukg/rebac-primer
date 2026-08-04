@@ -197,9 +197,9 @@ func TestCheck_MapsRequestAndAllowedResponse(t *testing.T) {
 		modelID = "01H00000000000000000000001"
 	)
 	want := rebac.CheckRequest{
-		Subject:    rebac.User("alice"),
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   rebac.Document("roadmap"),
+		Subject:  rebac.User("alice"),
+		Action:   rebac.ActionDocumentEdit,
+		Resource: rebac.Document("roadmap"),
 	}
 	var gotPath string
 	var gotBody checkRequestBody
@@ -237,7 +237,7 @@ func TestCheck_MapsRequestAndAllowedResponse(t *testing.T) {
 		t.Errorf("authorization_model_id = %q, want %q", gotBody.AuthorizationModelID, modelID)
 	}
 	wantTuple := openfgaTuple{
-		User: string(want.Subject), Relation: string(want.Permission), Object: string(want.Resource),
+		User: string(want.Subject), Relation: string(want.Action), Object: string(want.Resource),
 	}
 	if gotBody.TupleKey != wantTuple {
 		t.Errorf("tuple_key = %+v, want %+v", gotBody.TupleKey, wantTuple)

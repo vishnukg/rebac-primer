@@ -128,9 +128,9 @@ alice ─member of─► team
 team#member ─editor of─► workspace ─workspace of─► document
 ```
 
-**Reachability** is the core question behind a ReBAC permission check:
+**Reachability** is the core question behind a ReBAC action check:
 
-> Does the subject have the requested permission on the resource through an
+> May the subject perform the requested action on the resource through an
 > allowed relationship chain?
 
 `Can Alice edit the roadmap?` =
@@ -253,7 +253,7 @@ type workspace
 - `or owner` / `or editor` builds the hierarchy:
   **owner ⊆ editor ⊆ viewer** as sets of users.
   Owners can do anything editors can; editors anything viewers can.
-- `can_create_document` is the permission application code checks before
+- `can_create_document` is the action application code checks before
   creating a document in the workspace.
 
 ```
@@ -277,11 +277,11 @@ Three new things here:
   surprises you.
 - **`X from Y`** (the key construct, "tuple-to-userset") —
   `editor from workspace` means: *follow this document's `workspace` edge to the
-  workspace object, then check `editor` there.* This is how permission flows from
+  workspace object, then check `editor` there.* This is how access flows from
   parent to child. It is graph traversal expressed in one line.
 - **Computed relations in OpenFGA** — `define can_edit: editor` means
   `can_edit` is not stored anywhere; it is computed as "whoever is `editor`."
-  The application domain calls `can_edit` a **permission** and `editor` a
+  The application domain calls `can_edit` an **action** and `editor` a
   **relation**; only the adapter maps both to OpenFGA's relation namespace.
 
 DSL constructs you'll see, summarized:
@@ -298,7 +298,7 @@ DSL constructs you'll see, summarized:
 ### The Check API = asking the reachability question
 
 ```
-Check(subject=user:alice, permission=can_edit, resource=document:roadmapDocument)
+Check(subject=user:alice, action=can_edit, resource=document:roadmapDocument)
   -> allowed / denied
 ```
 
@@ -313,7 +313,7 @@ read?"), `BatchCheck` (many checks at once), `Expand` (debug a relation).
 | the rules | `internal/authz/model.go` tables | `model.fga` DSL |
 | the facts | in-memory relationship store (`internal/authz/store.go`) | OpenFGA's tuple datastore |
 | `X from Y` inheritance | `expandDocument` in `internal/authz/evaluator.go` | the `from` keyword |
-| computed permission | `permissionRules[document][can_edit] = {editor}` | `define can_edit: editor` |
+| computed action | `actionRules[document][can_edit] = {editor}` | `define can_edit: editor` |
 | the Check | `GraphEvaluator.Evaluate` | OpenFGA `/check` |
 
 The repo can run **either** backend behind the same interface — set
@@ -333,7 +333,7 @@ in your process, one is a real service.
 
 - **Resource / node** — a typed thing, `type:id`; OpenFGA calls it an object.
 - **Relation / label** — a named edge: `member`, `editor`, `workspace`.
-- **Permission** — an authority checked by application code, such as `can_edit`.
+- **Action** — an operation checked by application code, such as `can_edit`.
 - **Relationship / edge / fact** — one stored fact
   `(subject, relation, resource)`; OpenFGA stores it as a tuple.
 - **Subject set** — `team:x#member`, "everyone with `member` on `team:x`."

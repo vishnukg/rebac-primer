@@ -33,7 +33,7 @@ cmd/server/main.go chooses adapters
 
 | Package | Role |
 |---|---|
-| `internal/rebac` | shared domain vocabulary: subjects, resources, relations, relationships, permissions, decisions |
+| `internal/rebac` | shared domain vocabulary: subjects, resources, relations, relationships, actions, decisions |
 | `internal/authz` | concrete authorization service plus the evaluator and relationship repository interfaces it consumes |
 | `internal/documents` | document use cases and the ports they need |
 | `internal/api` | HTTP adapter and the narrow interfaces it consumes |

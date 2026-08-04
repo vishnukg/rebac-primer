@@ -141,9 +141,9 @@ var fixed [3]string
 Most Go code uses slices:
 
 ```go
-permissions := []rebac.Permission{
-    rebac.PermissionDocumentRead,
-    rebac.PermissionDocumentEdit,
+actions := []rebac.Action{
+    rebac.ActionDocumentRead,
+    rebac.ActionDocumentEdit,
 }
 ```
 
@@ -151,14 +151,14 @@ A slice is a small descriptor pointing at an underlying array. It has a length
 and capacity:
 
 ```go
-len(permissions)
-cap(permissions)
+len(actions)
+cap(actions)
 ```
 
 Append may reuse the existing array or allocate a new one:
 
 ```go
-permissions = append(permissions, rebac.PermissionDocumentDelete)
+actions = append(actions, rebac.ActionDocumentDelete)
 ```
 
 Always assign the result of `append`.
@@ -181,29 +181,29 @@ encodes as `[]`.
 Create a writable map with `make` or a literal:
 
 ```go
-permissions := make(map[rebac.Permission]bool)
+actions := make(map[rebac.Action]bool)
 
-permissions := map[rebac.Permission]bool{
-    rebac.PermissionDocumentRead: true,
+actions := map[rebac.Action]bool{
+    rebac.ActionDocumentRead: true,
 }
 ```
 
 Reading a missing key returns the value type's zero value:
 
 ```go
-allowed := permissions[permission]
+allowed := actions[action]
 ```
 
 Use the comma-ok form when absence differs from a stored zero value:
 
 ```go
-allowed, exists := permissions[permission]
+allowed, exists := actions[action]
 ```
 
 Delete is safe even when the key is absent:
 
 ```go
-delete(permissions, permission)
+delete(actions, action)
 ```
 
 A nil map can be read but writing to it panics. Maps are reference-like runtime

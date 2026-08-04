@@ -41,13 +41,13 @@ consumer. The authz HTTP example has a separate interface that also includes
 ```go
 resp, err := s.client.Check(ctx).Body(openfga.ClientCheckRequest{
     User:     string(req.Subject),
-    Relation: string(req.Permission),
+    Relation: string(req.Action),
     Object:   string(req.Resource),
 }).Execute()
 ```
 
 This is the explicit domain-to-OpenFGA translation:
-`subject/permission/resource` becomes `user/relation/object`. OpenFGA evaluates
+`subject/action/resource` becomes `user/relation/object`. OpenFGA evaluates
 `model.fga` plus stored tuples and returns allow/deny.
 
 The adapter validates the check shape before making the network call, matching
@@ -88,13 +88,13 @@ questions and avoid treating tuple reads as a general listing/search API.
 the authorization model. OpenFGA separates effective-access queries:
 
 ```text
-Check        one subject, permission (relation field), and resource (object field)
+Check        one subject, action (relation field), and resource (object field)
 ListObjects  objects of a type related to one subject
 ListUsers    subjects of a selected type related to one object
 Expand       userset expression tree for one relation and object
 ```
 
-This adapter intentionally exposes only permission checks and relationship
+This adapter intentionally exposes only action checks and relationship
 administration. Adding
 listing requires product-specific pagination, result limits, latency budgets,
 and search integration.

@@ -126,6 +126,45 @@ func TestParseSubjectSet_GivenMalformedSubjectSet_WhenParsed_ThenReturnsError(t 
 	}
 }
 
+func TestParseResource_GivenIDWithSubjectSetSeparator_WhenParsed_ThenReturnsError(t *testing.T) {
+	// Arrange: '#' separates a subject set from its relation, so an id containing
+	// one would make "team:t#x#member" ambiguous. See ValidateID.
+	cases := map[string]string{
+		"hash in id":           "team:t#x",
+		"trailing space in id": "user:alice ",
+		"internal space in id": "document:road map",
+		"leading space in id":  "user: alice",
+		"tab in id":            "workspace:pro\tduct",
+	}
+
+	for name, input := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Act
+			_, _, err := rebac.ParseResource(input)
+
+			// Assert
+			if err == nil {
+				t.Errorf("ParseResource(%q) = nil error, want an error", input)
+			}
+		})
+	}
+}
+
+func TestParseSubjectSet_GivenSecondSeparator_WhenParsed_ThenReturnsError(t *testing.T) {
+	// Arrange: this is what SubjectSet would build from an invalid id containing
+	// '#'. Splitting on the first '#' would resolve team:t rather than team:t#x,
+	// so the parser must reject it instead of guessing.
+	const input rebac.Subject = "team:t#x#member"
+
+	// Act
+	_, _, err := rebac.ParseSubjectSet(input)
+
+	// Assert
+	if err == nil {
+		t.Errorf("ParseSubjectSet(%q) = nil error, want an error", input)
+	}
+}
+
 func TestIsSubjectSet_GivenSubjectSet_WhenChecked_ThenReportsTrue(t *testing.T) {
 	// Arrange
 	subject := rebac.SubjectSet(rebac.Team("platformTeam"), rebac.RelationTeamMember)
@@ -219,6 +258,20 @@ func FuzzParseResource(f *testing.F) {
 		}
 		if string(resource) != s {
 			t.Errorf("round-trip failed: ParseResource(%q) -> type=%s id=%s -> Resource=%q", s, typ, id, resource)
+		}
+
+		// Any resource the parser accepts must also survive being turned into a
+		// subject set and read back. This is the property that a '#' in an id
+		// would break: SubjectSet(team:t#x, member) builds "team:t#x#member",
+		// which splits back into team:t and "x#member" — a different group.
+		ss := rebac.SubjectSet(resource, rebac.RelationTeamMember)
+		gotResource, gotRelation, err := rebac.ParseSubjectSet(ss)
+		if err != nil {
+			t.Fatalf("ParseSubjectSet(%q) returned unexpected error: %v", ss, err)
+		}
+		if gotResource != resource || gotRelation != rebac.RelationTeamMember {
+			t.Errorf("subject-set round-trip failed: %q -> (%q, %q), want (%q, member)",
+				ss, gotResource, gotRelation, resource)
 		}
 	})
 }

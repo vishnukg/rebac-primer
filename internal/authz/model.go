@@ -43,26 +43,26 @@ import "rebac-primer/internal/rebac"
 // "Key relation is implied by any of the value relations."
 type impliedBy map[rebac.Relation][]rebac.Relation
 
-// permissionRules maps each application permission to the base relation that
-// satisfies it. Permissions are policy results; relations name the stored
+// actionRules maps each application action to the base relation that
+// satisfies it. Actions are policy results; relations name the stored
 // associations and derived role-like sets used to prove those results.
-var permissionRules = map[rebac.ResourceType]map[rebac.Permission][]rebac.Relation{
+var actionRules = map[rebac.ResourceType]map[rebac.Action][]rebac.Relation{
 	rebac.ResourceTypeWorkspace: {
-		rebac.PermissionWorkspaceCreateDocument: {rebac.RelationWorkspaceEditor},
+		rebac.ActionWorkspaceCreateDocument: {rebac.RelationWorkspaceEditor},
 	},
 	rebac.ResourceTypeDocument: {
-		rebac.PermissionDocumentRead:    {rebac.RelationDocumentViewer},
-		rebac.PermissionDocumentComment: {rebac.RelationDocumentViewer},
-		rebac.PermissionDocumentEdit:    {rebac.RelationDocumentEditor},
-		rebac.PermissionDocumentDelete:  {rebac.RelationDocumentOwner},
+		rebac.ActionDocumentRead:    {rebac.RelationDocumentViewer},
+		rebac.ActionDocumentComment: {rebac.RelationDocumentViewer},
+		rebac.ActionDocumentEdit:    {rebac.RelationDocumentEditor},
+		rebac.ActionDocumentDelete:  {rebac.RelationDocumentOwner},
 	},
 }
 
-func permissionRelationsFor(
+func actionRelationsFor(
 	resourceType rebac.ResourceType,
-	permission rebac.Permission,
+	action rebac.Action,
 ) []rebac.Relation {
-	return permissionRules[resourceType][permission]
+	return actionRules[resourceType][action]
 }
 
 // teamRules — the team relation hierarchy.
@@ -122,9 +122,9 @@ var workspaceRules = impliedBy{
 //
 // Hierarchy of base relations: owner ⊆ editor ⊆ viewer as sets of subjects
 //
-// Permissions are deliberately a separate domain type. Evaluate maps each
-// permission to its required base relation; ValidateCheckRequest uses the same
-// mapping to reject permissions that are not valid for the resource type:
+// Actions are deliberately a separate domain type. Evaluate maps each
+// action to its required base relation; ValidateCheckRequest uses the same
+// mapping to reject actions that are not valid for the resource type:
 //
 //	can_read    ← viewer (and therefore editor and owner)
 //	can_comment ← viewer (and therefore editor and owner)

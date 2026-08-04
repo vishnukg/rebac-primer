@@ -35,11 +35,11 @@ type CheckFunc func(context.Context, rebac.CheckRequest) (rebac.CheckResult, err
 
 // Case is one row of the truth table: a question and its required answer.
 type Case struct {
-	Name       string
-	Subject    rebac.Resource
-	Permission rebac.Permission
-	Resource   rebac.Resource
-	Allowed    bool
+	Name     string
+	Subject  rebac.Resource
+	Action   rebac.Action
+	Resource rebac.Resource
+	Allowed  bool
 }
 
 // ExtraRelationships returns contract-only relationships that exercise policy paths not
@@ -86,40 +86,40 @@ func Cases() []Case {
 	ws := fixtures.ProductWorkspace
 
 	return []Case{
-		// ── Document computed permissions ─────────────────────────────────────
+		// ── Document computed actions ─────────────────────────────────────
 		// alice: team member → workspace editor → document editor (inherited).
-		{"alice can_read roadmap", fixtures.Alice, rebac.PermissionDocumentRead, doc, true},
-		{"alice can_comment roadmap", fixtures.Alice, rebac.PermissionDocumentComment, doc, true},
-		{"alice can_edit roadmap", fixtures.Alice, rebac.PermissionDocumentEdit, doc, true},
-		{"alice lacks can_delete on roadmap (not owner)", fixtures.Alice, rebac.PermissionDocumentDelete, doc, false},
+		{"alice can_read roadmap", fixtures.Alice, rebac.ActionDocumentRead, doc, true},
+		{"alice can_comment roadmap", fixtures.Alice, rebac.ActionDocumentComment, doc, true},
+		{"alice can_edit roadmap", fixtures.Alice, rebac.ActionDocumentEdit, doc, true},
+		{"alice lacks can_delete on roadmap (not owner)", fixtures.Alice, rebac.ActionDocumentDelete, doc, false},
 
 		// dana: direct document owner.
-		{"dana can_read roadmap (direct owner)", fixtures.Dana, rebac.PermissionDocumentRead, doc, true},
-		{"dana can_comment roadmap (direct owner)", fixtures.Dana, rebac.PermissionDocumentComment, doc, true},
-		{"dana can_edit roadmap (direct owner)", fixtures.Dana, rebac.PermissionDocumentEdit, doc, true},
-		{"dana can_delete roadmap (direct owner)", fixtures.Dana, rebac.PermissionDocumentDelete, doc, true},
+		{"dana can_read roadmap (direct owner)", fixtures.Dana, rebac.ActionDocumentRead, doc, true},
+		{"dana can_comment roadmap (direct owner)", fixtures.Dana, rebac.ActionDocumentComment, doc, true},
+		{"dana can_edit roadmap (direct owner)", fixtures.Dana, rebac.ActionDocumentEdit, doc, true},
+		{"dana can_delete roadmap (direct owner)", fixtures.Dana, rebac.ActionDocumentDelete, doc, true},
 
 		// erin: team admin -> workspace owner via team#admin -> document owner.
-		{"erin can_read roadmap (workspace owner)", fixtures.Erin, rebac.PermissionDocumentRead, doc, true},
-		{"erin can_edit roadmap (workspace owner)", fixtures.Erin, rebac.PermissionDocumentEdit, doc, true},
-		{"erin can_delete roadmap (workspace owner)", fixtures.Erin, rebac.PermissionDocumentDelete, doc, true},
+		{"erin can_read roadmap (workspace owner)", fixtures.Erin, rebac.ActionDocumentRead, doc, true},
+		{"erin can_edit roadmap (workspace owner)", fixtures.Erin, rebac.ActionDocumentEdit, doc, true},
+		{"erin can_delete roadmap (workspace owner)", fixtures.Erin, rebac.ActionDocumentDelete, doc, true},
 
 		// bob: direct workspace viewer → document viewer (inherited).
-		{"bob can_read roadmap", fixtures.Bob, rebac.PermissionDocumentRead, doc, true},
-		{"bob can_comment roadmap", fixtures.Bob, rebac.PermissionDocumentComment, doc, true},
-		{"bob lacks can_edit on roadmap (viewer only)", fixtures.Bob, rebac.PermissionDocumentEdit, doc, false},
-		{"bob lacks can_delete on roadmap", fixtures.Bob, rebac.PermissionDocumentDelete, doc, false},
+		{"bob can_read roadmap", fixtures.Bob, rebac.ActionDocumentRead, doc, true},
+		{"bob can_comment roadmap", fixtures.Bob, rebac.ActionDocumentComment, doc, true},
+		{"bob lacks can_edit on roadmap (viewer only)", fixtures.Bob, rebac.ActionDocumentEdit, doc, false},
+		{"bob lacks can_delete on roadmap", fixtures.Bob, rebac.ActionDocumentDelete, doc, false},
 
 		// casey: no relationships → no access.
-		{"casey lacks can_read on roadmap", fixtures.Casey, rebac.PermissionDocumentRead, doc, false},
-		{"casey lacks can_edit on roadmap", fixtures.Casey, rebac.PermissionDocumentEdit, doc, false},
-		{"casey lacks can_delete on roadmap", fixtures.Casey, rebac.PermissionDocumentDelete, doc, false},
+		{"casey lacks can_read on roadmap", fixtures.Casey, rebac.ActionDocumentRead, doc, false},
+		{"casey lacks can_edit on roadmap", fixtures.Casey, rebac.ActionDocumentEdit, doc, false},
+		{"casey lacks can_delete on roadmap", fixtures.Casey, rebac.ActionDocumentDelete, doc, false},
 
-		// ── Workspace permission ──────────────────────────────────────────────
-		{"alice can create documents in workspace", fixtures.Alice, rebac.PermissionWorkspaceCreateDocument, ws, true},
-		{"erin can create documents in workspace", fixtures.Erin, rebac.PermissionWorkspaceCreateDocument, ws, true},
-		{"bob cannot create documents in workspace", fixtures.Bob, rebac.PermissionWorkspaceCreateDocument, ws, false},
-		{"casey cannot create documents in workspace", fixtures.Casey, rebac.PermissionWorkspaceCreateDocument, ws, false},
+		// ── Workspace action ──────────────────────────────────────────────
+		{"alice can create documents in workspace", fixtures.Alice, rebac.ActionWorkspaceCreateDocument, ws, true},
+		{"erin can create documents in workspace", fixtures.Erin, rebac.ActionWorkspaceCreateDocument, ws, true},
+		{"bob cannot create documents in workspace", fixtures.Bob, rebac.ActionWorkspaceCreateDocument, ws, false},
+		{"casey cannot create documents in workspace", fixtures.Casey, rebac.ActionWorkspaceCreateDocument, ws, false},
 	}
 }
 
@@ -133,9 +133,9 @@ func Run(t *testing.T, check CheckFunc) {
 			// Arrange
 			ctx := t.Context()
 			req := rebac.CheckRequest{
-				Subject:    c.Subject,
-				Permission: c.Permission,
-				Resource:   c.Resource,
+				Subject:  c.Subject,
+				Action:   c.Action,
+				Resource: c.Resource,
 			}
 
 			// Act
@@ -147,7 +147,7 @@ func Run(t *testing.T, check CheckFunc) {
 			}
 			if result.Allowed != c.Allowed {
 				t.Errorf("Check(%s, %s, %s) = allowed:%v, want allowed:%v",
-					c.Subject, c.Permission, c.Resource, result.Allowed, c.Allowed)
+					c.Subject, c.Action, c.Resource, result.Allowed, c.Allowed)
 			}
 		})
 	}

@@ -1,9 +1,9 @@
 // Package rebac defines the authorization-domain vocabulary used across the project:
 //
 //	Resource / Relation / Subject  →  named types for relationship facts
-//	Permission                     →  an authority derived by policy
+//	Action                         →  an operation a subject may perform, derived by policy
 //	Relationship                   →  one fact in the relationship graph
-//	CheckRequest / CheckResult     →  a permission question and its decision
+//	CheckRequest / CheckResult     →  an action question and its decision
 //
 // The authz and documents packages both import it; neither owns it.
 package rebac
@@ -11,6 +11,7 @@ package rebac
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 // ── Resource types ────────────────────────────────────────────────────────────
@@ -57,21 +58,22 @@ const (
 	RelationDocumentViewer Relation = "viewer"
 )
 
-// Permission names an authority the policy can derive for a subject and
-// resource. Permissions are checked, never stored as relationship facts.
+// Action names an operation the policy can allow a subject to perform on a
+// resource. Actions are checked, never stored as relationship facts.
 //
-// OpenFGA represents permissions in its relation field. The OpenFGA adapter
-// performs that vocabulary translation; the application domain keeps the
-// concepts distinct.
-type Permission string
+// Other systems call this concept a "permission" (SpiceDB) or model it as a
+// computed relation (OpenFGA, Zanzibar). OpenFGA represents actions in its
+// relation field; the OpenFGA adapter performs that vocabulary translation
+// while the application domain keeps the concepts distinct.
+type Action string
 
 const (
-	PermissionWorkspaceCreateDocument Permission = "can_create_document"
+	ActionWorkspaceCreateDocument Action = "can_create_document"
 
-	PermissionDocumentRead    Permission = "can_read"
-	PermissionDocumentComment Permission = "can_comment"
-	PermissionDocumentEdit    Permission = "can_edit"
-	PermissionDocumentDelete  Permission = "can_delete"
+	ActionDocumentRead    Action = "can_read"
+	ActionDocumentComment Action = "can_comment"
+	ActionDocumentEdit    Action = "can_edit"
+	ActionDocumentDelete  Action = "can_delete"
 )
 
 // Subject is either a plain Resource ("user:alice") or a subject set
@@ -93,11 +95,11 @@ type Relationship struct {
 
 // ── Check types ───────────────────────────────────────────────────────────────
 
-// CheckRequest asks whether Subject has Permission on Resource.
+// CheckRequest asks whether Subject may perform Action on Resource.
 type CheckRequest struct {
-	Subject    Resource   `json:"subject"`
-	Permission Permission `json:"permission"`
-	Resource   Resource   `json:"resource"`
+	Subject  Resource `json:"subject"`
+	Action   Action   `json:"action"`
+	Resource Resource `json:"resource"`
 }
 
 // CheckResult is the decision for a CheckRequest.
@@ -136,6 +138,10 @@ func NewRelationship(subject Subject, relation Relation, resource Resource) Rela
 
 // ParseResource splits "type:id" into its constituent parts.
 // Returns an error if the format is invalid or the type is unrecognised.
+//
+// Only the first colon separates type from id, so an id may itself contain
+// colons ("document:a:b:c" is id "a:b:c"). That stays unambiguous because the
+// type is always a prefix. '#' and whitespace are rejected — see ValidateID.
 func ParseResource(s string) (ResourceType, string, error) {
 	idx := strings.IndexByte(s, ':')
 	if idx < 1 || idx == len(s)-1 {
@@ -146,18 +152,50 @@ func ParseResource(s string) (ResourceType, string, error) {
 	if !isResourceType(typ) {
 		return "", "", fmt.Errorf("unknown resource type %q in %q", typ, s)
 	}
-	if strings.TrimSpace(id) == "" {
-		return "", "", fmt.Errorf("invalid resource %q: id cannot be blank", s)
+	if err := ValidateID(id); err != nil {
+		return "", "", fmt.Errorf("invalid resource %q: %w", s, err)
 	}
 	return typ, id, nil
 }
 
+// ValidateID reports whether id may appear in a Resource reference.
+//
+// '#' is rejected because Resource and Subject share one string space and '#'
+// separates a subject set from its relation. An id containing '#' would make
+// SubjectSet and ParseSubjectSet disagree: SubjectSet(team:t#x, member) builds
+// "team:t#x#member", which ParseSubjectSet splits at the first '#' into
+// ("team:t", "x#member") — a different group than the one intended. Whitespace
+// is rejected so two ids cannot differ only by invisible characters.
+//
+// OpenFGA imposes the same restriction: a valid object contains exactly one ':'
+// and no '#' or spaces.
+func ValidateID(id string) error {
+	if strings.TrimSpace(id) == "" {
+		return fmt.Errorf("id cannot be blank")
+	}
+	if strings.ContainsRune(id, '#') {
+		return fmt.Errorf("id %q cannot contain '#'", id)
+	}
+	if strings.ContainsFunc(id, unicode.IsSpace) {
+		return fmt.Errorf("id %q cannot contain whitespace", id)
+	}
+	return nil
+}
+
 // ParseSubjectSet splits "team:platformTeam#member" into its resource and relation.
+//
+// Exactly one '#' is required. Ids cannot contain '#' (see ValidateID), so a
+// second one means the caller built the string from an invalid id; rejecting it
+// is safer than picking a split point and resolving a different group than the
+// one intended.
 func ParseSubjectSet(s Subject) (Resource, Relation, error) {
 	str := string(s)
 	idx := strings.IndexByte(str, '#')
 	if idx < 1 || idx == len(str)-1 {
 		return "", "", fmt.Errorf("invalid subject set %q: want resource#relation", s)
+	}
+	if strings.ContainsRune(str[idx+1:], '#') {
+		return "", "", fmt.Errorf("invalid subject set %q: want exactly one '#'", s)
 	}
 	return Resource(str[:idx]), Relation(str[idx+1:]), nil
 }

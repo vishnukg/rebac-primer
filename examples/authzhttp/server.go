@@ -5,7 +5,7 @@
 // Routes:
 //
 //	GET    /health
-//	POST   /check           { subject, permission, resource }                   → { allowed, trace }
+//	POST   /check           { subject, action, resource }                   → { allowed, trace }
 //	POST   /relationships   { relationships: [{subject,relation,resource}] }    → { written }
 //	DELETE /relationships   { relationships: [{subject,relation,resource}] }    → { deleted }
 //	GET    /relationships   ?resource=...&relation=...                          → { relationships }

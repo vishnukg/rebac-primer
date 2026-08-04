@@ -217,6 +217,49 @@ func TestHandler_CreateDocument_Returns400ForBlankFields(t *testing.T) {
 	}
 }
 
+func TestHandler_CreateDocument_Returns400ForIDsThatBreakResourceReferences(t *testing.T) {
+	// Arrange: both ids become resource references in the relationship graph.
+	// A '#' would collide with subject-set syntax and whitespace would let two
+	// ids differ invisibly, so the handler rejects them before the domain sees them.
+	cases := map[string]map[string]string{
+		"hash in id":           {"id": "test#Doc", "title": "Test", "body": "Body", "workspaceId": "productWorkspace"},
+		"hash in workspaceId":  {"id": "testDoc", "title": "Test", "body": "Body", "workspaceId": "product#Workspace"},
+		"space inside id":      {"id": "test Doc", "title": "Test", "body": "Body", "workspaceId": "productWorkspace"},
+		"trailing space in id": {"id": "testDoc ", "title": "Test", "body": "Body", "workspaceId": "productWorkspace"},
+	}
+
+	for name, payload := range cases {
+		t.Run(name, func(t *testing.T) {
+			relationshipStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
+			authzSvc := authz.New(relationshipStore, authz.NewGraphEvaluator(relationshipStore))
+			docRepo := documents.NewInMemoryRepository()
+			docsSvc := documents.New(docRepo, authzSvc)
+			tokenVerifier := documents.NewDemoTokenVerifier(fixtures.DemoTokens())
+			handler := api.NewServer(tokenVerifier, docsSvc)
+			body, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatalf("marshal request body: %v", err)
+			}
+			req := httptest.NewRequest(http.MethodPost, "/documents", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer demo-token-alice")
+			rec := httptest.NewRecorder()
+
+			// Act
+			handler.ServeHTTP(rec, req)
+
+			// Assert
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected 400, got %d — body: %s", rec.Code, rec.Body.String())
+			}
+			// The document must not have been created before the id was rejected.
+			if doc, err := docRepo.FindByID(t.Context(), payload["id"]); err == nil && doc != nil {
+				t.Errorf("document %q was persisted despite the invalid id", payload["id"])
+			}
+		})
+	}
+}
+
 func TestHandler_CreateDocument_Returns401WhenTokenMissing(t *testing.T) {
 	// Arrange
 	relationshipStore := authz.NewInMemoryStore(fixtures.SeedRelationships()...)

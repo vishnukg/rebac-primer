@@ -4,7 +4,7 @@ OpenFGA separates:
 
 ```text
 store  -> environment namespace
-model  -> schema: object types, relations, computed permissions
+model  -> schema: object types, relations, computed relations (domain actions)
 tuples -> runtime facts: who has what on what
 ```
 
@@ -24,8 +24,8 @@ Read the model as a type system plus set algebra. Type restrictions say what may
 be written directly; relation expressions say what may be derived.
 
 Each OpenFGA `object#relation` can be understood as a set of subjects. In the
-application domain, a check asks whether one subject has a permission on a
-resource; the adapter puts that permission in OpenFGA's relation field.
+application domain, a check asks whether one subject may perform an action on a
+resource; the adapter puts that action in OpenFGA's relation field.
 
 ## Modeling Thought Process
 
@@ -50,9 +50,9 @@ The design process is:
 3. Identify relation and inheritance rules: admin implies member, owner implies
    editor, editor implies viewer, and document access can come from the parent
    workspace.
-4. Identify application permissions: `can_read`, `can_comment`, `can_edit`,
+4. Identify application actions: `can_read`, `can_comment`, `can_edit`,
    `can_delete`.
-5. Represent permissions as computed relations in OpenFGA so callers ask for intent
+5. Represent actions as computed relations in OpenFGA so callers ask for intent
    (`can_edit`) rather than implementation detail (`editor from workspace`).
 6. Write contract tests before trusting the model.
 
@@ -61,7 +61,7 @@ That gives this rule of thumb:
 ```text
 Facts that product workflows mutate go in tuples.
 Rules that explain what facts mean go in the model.
-Operations that code enforces are protected by `can_*` permissions.
+Operations that code enforces are protected by `can_*` actions.
 ```
 
 ## Types
@@ -141,9 +141,9 @@ editor from workspace
 That means: follow the document's `workspace` relation to a workspace object,
 then check whether the user is an editor there.
 
-`workspace` is a structural relation, not a permission. The application
+`workspace` is a structural relation, not an action. The application
 writes `document#workspace` tuples so inheritance can work, but user-facing
-checks ask for permissions such as `can_read`, `can_edit`, or `can_delete`.
+checks ask for actions such as `can_read`, `can_edit`, or `can_delete`.
 Relationship queries involving `owner`, `editor`, or `viewer` are a separate
 concern and are not exposed through the domain `CheckRequest`.
 
@@ -159,7 +159,7 @@ editor of the workspace this document points to." The parent object must be in
 the tuple's subject/user field because `from workspace` follows the document's
 `workspace` relation to that subject.
 
-The `can_*` names are permissions in the domain and computed relations in
+The `can_*` names are actions in the domain and computed relations in
 OpenFGA. They are not writable facts:
 
 ```text
@@ -170,7 +170,7 @@ can_delete  = owner
 ```
 
 This lets application code ask stable business questions while the model remains
-free to change how those permissions are derived.
+free to change how those actions are derived.
 
 ## Why It Matters
 
@@ -183,7 +183,7 @@ This is the central schema/data split:
 
 ```text
 relationship tuples  → changing product facts
-authorization model  → reusable rules for deriving permissions
+authorization model  → reusable rules for deriving actions
 ```
 
 The DSL constructs used here are:
@@ -208,7 +208,7 @@ and query APIs that the teaching evaluator does not implement.
 
 ## Try It
 
-Add a new computed permission:
+Add a new computed action:
 
 ```text
 define can_archive: owner
@@ -217,18 +217,18 @@ define can_archive: owner
 To keep both backends aligned, update:
 
 1. `deployments/openfga/model.fga`
-2. a `Permission` constant in `internal/rebac/rebac.go`
-3. `permissionRules` in `internal/authz/model.go`
-4. `permissionDefinedFor` validation in `internal/authz/validate.go`
+2. an `Action` constant in `internal/rebac/rebac.go`
+3. `actionRules` in `internal/authz/model.go`
+4. `actionDefinedFor` validation in `internal/authz/validate.go`
 5. the shared authorization contract and evaluator tests
 
-The traversal algorithm itself should not change. If adding a simple permission
+The traversal algorithm itself should not change. If adding a simple action
 requires editing DFS code, the model and evaluator are becoming too tightly
 coupled.
 
 ## Checkpoint
 
-Why is `can_edit` not stored as a tuple? Because it is a computed permission:
+Why is `can_edit` not stored as a tuple? Because it is a computed action:
 the model derives it from `editor`, while tuples store changing relationship
 facts.
 

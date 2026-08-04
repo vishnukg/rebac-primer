@@ -45,7 +45,7 @@ allocate an evaluator.
 
 ## Small Interfaces At The Point Of Use
 
-`AuditEvaluator` needs only one capability: evaluate a permission check. It
+`AuditEvaluator` needs only one capability: evaluate an action check. It
 does not need to know whether the inner implementation is:
 
 - the in-memory graph evaluator
@@ -133,7 +133,7 @@ func (a *AuditEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
     result, err := a.inner.Evaluate(ctx, req)
     elapsed := time.Since(start)
 
-    a.logger.Printf("check subject=%s permission=%s resource=%s ...", ...)
+    a.logger.Printf("check subject=%s action=%s resource=%s ...", ...)
     return result, err
 }
 ```

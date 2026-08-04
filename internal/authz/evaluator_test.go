@@ -16,9 +16,9 @@ func TestGraphEvaluator_TeamMemberCanEditDocument(t *testing.T) {
 	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
-		Subject:    fixtures.Alice,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Alice,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	}
 
 	// Act
@@ -51,11 +51,11 @@ func TestGraphEvaluator_BobCanReadButNotEdit(t *testing.T) {
 	ev := authz.NewGraphEvaluator(store)
 	ctx := t.Context()
 
-	// Act: check both permissions.
+	// Act: check both actions.
 	readResult, err := ev.Evaluate(ctx, rebac.CheckRequest{
-		Subject:    fixtures.Bob,
-		Permission: rebac.PermissionDocumentRead,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Bob,
+		Action:   rebac.ActionDocumentRead,
+		Resource: fixtures.RoadmapDocument,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error on read check: %v", err)
@@ -68,9 +68,9 @@ func TestGraphEvaluator_BobCanReadButNotEdit(t *testing.T) {
 	}
 
 	editResult, err := ev.Evaluate(ctx, rebac.CheckRequest{
-		Subject:    fixtures.Bob,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Bob,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error on edit check: %v", err)
@@ -87,9 +87,9 @@ func TestGraphEvaluator_CaseyIsDenied(t *testing.T) {
 	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
-		Subject:    fixtures.Casey,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Casey,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	}
 
 	// Act
@@ -124,9 +124,9 @@ func TestGraphEvaluator_CycleDetectionDoesNotHang(t *testing.T) {
 	)
 	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
-		Subject:    fixtures.Casey,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   document,
+		Subject:  fixtures.Casey,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: document,
 	}
 
 	// Act
@@ -147,23 +147,23 @@ func TestGraphEvaluator_CycleDetectionDoesNotHang(t *testing.T) {
 	}
 }
 
-func TestGraphEvaluator_IgnoresStoredPermissionValue(t *testing.T) {
+func TestGraphEvaluator_IgnoresStoredActionValue(t *testing.T) {
 	// Arrange
 	// can_edit is computed from editor; the model does not permit a can_edit
 	// relationship. Seed the low-level store directly to prove corrupted data cannot
 	// bypass the model and over-grant access.
 	store := authz.NewInMemoryStore(rebac.NewRelationship(
 		rebac.Subject(fixtures.Casey),
-		rebac.Relation(rebac.PermissionDocumentEdit),
+		rebac.Relation(rebac.ActionDocumentEdit),
 		fixtures.RoadmapDocument,
 	))
 	ev := authz.NewGraphEvaluator(store)
 
 	// Act
 	result, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
-		Subject:    fixtures.Casey,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Casey,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	})
 
 	// Assert
@@ -186,9 +186,9 @@ func TestGraphEvaluator_TeamAdminIsAlsoMember(t *testing.T) {
 	store := authz.NewInMemoryStore(relationships...)
 	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
-		Subject:    fixtures.Casey,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Casey,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	}
 
 	// Act
@@ -210,31 +210,31 @@ func TestGraphEvaluator_TeamAdminIsAlsoMember(t *testing.T) {
 	}
 }
 
-// TestGraphEvaluator_PermissionMatrix uses a table-driven test to verify the
-// full permission matrix for the three fixture users against the roadmap document.
-func TestGraphEvaluator_PermissionMatrix(t *testing.T) {
+// TestGraphEvaluator_ActionMatrix uses a table-driven test to verify the
+// full action matrix for the three fixture users against the roadmap document.
+func TestGraphEvaluator_ActionMatrix(t *testing.T) {
 	// Arrange
 	rows := []struct {
-		name       string
-		subject    rebac.Resource
-		permission rebac.Permission
-		want       bool
+		name    string
+		subject rebac.Resource
+		action  rebac.Action
+		want    bool
 	}{
 		// alice — inherits editor via team → workspace → document
-		{"editor_can_read", fixtures.Alice, rebac.PermissionDocumentRead, true},
-		{"editor_can_comment", fixtures.Alice, rebac.PermissionDocumentComment, true},
-		{"editor_can_edit", fixtures.Alice, rebac.PermissionDocumentEdit, true},
-		{"editor_cannot_delete", fixtures.Alice, rebac.PermissionDocumentDelete, false},
+		{"editor_can_read", fixtures.Alice, rebac.ActionDocumentRead, true},
+		{"editor_can_comment", fixtures.Alice, rebac.ActionDocumentComment, true},
+		{"editor_can_edit", fixtures.Alice, rebac.ActionDocumentEdit, true},
+		{"editor_cannot_delete", fixtures.Alice, rebac.ActionDocumentDelete, false},
 
 		// bob — inherits viewer via workspace → document
-		{"viewer_can_read", fixtures.Bob, rebac.PermissionDocumentRead, true},
-		{"viewer_can_comment", fixtures.Bob, rebac.PermissionDocumentComment, true},
-		{"viewer_cannot_edit", fixtures.Bob, rebac.PermissionDocumentEdit, false},
-		{"viewer_cannot_delete", fixtures.Bob, rebac.PermissionDocumentDelete, false},
+		{"viewer_can_read", fixtures.Bob, rebac.ActionDocumentRead, true},
+		{"viewer_can_comment", fixtures.Bob, rebac.ActionDocumentComment, true},
+		{"viewer_cannot_edit", fixtures.Bob, rebac.ActionDocumentEdit, false},
+		{"viewer_cannot_delete", fixtures.Bob, rebac.ActionDocumentDelete, false},
 
 		// casey — no relationships, no path
-		{"outside_cannot_read", fixtures.Casey, rebac.PermissionDocumentRead, false},
-		{"outside_cannot_edit", fixtures.Casey, rebac.PermissionDocumentEdit, false},
+		{"outside_cannot_read", fixtures.Casey, rebac.ActionDocumentRead, false},
+		{"outside_cannot_edit", fixtures.Casey, rebac.ActionDocumentEdit, false},
 	}
 
 	for _, row := range rows {
@@ -245,9 +245,9 @@ func TestGraphEvaluator_PermissionMatrix(t *testing.T) {
 
 			// Act
 			result, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
-				Subject:    row.subject,
-				Permission: row.permission,
-				Resource:   fixtures.RoadmapDocument,
+				Subject:  row.subject,
+				Action:   row.action,
+				Resource: fixtures.RoadmapDocument,
 			})
 
 			// Assert
@@ -270,9 +270,9 @@ func BenchmarkGraphEvaluator_Evaluate(b *testing.B) {
 	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 	req := rebac.CheckRequest{
-		Subject:    fixtures.Alice,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Alice,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	}
 	ctx := b.Context()
 

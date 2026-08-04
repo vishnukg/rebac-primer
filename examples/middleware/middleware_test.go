@@ -18,9 +18,9 @@ func TestAuditEvaluator_DelegatesResultToInner(t *testing.T) {
 	var buf bytes.Buffer
 	audit := middleware.NewAuditEvaluator(ev, &buf)
 	req := rebac.CheckRequest{
-		Subject:    fixtures.Alice,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Alice,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	}
 
 	// Act
@@ -42,9 +42,9 @@ func TestAuditEvaluator_WritesLogLine(t *testing.T) {
 	var buf bytes.Buffer
 	audit := middleware.NewAuditEvaluator(ev, &buf)
 	req := rebac.CheckRequest{
-		Subject:    fixtures.Bob,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Bob,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	}
 
 	// Act
@@ -56,7 +56,7 @@ func TestAuditEvaluator_WritesLogLine(t *testing.T) {
 	}
 	line := buf.String()
 	if !strings.Contains(line, "can_edit") {
-		t.Errorf("expected log to mention permission can_edit, got: %s", line)
+		t.Errorf("expected log to mention action can_edit, got: %s", line)
 	}
 	if !strings.Contains(line, "denied") {
 		t.Errorf("expected log to mention denied, got: %s", line)
@@ -74,9 +74,9 @@ func TestAuditEvaluator_SatisfiesCheckerInterface(t *testing.T) {
 
 	// Act
 	result, err := c.Evaluate(t.Context(), rebac.CheckRequest{
-		Subject:    fixtures.Alice,
-		Permission: rebac.PermissionDocumentRead,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Alice,
+		Action:   rebac.ActionDocumentRead,
+		Resource: fixtures.RoadmapDocument,
 	})
 
 	// Assert
@@ -119,9 +119,9 @@ func TestReadOnlyStore_CanDriveGraphEvaluator(t *testing.T) {
 
 	// Act
 	result, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
-		Subject:    fixtures.Alice,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Alice,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	})
 
 	// Assert

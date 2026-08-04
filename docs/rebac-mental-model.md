@@ -57,7 +57,7 @@ authorization model.
 
 ### 1. Subject
 
-The subject is the already-authenticated identity whose permission is checked:
+The subject is the already-authenticated identity whose access is checked:
 
 ```text
 user:alice
@@ -81,7 +81,7 @@ document:roadmapDocument
 The type is part of the identifier. It tells the model which relations and
 rules are valid.
 
-### 3. Relation and permission
+### 3. Relation and action
 
 A relation names an association or set used as policy evidence on a resource:
 
@@ -90,7 +90,7 @@ team:platformTeam#member
 workspace:productWorkspace#editor
 ```
 
-Permissions name policy-derived authority, such as
+Actions name policy-derived authority, such as
 `document:roadmapDocument#can_read` or
 `document:roadmapDocument#can_edit`. OpenFGA places both concepts in its
 relation namespace; the application domain keeps them distinct.
@@ -113,9 +113,9 @@ means “Alice is a member of Platform Team.” The Go `Relationship` uses
 `Subject`, `Relation`, and `Resource`. The OpenFGA adapter translates them to
 its `user`, `relation`, and `object` tuple fields.
 
-### 5. Permission check
+### 5. Action check
 
-Application code should ask for the permission required by the operation:
+Application code should ask for the action required by the operation:
 
 ```text
 Check(user:alice, can_edit, document:roadmapDocument)
@@ -207,10 +207,10 @@ Alice is a team member
   -> therefore allowed to edit the document
 ```
 
-The evaluator works backward from requested permission to supporting facts. It
+The evaluator works backward from the requested action to supporting facts. It
 does not begin at Alice and wander across every edge in the store.
 
-## Facts, Roles, And Permissions
+## Facts, Roles, And Actions
 
 Use these distinctions when modeling:
 
@@ -220,11 +220,11 @@ Use these distinctions when modeling:
 | structural fact | document belongs to workspace | yes |
 | membership | Alice belongs to team | yes |
 | scoped role | team edits workspace | yes |
-| computed permission | Alice can edit document | no |
+| computed action | Alice can edit document | no |
 | request context | current time, device risk | no long-lived relationship |
 
 Role-like names such as `owner` and `editor` are relations scoped to a
-resource; assigning a subject to one is a relationship. Permissions are the
+resource; assigning a subject to one is a relationship. Actions are the
 authorities application code enforces. Keeping `editor` separate from
 `can_edit` allows the meaning of `can_edit` to evolve without changing every
 call site.
@@ -254,7 +254,7 @@ The running application has three separate gates:
 ```text
 1. access-token validation  -> may this credential be trusted for this API?
 2. OAuth scope              -> may this client call this class of endpoint?
-3. ReBAC check              -> does this subject have permission on this resource?
+3. ReBAC check              -> may this subject perform this action on this resource?
 ```
 
 Passing one gate does not imply passing another. A test rejected by the scope
@@ -264,9 +264,9 @@ gate does not prove the ReBAC model would deny the same subject.
 
 When a check surprises you, use this order:
 
-1. Write the exact subject, permission, and resource.
+1. Write the exact subject, action, and resource.
 2. Confirm the subject came from validated authentication.
-3. Open the model and expand only the requested permission.
+3. Open the model and expand only the requested action.
 4. List the relationships needed by each permitted branch.
 5. Confirm those facts exist in the authorization store.
 6. Check model ID, tenant boundary, consistency mode, and recent writes.
@@ -290,7 +290,7 @@ Then classify each noun and statement:
 1. Which nouns are typed resources?
 2. Which changing facts become relationships?
 3. Which reusable implications belong in the model?
-4. Which `can_*` permission should application code check?
+4. Which `can_*` action should application code check?
 5. Which allow, near-miss deny, revocation, and cross-tenant cases prove it?
 6. Which service owns each relationship and how is it synchronized?
 
@@ -322,7 +322,7 @@ Authenticate first; authorize second.
 A resource relation defines a set of subjects.
 A relationship is one current product fact.
 The model says how effective sets are derived.
-A check asks whether one subject belongs to one permission set.
+A check asks whether one subject belongs to one action set.
 Only model-valid paths count; no proof means deny.
 Deny and engine failure are different outcomes.
 ```

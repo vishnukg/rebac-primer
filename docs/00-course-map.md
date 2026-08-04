@@ -42,8 +42,8 @@ Read these in order:
 
 | Doc | Topic | Code to inspect |
 |---|---|---|
-| [mental model](rebac-mental-model.md) | sets, relationships, subject sets, permissions, decision debugging | `internal/rebac/rebac.go`, `deployments/openfga/model.fga` |
-| [domain language](authorization-domain-language.md) | subject, resource, action, relation, relationship, permission, decision | `internal/rebac/rebac.go`, `internal/openfga/openfga.go` |
+| [mental model](rebac-mental-model.md) | sets, relationships, subject sets, actions, decision debugging | `internal/rebac/rebac.go`, `deployments/openfga/model.fga` |
+| [domain language](authorization-domain-language.md) | subject, resource, action, relation, relationship, decision | `internal/rebac/rebac.go`, `internal/openfga/openfga.go` |
 | 02 | Authorization fundamentals: RBAC, ABAC, ReBAC | conceptual |
 | 03 | Graph theory needed for ReBAC | conceptual |
 | 04 | ReBAC concepts: why relationships, subject sets, checks | `internal/rebac/rebac.go` |

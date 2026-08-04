@@ -115,7 +115,7 @@ func TestService_GivenEvaluatorAllows_WhenCheck_ThenReturnsEvaluatorResult(t *te
 	// Arrange: a STUB evaluator pinned to an allowed result.
 	evaluator := stubEvaluator{result: rebac.CheckResult{Allowed: true, Trace: []string{"Result: allowed"}}}
 	svc := authz.New(stubRepository{}, evaluator)
-	req := rebac.CheckRequest{Subject: rebac.User("alice"), Permission: rebac.PermissionDocumentEdit, Resource: rebac.Document("roadmapDocument")}
+	req := rebac.CheckRequest{Subject: rebac.User("alice"), Action: rebac.ActionDocumentEdit, Resource: rebac.Document("roadmapDocument")}
 
 	// Act
 	result, err := svc.Check(t.Context(), req)
@@ -133,7 +133,7 @@ func TestService_GivenEvaluatorFails_WhenCheck_ThenPropagatesError(t *testing.T)
 	// Arrange: a STUB evaluator that fails.
 	wantErr := errors.New("evaluator exploded")
 	svc := authz.New(stubRepository{}, stubEvaluator{err: wantErr})
-	req := rebac.CheckRequest{Subject: rebac.User("alice"), Permission: rebac.PermissionDocumentEdit, Resource: rebac.Document("roadmapDocument")}
+	req := rebac.CheckRequest{Subject: rebac.User("alice"), Action: rebac.ActionDocumentEdit, Resource: rebac.Document("roadmapDocument")}
 
 	// Act
 	_, err := svc.Check(t.Context(), req)
@@ -148,7 +148,7 @@ func TestService_GivenCheckRequest_WhenCheck_ThenDelegatesExactRequestToEvaluato
 	// Arrange: a MOCK evaluator so we can verify the delegation, not the result.
 	evaluator := &mockEvaluator{result: rebac.CheckResult{Allowed: true}}
 	svc := authz.New(stubRepository{}, evaluator)
-	req := rebac.CheckRequest{Subject: rebac.User("alice"), Permission: rebac.PermissionDocumentEdit, Resource: rebac.Document("roadmapDocument")}
+	req := rebac.CheckRequest{Subject: rebac.User("alice"), Action: rebac.ActionDocumentEdit, Resource: rebac.Document("roadmapDocument")}
 
 	// Act
 	if _, err := svc.Check(t.Context(), req); err != nil {
@@ -290,10 +290,10 @@ func TestService_GivenInvalidRelationship_WhenWriteRelationships_ThenReturnsVali
 			Subject:  "platformTeam#member",
 		},
 		"unknown relation for resource": {
-			Resource: rebac.Team("platformTeam"), Relation: rebac.Relation(rebac.PermissionDocumentRead), Subject: rebac.Subject(rebac.User("alice")),
+			Resource: rebac.Team("platformTeam"), Relation: rebac.Relation(rebac.ActionDocumentRead), Subject: rebac.Subject(rebac.User("alice")),
 		},
-		"permission cannot be written as relation": {
-			Resource: rebac.Document("d1"), Relation: rebac.Relation(rebac.PermissionDocumentEdit), Subject: rebac.Subject(rebac.User("alice")),
+		"action cannot be written as relation": {
+			Resource: rebac.Document("d1"), Relation: rebac.Relation(rebac.ActionDocumentEdit), Subject: rebac.Subject(rebac.User("alice")),
 		},
 		"workspace pointer must reference workspace": {
 			Resource: rebac.Document("d1"), Relation: rebac.RelationDocumentWorkspace, Subject: rebac.Subject(rebac.User("alice")),
@@ -329,14 +329,14 @@ func TestService_GivenInvalidCheck_WhenCheck_ThenRejectsBeforeEvaluator(t *testi
 	// Arrange
 	cases := map[string]rebac.CheckRequest{
 		"subject must be user": {
-			Subject:    rebac.Team("platformTeam"),
-			Permission: rebac.PermissionDocumentEdit,
-			Resource:   rebac.Document("d1"),
+			Subject:  rebac.Team("platformTeam"),
+			Action:   rebac.ActionDocumentEdit,
+			Resource: rebac.Document("d1"),
 		},
-		"relation cannot be supplied as permission": {
-			Subject:    rebac.User("alice"),
-			Permission: rebac.Permission(rebac.RelationDocumentWorkspace),
-			Resource:   rebac.Document("d1"),
+		"relation cannot be supplied as action": {
+			Subject:  rebac.User("alice"),
+			Action:   rebac.Action(rebac.RelationDocumentWorkspace),
+			Resource: rebac.Document("d1"),
 		},
 	}
 

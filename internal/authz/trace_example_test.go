@@ -21,15 +21,15 @@ import (
 // line-by-line explanation of the alice/can_edit trace.
 func TestTrace(t *testing.T) {
 	cases := []struct {
-		name       string
-		subject    rebac.Resource
-		permission rebac.Permission
-		resource   rebac.Resource
+		name     string
+		subject  rebac.Resource
+		action   rebac.Action
+		resource rebac.Resource
 	}{
-		{"alice can_edit roadmap (allowed via team->workspace)", fixtures.Alice, rebac.PermissionDocumentEdit, fixtures.RoadmapDocument},
-		{"bob can_read roadmap (allowed via direct viewer)", fixtures.Bob, rebac.PermissionDocumentRead, fixtures.RoadmapDocument},
-		{"bob can_edit roadmap (denied: viewer is not editor)", fixtures.Bob, rebac.PermissionDocumentEdit, fixtures.RoadmapDocument},
-		{"casey can_read roadmap (denied: no path)", fixtures.Casey, rebac.PermissionDocumentRead, fixtures.RoadmapDocument},
+		{"alice can_edit roadmap (allowed via team->workspace)", fixtures.Alice, rebac.ActionDocumentEdit, fixtures.RoadmapDocument},
+		{"bob can_read roadmap (allowed via direct viewer)", fixtures.Bob, rebac.ActionDocumentRead, fixtures.RoadmapDocument},
+		{"bob can_edit roadmap (denied: viewer is not editor)", fixtures.Bob, rebac.ActionDocumentEdit, fixtures.RoadmapDocument},
+		{"casey can_read roadmap (denied: no path)", fixtures.Casey, rebac.ActionDocumentRead, fixtures.RoadmapDocument},
 	}
 
 	for _, tc := range cases {
@@ -40,9 +40,9 @@ func TestTrace(t *testing.T) {
 
 			// Act
 			result, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
-				Subject:    tc.subject,
-				Permission: tc.permission,
-				Resource:   tc.resource,
+				Subject:  tc.subject,
+				Action:   tc.action,
+				Resource: tc.resource,
 			})
 
 			// Assert and report the trace.

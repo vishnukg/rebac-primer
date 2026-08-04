@@ -13,7 +13,7 @@ import (
 
 // blockingEvaluator is a fake Checker whose Evaluate does no work until the
 // context is cancelled, then reports the context error. It lets us exercise
-// AllPermissions' cancellation path deterministically.
+// AllActions' cancellation path deterministically.
 type blockingEvaluator struct{}
 
 func (blockingEvaluator) Evaluate(ctx context.Context, _ rebac.CheckRequest) (rebac.CheckResult, error) {
@@ -21,16 +21,16 @@ func (blockingEvaluator) Evaluate(ctx context.Context, _ rebac.CheckRequest) (re
 	return rebac.CheckResult{}, ctx.Err()
 }
 
-func TestAllPermissions_CancelledContextReturnsError(t *testing.T) {
+func TestAllActions_CancelledContextReturnsError(t *testing.T) {
 	// Arrange: a context that is already cancelled, and an evaluator that only
 	// unblocks once the context is done.
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	// Act
-	summary, err := concurrency.AllPermissions(ctx, blockingEvaluator{}, fixtures.Alice, fixtures.RoadmapDocument)
+	summary, err := concurrency.AllActions(ctx, blockingEvaluator{}, fixtures.Alice, fixtures.RoadmapDocument)
 
-	// Assert: AllPermissions must surface the cancellation, not block or return a
+	// Assert: AllActions must surface the cancellation, not block or return a
 	// partial summary. (-race confirms no goroutine writes after we return.)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got %v", err)
@@ -40,65 +40,65 @@ func TestAllPermissions_CancelledContextReturnsError(t *testing.T) {
 	}
 }
 
-func TestAllPermissions_ReturnsFullSummaryForEditor(t *testing.T) {
+func TestAllActions_ReturnsFullSummaryForEditor(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 
 	// Act
-	summary, err := concurrency.AllPermissions(t.Context(), ev, fixtures.Alice, fixtures.RoadmapDocument)
+	summary, err := concurrency.AllActions(t.Context(), ev, fixtures.Alice, fixtures.RoadmapDocument)
 
 	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := map[rebac.Permission]bool{
-		rebac.PermissionDocumentRead:    true,
-		rebac.PermissionDocumentComment: true,
-		rebac.PermissionDocumentEdit:    true,
-		rebac.PermissionDocumentDelete:  false,
+	want := map[rebac.Action]bool{
+		rebac.ActionDocumentRead:    true,
+		rebac.ActionDocumentComment: true,
+		rebac.ActionDocumentEdit:    true,
+		rebac.ActionDocumentDelete:  false,
 	}
-	for permission, expected := range want {
-		if got := summary[permission]; got != expected {
-			t.Errorf("summary[%s] = %v, want %v", permission, got, expected)
+	for action, expected := range want {
+		if got := summary[action]; got != expected {
+			t.Errorf("summary[%s] = %v, want %v", action, got, expected)
 		}
 	}
 }
 
-func TestAllPermissions_ViewerCanReadButNotEdit(t *testing.T) {
+func TestAllActions_ViewerCanReadButNotEdit(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 
 	// Act
-	summary, err := concurrency.AllPermissions(t.Context(), ev, fixtures.Bob, fixtures.RoadmapDocument)
+	summary, err := concurrency.AllActions(t.Context(), ev, fixtures.Bob, fixtures.RoadmapDocument)
 
 	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !summary[rebac.PermissionDocumentRead] {
+	if !summary[rebac.ActionDocumentRead] {
 		t.Error("expected viewer can_read=true")
 	}
-	if !summary[rebac.PermissionDocumentComment] {
+	if !summary[rebac.ActionDocumentComment] {
 		t.Error("expected viewer can_comment=true")
 	}
-	if summary[rebac.PermissionDocumentEdit] {
+	if summary[rebac.ActionDocumentEdit] {
 		t.Error("expected viewer can_edit=false")
 	}
-	if summary[rebac.PermissionDocumentDelete] {
+	if summary[rebac.ActionDocumentDelete] {
 		t.Error("expected viewer can_delete=false")
 	}
 }
 
-func TestAllPermissions_NonDocumentResourceReturnsEmptySummary(t *testing.T) {
+func TestAllActions_NonDocumentResourceReturnsEmptySummary(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 
 	// Act
-	summary, err := concurrency.AllPermissions(t.Context(), ev, fixtures.Alice, fixtures.ProductWorkspace)
+	summary, err := concurrency.AllActions(t.Context(), ev, fixtures.Alice, fixtures.ProductWorkspace)
 
 	// Assert
 	if err != nil {
@@ -114,9 +114,9 @@ func TestBulkCheck_ReturnsResultsInInputOrder(t *testing.T) {
 	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	ev := authz.NewGraphEvaluator(store)
 	reqs := []rebac.CheckRequest{
-		{Subject: fixtures.Alice, Permission: rebac.PermissionDocumentEdit, Resource: fixtures.RoadmapDocument},
-		{Subject: fixtures.Bob, Permission: rebac.PermissionDocumentEdit, Resource: fixtures.RoadmapDocument},
-		{Subject: fixtures.Bob, Permission: rebac.PermissionDocumentRead, Resource: fixtures.RoadmapDocument},
+		{Subject: fixtures.Alice, Action: rebac.ActionDocumentEdit, Resource: fixtures.RoadmapDocument},
+		{Subject: fixtures.Bob, Action: rebac.ActionDocumentEdit, Resource: fixtures.RoadmapDocument},
+		{Subject: fixtures.Bob, Action: rebac.ActionDocumentRead, Resource: fixtures.RoadmapDocument},
 	}
 
 	// Act

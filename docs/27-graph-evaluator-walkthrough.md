@@ -1,7 +1,7 @@
 # How the graph evaluator works
 
 This document explains, step by step, how the in-process graph evaluator
-answers a permission check. Chapter 07 explains how this teaching implementation
+answers an action check. Chapter 07 explains how this teaching implementation
 fits into a production ReBAC service and an OpenFGA adoption decision.
 
 The relevant source files are:
@@ -74,9 +74,9 @@ get workspace editor access without any new workspace relationship.
 
 ---
 
-## What a permission check is asking
+## What an action check is asking
 
-A check question is: **"does `<subject>` have `<permission>` on
+A check question is: **"may `<subject>` perform `<action>` on
 `<resource>`?"**
 
 Concretely:
@@ -104,9 +104,9 @@ proves the relationship chain by searching in reverse from the requested
 document toward candidate subjects.
 
 More precisely, it evaluates whether Alice belongs to
-the `can_edit` permission on `document:roadmapDocument`. It does not perform
+the `can_edit` action on `document:roadmapDocument`. It does not perform
 unrestricted graph reachability: every recursive branch comes from the
-permission mapping and relation model.
+action mapping and relation model.
 
 ---
 
@@ -115,7 +115,7 @@ permission mapping and relation model.
 The evaluator uses **depth-first search (DFS)**: it picks one branch and follows
 it all the way to the end before trying another.
 
-Before traversal, the evaluator maps the checked permission to a relation. For
+Before traversal, the evaluator maps the checked action to a relation. For
 each `(resource, relation)` pair it visits, it tries four things:
 
 | Step | Name | What it does |
@@ -144,7 +144,7 @@ Let's trace every step the evaluator takes.
 Check(alice, can_edit, document:roadmapDocument)
 ```
 
-**Permission mapping:** `permissionRelationsFor` maps the `can_edit` permission
+**Action mapping:** `actionRelationsFor` maps the `can_edit` action
 to the document's `editor` relation:
 
 ```text
@@ -252,7 +252,7 @@ user:alice member team:platformTeam                → true ✓
       hasRelation on workspace:productWorkspace/editor → true ✓
         workspace inheritance for document/editor  → true ✓
           hasRelation on document:roadmapDocument/editor → true ✓
-            permission can_edit requires editor → true ✓
+            action can_edit requires editor → true ✓
 ```
 
 **Result: allowed.**
@@ -265,8 +265,8 @@ The evaluator records every step it takes in a `Trace` slice. For the Alice /
 `can_edit` / `roadmapDocument` check, the trace looks like this:
 
 ```
-Check whether user:alice has permission can_edit on document:roadmapDocument
-Permission can_edit requires relation editor
+Check whether user:alice may perform action can_edit on document:roadmapDocument
+Action can_edit requires relation editor
 document:roadmapDocument editor includes owner
 document:roadmapDocument owner can inherit owner from workspace:productWorkspace
 document:roadmapDocument editor can inherit editor from workspace:productWorkspace
@@ -285,9 +285,9 @@ You can print the trace yourself from a test:
 
 ```go
 result, _ := evaluator.Evaluate(ctx, rebac.CheckRequest{
-    Subject:    fixtures.Alice,
-    Permission: rebac.PermissionDocumentEdit,
-    Resource:   fixtures.RoadmapDocument,
+    Subject:  fixtures.Alice,
+    Action:   rebac.ActionDocumentEdit,
+    Resource: fixtures.RoadmapDocument,
 })
 for _, line := range result.Trace {
     fmt.Println(line)
@@ -301,7 +301,7 @@ for _, line := range result.Trace {
 Casey has no relationships. The evaluator exhausts every branch and finds nothing.
 
 ```
-permission can_read requires relation viewer
+action can_read requires relation viewer
 hasRelation(casey, document:roadmapDocument, viewer)
   step 1: no direct relationship
   step 3: viewer → editor → owner (documentRules, chained)
@@ -388,9 +388,9 @@ revisit the same graph node without being incorrectly denied.
 
 ---
 
-## Permission mappings and relation rules
+## Action mappings and relation rules
 
-`internal/authz/model.go` holds a permission-to-relation mapping and three
+`internal/authz/model.go` holds an action-to-relation mapping and three
 relation-hierarchy tables—one per resource type. Each hierarchy table maps a
 relation to the *stronger* relations that imply it.
 
@@ -425,7 +425,7 @@ Resolve "viewer" on workspace:productWorkspace for alice:
 |---|---|
 | Entry point for a check | `GraphEvaluator.Evaluate()` (builds a per-request `resolution`) |
 | The recursive traversal | `resolution.hasRelation()` |
-| Permission-to-relation mapping | `permissionRelationsFor()` |
+| Action-to-relation mapping | `actionRelationsFor()` |
 | Step 1: direct lookup | `hasRelationship()` — direct `store.Has` lookup |
 | Step 2: subject-set | `hasRelationship()` — the candidate loop |
 | Subject-set recursion | `subjectSetContains()` |
@@ -438,28 +438,28 @@ Resolve "viewer" on workspace:productWorkspace for alice:
 
 ---
 
-## Exercise: add a new permission
+## Exercise: add a new action
 
-Add a `can_share` permission: only document owners can share.
+Add a `can_share` action: only document owners can share.
 
-**1. Add the permission constant** in `internal/rebac/rebac.go`:
+**1. Add the action constant** in `internal/rebac/rebac.go`:
 
 ```go
-PermissionDocumentShare Permission = "can_share"
+ActionDocumentShare Action = "can_share"
 ```
 
-**2. Add the permission mapping** in `internal/authz/model.go`:
+**2. Add the action mapping** in `internal/authz/model.go`:
 
 ```go
-var permissionRules = map[rebac.ResourceType]map[rebac.Permission][]rebac.Relation{
+var actionRules = map[rebac.ResourceType]map[rebac.Action][]rebac.Relation{
     // ... existing rules ...
     rebac.ResourceTypeDocument: {
-        rebac.PermissionDocumentShare: {rebac.RelationDocumentOwner},
+        rebac.ActionDocumentShare: {rebac.RelationDocumentOwner},
     },
 }
 ```
 
-`permissionDefinedFor` reads this mapping, while relationship validation accepts
+`actionDefinedFor` reads this mapping, while relationship validation accepts
 only relations, so `can_share` remains unwritable by construction.
 
 **3. Mirror the rule in OpenFGA** in `deployments/openfga/model.fga`:
@@ -485,9 +485,9 @@ func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
 
     // alice (owner) can share
     got, err := ev.Evaluate(ctx, rebac.CheckRequest{
-        Subject:    fixtures.Alice,
-        Permission: rebac.PermissionDocumentShare,
-        Resource:   fixtures.RoadmapDocument,
+        Subject:  fixtures.Alice,
+        Action:   rebac.ActionDocumentShare,
+        Resource: fixtures.RoadmapDocument,
     })
     if err != nil {
         t.Fatalf("owner check: %v", err)
@@ -498,9 +498,9 @@ func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
 
     // bob (viewer) cannot share
     got, err = ev.Evaluate(ctx, rebac.CheckRequest{
-        Subject:    fixtures.Bob,
-        Permission: rebac.PermissionDocumentShare,
-        Resource:   fixtures.RoadmapDocument,
+        Subject:  fixtures.Bob,
+        Action:   rebac.ActionDocumentShare,
+        Resource: fixtures.RoadmapDocument,
     })
     if err != nil {
         t.Fatalf("viewer check: %v", err)
@@ -511,8 +511,8 @@ func TestGraphEvaluator_OnlyOwnerCanShare(t *testing.T) {
 }
 ```
 
-No changes to the traversal algorithm are needed—the permission mapping and
-relation tables drive it. The permission mapping, OpenFGA model, and contract
+No changes to the traversal algorithm are needed—the action mapping and
+relation tables drive it. The action mapping, OpenFGA model, and contract
 test edits are important because this repository keeps a teaching evaluator
 and an OpenFGA model intentionally aligned.
 

@@ -37,7 +37,7 @@ Go uses small named types to prevent accidental mixing:
 ```go
 type Resource string
 type Relation string
-type Permission string
+type Action string
 
 type Relationship struct {
     Subject  Subject

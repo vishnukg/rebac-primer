@@ -4,7 +4,7 @@ This repository uses one authorization vocabulary across product services,
 domain types, HTTP examples, tests, and documentation:
 
 ```text
-Check(subject, permission, resource) -> decision
+Check(subject, action, resource) -> decision
 ```
 
 The vocabulary is deliberately independent of any authorization engine. An
@@ -16,18 +16,25 @@ adapter translates it when an external system uses different field names.
 |---|---|---|
 | subject | resource or subject set on the left side of a relationship; in a check, the identity being evaluated | `user:alice`, `team:platformTeam#member` |
 | resource | typed entity being protected or related | `document:roadmapDocument` |
-| action | business operation currently being attempted | `edit` |
+| action | policy-derived operation a subject may perform, checked by applications | `can_edit` |
 | relation | named association on a resource used as stored or derivable policy evidence | `member`, `editor`, `workspace` |
 | relationship | stored fact in `(subject, relation, resource)` form | Alice is a member of Platform Team |
-| permission | policy-derived authority that an application may check | `can_edit` |
-| decision | result of successfully checking one permission | `allow` or `deny` |
+| decision | result of successfully checking one action | `allow` or `deny` |
 
 Each term has one job. In particular, relations are policy evidence and
-permissions are policy results. Application code checks permissions; it does
-not reproduce policy by checking a role-like relation.
+actions are policy results. Application code checks actions; it does not
+reproduce policy by checking a role-like relation.
+
+Much of the authorization literature calls this checked term a *permission*
+(SpiceDB even has a `permission` keyword). This repository says *action*
+because it names what the subject is trying to do; the concept is the same.
 
 An evaluation failure is an error, not a denial decision. Callers may fail
 closed, but logs and reliability controls should preserve that distinction.
+
+Resource ids may not contain `#` or whitespace (`rebac.ValidateID`), because
+resources and subject sets share one string space and `#` separates a subject
+set from its relation. OpenFGA applies the same rule to object ids.
 
 ## Relationships And Checks
 
@@ -51,29 +58,29 @@ Alice is a member of Platform Team.
 Platform Team members are editors of Product Workspace.
 ```
 
-A permission check has a different middle term:
+An action check has a different middle term:
 
 ```text
-Check(subject, permission, resource)
+Check(subject, action, resource)
 Check(user:alice, can_edit, document:roadmapDocument)
 ```
 
 The model derives `can_edit` from relationships such as `editor`, `owner`, team
 membership, and document-to-workspace structure.
 
-## Action Versus Permission
+## Action Versus Relation
 
-An action is what the application is doing. A permission is the authority that
-the action requires:
+An action is what the application is trying to do on behalf of a subject. A
+relation is a durable fact that serves as evidence for allowing it:
 
 ```text
-action:              edit a document
-required permission: can_edit
+action:              can_edit  (checked, never stored)
+supporting relation: editor    (stored, or derived from owner)
 ```
 
-Simple operations often map one-to-one to permissions, but they are not the
-same concept. A workflow can require several permission checks, and one
-permission can protect more than one application entry point.
+Simple operations often map one-to-one to actions, but a workflow can require
+several action checks, and one action can protect more than one application
+entry point.
 
 ## Go Types
 
@@ -81,7 +88,7 @@ The shared domain package makes the distinction explicit:
 
 ```go
 type Relation string
-type Permission string
+type Action string
 
 type Relationship struct {
     Subject  Subject
@@ -90,26 +97,26 @@ type Relationship struct {
 }
 
 type CheckRequest struct {
-    Subject    Resource
-    Permission Permission
-    Resource   Resource
+    Subject  Resource
+    Action   Action
+    Resource Resource
 }
 ```
 
-Permission constants are separate from relation constants. For example:
+Action constants are separate from relation constants. For example:
 
 ```go
 rebac.RelationWorkspaceEditor // relationship evidence
-rebac.PermissionDocumentEdit  // permission checked by an application
+rebac.ActionDocumentEdit      // action checked by an application
 ```
 
-The relationship writer accepts only `Relation`, so a permission such as
+The relationship writer accepts only `Relation`, so an action such as
 `can_edit` cannot accidentally be persisted as a durable fact.
 
 ## OpenFGA Translation
 
 OpenFGA uses `user`, `relation`, and `object` for both stored tuples and checks.
-Its model also declares computed permissions such as `can_edit` in the
+Its model also declares computed relations such as `can_edit` in the
 `relations` section. That is OpenFGA's transport and model vocabulary, not the
 application's domain vocabulary.
 
@@ -118,7 +125,7 @@ The adapter owns this translation:
 | Domain | OpenFGA |
 |---|---|
 | subject | user |
-| permission, for a check | relation |
+| action, for a check | relation |
 | relation, for a relationship write | relation |
 | resource | object |
 | relationship | tuple |
@@ -128,7 +135,7 @@ Consequently, this OpenFGA request is correct at the adapter boundary:
 ```go
 openfga.ClientCheckRequest{
     User:     string(req.Subject),
-    Relation: string(req.Permission),
+    Relation: string(req.Action),
     Object:   string(req.Resource),
 }
 ```
@@ -140,10 +147,10 @@ the external adapter requires it.
 
 Use these checks when adding a feature:
 
-1. Name the attempted business action.
-2. Name the permission that protects it, usually `can_*`.
+1. Name the attempted business operation.
+2. Name the action that protects it, usually `can_*`.
 3. Add or reuse relations that describe durable business facts.
-4. Derive the permission from those relations in policy.
-5. Make application code call `Check(subject, permission, resource)`.
-6. Store only relationships, never permission results.
+4. Derive the action from those relations in policy.
+5. Make application code call `Check(subject, action, resource)`.
+6. Store only relationships, never check decisions.
 7. Translate to engine-specific vocabulary only inside its adapter.

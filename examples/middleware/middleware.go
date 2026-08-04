@@ -14,7 +14,7 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// Checker is the permission-evaluation capability consumed by this decorator.
+// Checker is the action-evaluation capability consumed by this decorator.
 type Checker interface {
 	Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
 }
@@ -54,8 +54,8 @@ func (a *AuditEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
 		status = "denied"
 	}
 
-	a.logger.Printf("check subject=%s permission=%s resource=%s -> %s (%s)",
-		req.Subject, req.Permission, req.Resource, status, elapsed)
+	a.logger.Printf("check subject=%s action=%s resource=%s -> %s (%s)",
+		req.Subject, req.Action, req.Resource, status, elapsed)
 
 	return result, err
 }

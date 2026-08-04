@@ -156,7 +156,7 @@ Keep them visible and make them useful:
 
 ```go
 if err != nil {
-    return fmt.Errorf("check document permission: %w", err)
+    return fmt.Errorf("check document action: %w", err)
 }
 ```
 
@@ -223,7 +223,7 @@ Exported declarations should have comments that start with the declaration
 name. That keeps `go doc` useful:
 
 ```go
-// GraphEvaluator answers permission checks by walking the relationship graph.
+// GraphEvaluator answers action checks by walking the relationship graph.
 type GraphEvaluator struct { ... }
 ```
 
@@ -239,7 +239,7 @@ Before writing `go f()`, answer:
 - Who waits for it?
 - Can it block forever on send, receive, lock, or I/O?
 
-`examples/concurrency.AllPermissions` uses a buffered channel so workers can
+`examples/concurrency.AllActions` uses a buffered channel so workers can
 finish even if the collector returns early after context cancellation.
 
 `examples/concurrency.BulkCheck` uses `sync.WaitGroup.Go` because it wants to

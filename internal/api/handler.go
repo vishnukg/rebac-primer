@@ -64,6 +64,16 @@ func (h *handler) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errorBody("id, title, body, and workspaceId are required"))
 		return
 	}
+	// Both ids become resource references in the relationship graph, so reject
+	// characters that would make those references ambiguous before they get there.
+	if err = rebac.ValidateID(body.ID); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorBody("id: "+err.Error()))
+		return
+	}
+	if err = rebac.ValidateID(body.WorkspaceID); err != nil {
+		writeJSON(w, http.StatusBadRequest, errorBody("workspaceId: "+err.Error()))
+		return
+	}
 
 	doc, err := h.docs.Create(r.Context(), documents.CreateDocumentInput{
 		ID:        body.ID,

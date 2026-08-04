@@ -20,7 +20,7 @@ Do only this first session:
 4. Explain these three facts aloud:
    - a relationship is a changing product fact
    - the model contains reusable rules
-   - a check asks whether one subject has one permission on one resource
+   - a check asks whether one subject may perform one action on one resource
 5. Stop.
 
 That is enough for one session. Defer—not discard—these topics:
@@ -80,8 +80,8 @@ model + relationships + check
   viewers, and document editors can come from the parent workspace.
 - **Relationships** are changing product facts: Alice belongs to this team, this team
   edits that workspace, and this document belongs to that workspace.
-- A **check** asks whether one subject has one permission on one resource:
-  `Check(subject, permission, resource)`.
+- A **check** asks whether one subject may perform one action on one resource:
+  `Check(subject, action, resource)`.
 
 Read every relationship as one sentence:
 
@@ -91,7 +91,7 @@ Read every relationship as one sentence:
 
 The only unusual subject is `team:platformTeam#member`. It means a set—“all
 members of the platform team”—rather than one person. The evaluator starts at
-the requested permission and works backward through allowed rules and facts. If
+the requested action and works backward through allowed rules and facts. If
 it cannot prove a path to the subject, the answer is deny.
 
 Authentication supplies “who is asking.” ReBAC answers “may that identity do
@@ -99,11 +99,11 @@ this action to this resource?” Keep those as two separate questions.
 
 The stable vocabulary is: actions are attempted by the application, relations
 name policy associations, relationships record durable facts, and policy
-derives permissions such as `can_edit`. Application code checks permissions. See
+derives actions such as `can_edit`. Application code checks actions. See
 [Authorization Domain Language](docs/authorization-domain-language.md).
 
 The full version of this memory aid—including sets, usersets, roles versus
-permissions, debugging, and modeling at work—is
+actions, debugging, and modeling at work—is
 [A ReBAC Mental Model You Can Reuse](docs/rebac-mental-model.md).
 
 ## Before You Begin
@@ -201,7 +201,7 @@ the first evaluator test is allowed, you have understood the core system.
 ```bash
 make test
 make trace
-make test-permission
+make test-action
 ```
 
 `TestTrace` prints every step the evaluator took. For `alice / can_edit`, the

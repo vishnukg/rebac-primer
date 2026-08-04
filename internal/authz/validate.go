@@ -80,9 +80,9 @@ func ValidateCheckRequest(req rebac.CheckRequest) error {
 			"check resource %q is invalid (%v)", req.Resource, err,
 		)}
 	}
-	if !permissionDefinedFor(resourceType, req.Permission) {
+	if !actionDefinedFor(resourceType, req.Action) {
 		return &CheckValidationError{Message: fmt.Sprintf(
-			"permission %q is not defined for %s resources", req.Permission, resourceType,
+			"action %q is not defined for %s resources", req.Action, resourceType,
 		)}
 	}
 	return nil
@@ -108,8 +108,8 @@ func relationDefinedFor(resourceType rebac.ResourceType, relation rebac.Relation
 	return false
 }
 
-func permissionDefinedFor(resourceType rebac.ResourceType, permission rebac.Permission) bool {
-	return len(permissionRelationsFor(resourceType, permission)) > 0
+func actionDefinedFor(resourceType rebac.ResourceType, action rebac.Action) bool {
+	return len(actionRelationsFor(resourceType, action)) > 0
 }
 
 func isDocumentBaseRelation(relation rebac.Relation) bool {

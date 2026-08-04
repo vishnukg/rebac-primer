@@ -4,8 +4,8 @@ Authorization is the part of the system that decides whether an authenticated
 subject can perform an action on a resource.
 
 ```text
-business operation:   subject + action + resource
-authorization check:  Check(subject, required permission, resource) -> decision
+business operation:   subject + operation + resource
+authorization check:  Check(subject, action, resource) -> decision
 ```
 
 Before ReBAC makes sense, you need to understand the common authorization models
@@ -14,7 +14,7 @@ and where they break.
 By the end, you should be able to turn a product sentence into:
 
 ```text
-Check(subject, permission, resource)
+Check(subject, action, resource)
 ```
 
 The core path ends after "Authorization architecture in this repo." The agentic
@@ -45,16 +45,16 @@ Now global roles are not enough.
 Every authorization check in this repository needs the same three pieces:
 
 ```text
-Check(subject, permission, resource) -> decision
+Check(subject, action, resource) -> decision
 ```
 
-The business action determines which permission the application checks:
+The business operation determines which action the application checks:
 
 ```text
-subject             = user:alice
-action              = edit
-required permission = can_edit
-resource            = document:roadmapDocument
+subject         = user:alice
+operation       = edit
+checked action  = can_edit
+resource        = document:roadmapDocument
 ```
 
 The business question is:
@@ -69,13 +69,13 @@ The authorization check is:
 Check(user:alice, can_edit, document:roadmapDocument)
 ```
 
-The application attempts the `edit` action and asks the authorization domain
-for the `can_edit` permission. Relationships are the durable facts used to
-derive that permission; their relation names describe what each fact means:
+The application attempts the `edit` operation and asks the authorization domain
+for the `can_edit` action. Relationships are the durable facts used to
+derive that action; their relation names describe what each fact means:
 
 ```text
 relationship: Alice is a member of Platform Team
-permission:   Alice can_edit Roadmap Document
+action:       Alice can_edit Roadmap Document
 ```
 
 OpenFGA represents both in its relation namespace, but the application domain
@@ -120,7 +120,7 @@ The names are historical and slightly confusing. For learning:
 403 -> authorization problem
 ```
 
-## A Tiny Permission Matrix
+## A Tiny Action Matrix
 
 Before thinking about graphs, write the desired outcomes:
 
@@ -172,7 +172,7 @@ Do not skip authorization just because authentication succeeded.
 
 ## Common Beginner Mistakes
 
-Mistake 1: treating login as permission.
+Mistake 1: treating login as authorization.
 
 ```text
 Bad:  user is logged in, so allow document update
@@ -190,7 +190,7 @@ Mistake 3: putting authorization only in the client.
 
 ```text
 Bad:  hide the edit button and trust the browser
-Good: hide the edit button for UX, but enforce permission on the server
+Good: hide the edit button for UX, but enforce the check on the server
 ```
 
 Mistake 4: making the HTTP handler own the policy.
@@ -405,7 +405,7 @@ Now team membership is the source of truth.
 │ Document     │ enforces business rule
 │ Service      │
 └──────┬───────┘
-       │ Check(subject, permission, resource)
+       │ Check(subject, action, resource)
        ▼
 ┌───────────────────────┐
 │ Authorization Service │ graph evaluator or OpenFGA adapter
@@ -500,7 +500,7 @@ Diagram:
        │ wants to read/edit resource
        ▼
 ┌──────────────┐
-│ Authz layer  │ Check(subject, permission, resource)
+│ Authz layer  │ Check(subject, action, resource)
 └──────┬───────┘
        │ allow/deny
        ▼
@@ -513,11 +513,11 @@ Two identities may matter:
 
 | Identity | Example | Why it matters |
 |----------|---------|----------------|
-| User identity | `user:alice` | Whose data and permissions are being used |
+| User identity | `user:alice` | Whose data and access are being used |
 | Agent identity | `agent:docAssistant` | Which agent/tooling is allowed to operate |
 
 For many apps, the agent should not get broad new powers. It should inherit a
-limited subset of the user's permissions:
+limited subset of the user's access:
 
 ```text
 agent can read only documents the user can read
@@ -528,7 +528,7 @@ agent can call only tools the app permits for this workflow
 That gives you two checks:
 
 ```text
-1. Does the subject have the required permission on this resource?
+1. Is the subject allowed the required action on this resource?
 2. Is this agent/tool allowed to perform this kind of action?
 ```
 
@@ -561,7 +561,7 @@ agent:docAssistant          approved_agent  tool:update_document
 ```
 
 Here `approved_agent` is stored evidence; policy derives the checked `can_use`
-permission from it.
+action from it.
 
 The important production habit is the same as normal web apps:
 
@@ -619,8 +619,8 @@ Casey creates a document in workspace:productWorkspace.
 Format:
 
 ```text
-Can <subject> <action> <resource>?
-Check(<subject>, <permission>, <resource>)
+Can <subject> <operation> <resource>?
+Check(<subject>, <action>, <resource>)
 ```
 
 Example:
@@ -634,8 +634,8 @@ Check(user:alice, can_edit, document:roadmapDocument)
 
 Why does ReBAC fit collaborative documents better than global RBAC?
 
-Good answer: collaborative documents need resource-specific permissions that
-follow relationships between users, teams, workspaces, and documents. ReBAC
+Good answer: collaborative documents need resource-specific access that
+follows relationships between users, teams, workspaces, and documents. ReBAC
 models those relationships directly.
 
 Next: [Graph theory for ReBAC](03-graph-theory-for-rebac.md) turns that

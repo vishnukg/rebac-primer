@@ -13,7 +13,7 @@ FGA_CLI  := docker run --rm -v "$(CURDIR):/workspace" -w /workspace openfga/cli:
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build test test-race trace test-permission vet lint vulncheck modernize check shell server server-down server-openfga \
+.PHONY: help build test test-race trace test-action vet lint vulncheck modernize check shell server server-down server-openfga \
         openfga/up openfga/down openfga/model-test openfga/seed compose/config clean
 
 help:
@@ -26,7 +26,7 @@ help:
 	@printf '%s\n' '  make test           Run Go tests'
 	@printf '%s\n' '  make test-race      Run tests with the race detector'
 	@printf '%s\n' '  make trace          Print the Alice can_edit graph traversal'
-	@printf '%s\n' '  make test-permission Run one representative permission test'
+	@printf '%s\n' '  make test-action Run one representative action test'
 	@printf '%s\n' '  make vet            Run go vet'
 	@printf '%s\n' '  make lint           Run staticcheck'
 	@printf '%s\n' '  make vulncheck      Scan dependencies with govulncheck'
@@ -57,7 +57,7 @@ test-race:
 trace:
 	$(GO_TOOLS) go test -v -run TestTrace ./internal/authz
 
-test-permission:
+test-action:
 	$(GO_TOOLS) go test -v -run TestGraphEvaluator_TeamMemberCanEditDocument ./internal/authz
 
 vet:

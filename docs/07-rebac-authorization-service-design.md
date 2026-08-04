@@ -59,7 +59,7 @@ Alice can edit Roadmap Document.
 The core decision shape remains:
 
 ```text
-Does subject S have permission P on resource R?
+May subject S perform action A on resource R?
 ```
 
 For this repository:
@@ -124,7 +124,7 @@ Turn each requirement into examples:
 | Bob | edit | roadmap | deny | viewer is not editor |
 | Casey | read | roadmap | deny | no granting relationship |
 
-This permission matrix is the policy contract. Model syntax and code are
+This action matrix is the policy contract. Model syntax and code are
 implementations of it.
 
 ## From Requirements to Policy
@@ -137,12 +137,12 @@ After writing product sentences, classify each sentence before touching the DSL:
 | platformTeam members edit productWorkspace | durable relationship fact using a subject set | relationship data |
 | roadmapDocument lives in productWorkspace | durable structural fact | relationship data |
 | workspace editors can edit workspace documents | reusable derivation rule | model |
-| document owners can delete documents | application permission rule | model |
+| document owners can delete documents | application action rule | model |
 | user has `documents:write` OAuth scope | request/token attribute | checked outside ReBAC |
 
 This classification prevents two common mistakes:
 
-- storing derived permissions as relationships, which creates duplicated authorization
+- storing derived actions as relationships, which creates duplicated authorization
   state and hard revocation
 - putting changing product facts into the model, which makes ordinary workflow
   changes require policy deployment
@@ -169,7 +169,7 @@ Avoid:  entity, resource, generic_role for everything
 ```
 
 Specific types make the policy easier to review, support type-specific
-permissions and listing, and usually produce shallower evaluation paths. Use
+actions and listing, and usually produce shallower evaluation paths. Use
 recursive generic hierarchies only when the product genuinely permits arbitrary
 nesting.
 
@@ -180,11 +180,11 @@ A good ReBAC policy usually has three layers:
 ```text
 base relations       owner, editor, viewer, member
 structural relations workspace, parent, organization
-computed permissions can_read, can_edit, can_delete
+computed actions can_read, can_edit, can_delete
 ```
 
 Base relations are usually product concepts people understand. Structural
-relations connect resources so access can inherit. Computed permissions are the
+relations connect resources so access can inherit. Computed actions are the
 authorities that business operations require.
 
 This repo's policy follows that shape:
@@ -196,11 +196,11 @@ This repo's policy follows that shape:
 | structural relation | `document#workspace` | connect child document to parent workspace |
 | hierarchy rule | `viewer includes editor` | avoid duplicating weaker-role relationships |
 | inheritance rule | `editor from workspace` | reuse workspace access for documents |
-| computed permission | `can_edit: editor` | let code check the permission required by an action |
+| computed action | `can_edit: editor` | let code check the action a business operation requires |
 
 When extending the model, place a new concept in the right layer. For example,
 `folder` would probably be a new resource type plus a structural relation;
-`can_share` would probably be a computed permission; "Alice is a reviewer"
+`can_share` would probably be a computed action; "Alice is a reviewer"
 would probably be a relationship.
 
 ## The Graph Has Semantics
@@ -221,7 +221,7 @@ workspace:product
 But authorization is not arbitrary reachability. A random graph path must not
 grant access.
 
-The requested permission defines which relationships may be traversed:
+The requested action defines which relationships may be traversed:
 
 ```text
 can_edit = editor
@@ -238,7 +238,7 @@ This distinction is fundamental:
 
 ```text
 Incorrect: any path between Alice and the document grants access
-Correct: only a path admitted by the permission's policy grants access
+Correct: only a path admitted by the action's policy grants access
 ```
 
 ## Core Data Concepts
@@ -285,9 +285,9 @@ viewer
 Relations describe how subjects are associated with a resource. A relationship
 assigns a particular subject to one of those relations.
 
-### Permission
+### Action
 
-A policy-derived authority required by an application action:
+A policy-derived authority required by a business operation:
 
 ```text
 can_read
@@ -296,7 +296,7 @@ can_delete
 can_share
 ```
 
-Keeping permissions separate from structural relations gives the model room to
+Keeping actions separate from structural relations gives the model room to
 evolve:
 
 ```text
@@ -304,7 +304,7 @@ can_edit = editor
 editor includes owner
 ```
 
-Callers ask for `can_edit`; they do not need to know how that permission is
+Callers ask for `can_edit`; they do not need to know how that action is
 currently derived.
 
 ### Relationship
@@ -324,7 +324,7 @@ user:alice  member  team:platform
 The Go `Relationship` fields are `Subject`, `Relation`, and `Resource`.
 OpenFGA's adapter translates those to `user`, `relation`, and `object`.
 
-### Relationships and derived permissions
+### Relationships and derived actions
 
 A direct relationship is backed by stored data:
 
@@ -332,13 +332,13 @@ A direct relationship is backed by stored data:
 user:alice member team:platform
 ```
 
-A permission is derived by policy:
+An action is derived by policy:
 
 ```text
 Alice can_edit roadmap
 ```
 
-There is no need to store every implied permission. Materializing all derived
+There is no need to store every implied action. Materializing all derived
 access causes duplication, write amplification, and difficult revocation.
 
 ### Subject sets or usersets
@@ -470,7 +470,7 @@ that stores the relationship data itself.
 Start with a small API:
 
 ```text
-Check(subject, permission, resource) -> decision
+Check(subject, action, resource) -> decision
 ```
 
 A decision is allow or deny; an evaluation failure is an error, not a third
@@ -489,7 +489,7 @@ Useful operations may include:
 
 | Operation | Purpose |
 |---|---|
-| Check | One subject, permission, and resource |
+| Check | One subject, action, and resource |
 | BatchCheck | Several independent checks |
 | ListObjects / ListResources | Resources a subject may access |
 | ListUsers / ListSubjects | Subjects with access to a resource |
@@ -500,7 +500,7 @@ Useful operations may include:
 
 Do not assume listing is merely “run Check for every database row.” That can
 create latency, load, pagination, and information-leak problems. Design
-permission-aware search explicitly.
+action-aware search explicitly.
 
 ## Data Ownership and Synchronization
 
@@ -588,7 +588,7 @@ a revocation window.
 Possible cache keys include:
 
 ```text
-subject + permission + resource + policy version + relationship version/context
+subject + action + resource + policy version + relationship version/context
 ```
 
 Questions to answer:
@@ -613,7 +613,7 @@ Approaches include:
 - tenant as a parent resource in the graph
 - tenant-qualified resource IDs
 - isolated stores or databases for stronger boundaries
-- a required tenant relationship on every permission path
+- a required tenant relationship on every action path
 
 Test cross-tenant near misses:
 
@@ -643,7 +643,7 @@ example, can require both application changes and relationship rewrites.
 
 A safe rollout can include:
 
-1. write a permission matrix
+1. write a action matrix
 2. add tests for old and new behavior
 3. deploy the new policy version without activating it
 4. run shadow decisions against both versions
@@ -698,7 +698,7 @@ Fail closed:
 
 ```text
 authorization timeout ≠ allow
-unknown permission     ≠ allow
+unknown action         ≠ allow
 missing policy version ≠ use an arbitrary version
 ```
 
@@ -727,7 +727,7 @@ graph data indiscriminately:
 ```text
 decision ID
 subject
-permission
+action
 resource
 allow/deny/error
 policy version
@@ -753,13 +753,13 @@ Cost depends on:
 - datastore and cache behavior
 
 Set limits for depth, breadth, result size, and request concurrency. Measure
-real permission shapes rather than benchmarking only direct relationships.
+real check shapes rather than benchmarking only direct relationships.
 
 Model clarity is a performance and security feature. Prefer a short,
 explainable path:
 
 ```text
-user → team membership → workspace permission → document inheritance
+user → team membership → workspace access → document inheritance
 ```
 
 over a deeply indirect policy that no reviewer can reason about.
@@ -803,7 +803,7 @@ This removes a large amount of engine and operational work.
 Your team still owns:
 
 - product authorization requirements
-- resource, relation, and permission vocabulary
+- resource, relation, and action vocabulary
 - where enforcement occurs
 - authentication of callers and workloads
 - source-of-truth ownership for relationships
@@ -883,7 +883,7 @@ Use this repository as a controlled comparison:
 
 1. Treat the Go evaluator as an executable specification of the basic policy.
 2. Express the same policy in `deployments/openfga/model.fga`.
-3. Run the same permission matrix against both.
+3. Run the same action matrix against both.
 4. Add one realistic work requirement at a time: nested groups, tenant
    boundaries, listing, revocation, model migration, and outage behavior.
 5. Record where the custom implementation needs new engine features and where
@@ -915,7 +915,7 @@ This repository's in-process evaluator implements a deliberately small subset:
 |---|---:|---:|
 | Direct relationships | yes | yes |
 | Subject sets/groups | yes | yes |
-| Computed permissions | yes | yes |
+| Computed actions | yes | yes |
 | Parent inheritance | document → workspace only | model-defined |
 | Union | yes | yes |
 | Intersection/exclusion | no | yes |
@@ -928,9 +928,9 @@ This repository's in-process evaluator implements a deliberately small subset:
 
 Before implementing ReBAC at work, produce:
 
-1. a glossary of subjects, resources, relations, and permissions
+1. a glossary of subjects, resources, relations, and actions
 2. product authorization sentences
-3. an allow/deny permission matrix
+3. an allow/deny action matrix
 4. a diagram of common relationship paths
 5. source-of-truth ownership for every relation
 6. the Check and listing API contracts
@@ -952,7 +952,7 @@ You are ready to design a ReBAC service when you can explain:
 - why valid policy paths differ from arbitrary graph paths
 - who owns each relationship and how it reaches the authorization store
 - how quickly revocation must become visible
-- how Check differs from permission-aware listing
+- how Check differs from action-aware listing
 - how policy versions are tested and rolled out
 - what the application does when the authorization service cannot decide
 

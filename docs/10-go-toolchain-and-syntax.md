@@ -254,7 +254,7 @@ for _, relationship := range relationships {
     fmt.Println(relationship)
 }
 
-for key, value := range permissions {
+for key, value := range actions {
     fmt.Println(key, value)
 }
 ```
@@ -279,7 +279,7 @@ A struct groups named fields:
 ```go
 type CheckRequest struct {
     Subject    Resource
-    Permission Permission
+    Action     Action
     Resource   Resource
 }
 ```
@@ -288,9 +288,9 @@ Prefer keyed literals, especially outside small local types:
 
 ```go
 request := rebac.CheckRequest{
-    Subject:    rebac.User("alice"),
-    Permission: rebac.PermissionDocumentEdit,
-    Resource:   rebac.Document("roadmapDocument"),
+    Subject:  rebac.User("alice"),
+    Action:   rebac.ActionDocumentEdit,
+    Resource: rebac.Document("roadmapDocument"),
 }
 ```
 
@@ -330,7 +330,7 @@ gofmt -w .
 Comments on exported declarations should begin with the declaration's name:
 
 ```go
-// GraphEvaluator answers permission checks by walking the relationship graph.
+// GraphEvaluator answers action checks by walking the relationship graph.
 type GraphEvaluator struct {
     // ...
 }

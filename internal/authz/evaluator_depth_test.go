@@ -43,9 +43,9 @@ func TestGraphEvaluator_ExceedingMaxDepthReturnsError(t *testing.T) {
 
 	// Act
 	_, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
-		Subject:    rebac.User("nobody"),
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   document,
+		Subject:  rebac.User("nobody"),
+		Action:   rebac.ActionDocumentEdit,
+		Resource: document,
 	})
 
 	// Assert

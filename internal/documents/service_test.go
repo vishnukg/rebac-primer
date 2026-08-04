@@ -142,7 +142,7 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 	// workspace editor only inherits document editor (can_edit) — never owner. So
 	// this passes only because Create wrote a direct (alice, owner, d1) relationship.
 	ownerCheck, err := authzSvc.Check(t.Context(), rebac.CheckRequest{
-		Subject: fixtures.Alice, Permission: rebac.PermissionDocumentDelete, Resource: rebac.Document("d1"),
+		Subject: fixtures.Alice, Action: rebac.ActionDocumentDelete, Resource: rebac.Document("d1"),
 	})
 	if err != nil {
 		t.Fatalf("check alice: %v", err)
@@ -153,7 +153,7 @@ func TestDocumentService_Create_MakesCreatorOwner(t *testing.T) {
 
 	// And bob (a workspace viewer) is not an owner — cannot delete.
 	viewerCheck, err := authzSvc.Check(t.Context(), rebac.CheckRequest{
-		Subject: fixtures.Bob, Permission: rebac.PermissionDocumentDelete, Resource: rebac.Document("d1"),
+		Subject: fixtures.Bob, Action: rebac.ActionDocumentDelete, Resource: rebac.Document("d1"),
 	})
 	if err != nil {
 		t.Fatalf("check bob: %v", err)

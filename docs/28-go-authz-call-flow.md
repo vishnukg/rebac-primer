@@ -65,7 +65,7 @@ This establishes who is asking. It does not decide what Bob can do.
 
 ## 3. OAuth Scope Gate
 
-The handler requires `documents:read`. This is the coarse API permission:
+The handler requires `documents:read`. This is the coarse API scope:
 
 ```text
 Does this token permit calls to the document-read endpoint?
@@ -95,9 +95,9 @@ user:bob can_read document:roadmapDocument
 
 ```go
 s.authz.Check(ctx, rebac.CheckRequest{
-    Subject:    subject,
-    Permission: rebac.PermissionDocumentRead,
-    Resource:   rebac.Document(id),
+    Subject:  subject,
+    Action:   rebac.ActionDocumentRead,
+    Resource: rebac.Document(id),
 })
 ```
 

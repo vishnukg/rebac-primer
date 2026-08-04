@@ -110,7 +110,7 @@ Resource server/API:
   result                       → allow or deny
 ```
 
-Keep these questions separate. OAuth scopes do not decide document permissions,
+Keep these questions separate. OAuth scopes do not decide document access,
 and OAuth by itself is not an authentication protocol. The OIDC client validates
 the ID token to establish the login. Separately, a resource server validates an
 access token presented to its API. The application then maps the validated
@@ -928,7 +928,7 @@ Never trust a JWT just because it decodes. Always verify the signature.
 
 ## Common mistakes
 
-**1. Treating login as permission**
+**1. Treating login as authorization**
 
 ```text
 Bad:    if user is logged in → allow edit
@@ -950,7 +950,7 @@ Bad:    user:alice@example.com   (emails change)
 Better: map (trusted issuer, subject) to an internal immutable user id
 ```
 
-**4. Treating OAuth scopes as resource permissions**
+**4. Treating OAuth scopes as resource authorization**
 
 ```text
 Bad:    documents.write scope → can edit every document
@@ -994,7 +994,7 @@ Three separate questions:
 - OIDC ID-token validation tells the client: **which user authenticated?**
 - OAuth access-token validation tells the API: **is this token valid for me and
   what authority does it carry?**
-- ReBAC answers: **what permission does this subject have on this resource?**
+- ReBAC answers: **which actions may this subject perform on this resource?**
 
 ## Further reading
 

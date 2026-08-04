@@ -24,7 +24,7 @@ func New(repository RelationshipRepository, evaluator Evaluator) *Service {
 	return &Service{writer: repository, lister: repository, evaluator: evaluator}
 }
 
-// Check delegates permission evaluation to the [Evaluator] port.
+// Check delegates action evaluation to the [Evaluator] port.
 func (d *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error) {
 	// Validate at the service boundary because callers may supply a different
 	// Evaluator implementation that does not validate requests itself.

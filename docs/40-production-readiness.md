@@ -89,7 +89,7 @@ drive availability alerts and retry/circuit-breaker behavior.
 
 Do not make OpenFGA authoritative until:
 
-- the same permission contract passes for the old and new paths
+- the same action contract passes for the old and new paths
 - real relationship data has been backfilled and reconciled
 - shadow traffic has no unexplained decision differences
 - read-after-write and revocation freshness meet their SLOs

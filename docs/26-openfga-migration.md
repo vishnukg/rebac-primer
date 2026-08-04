@@ -62,13 +62,13 @@ The teaching backend is not throwaway work. These parts should carry into a
 production integration:
 
 ```text
-typed resource IDs plus relation and permission vocabulary
-product-facing can_* permission names
+typed resource IDs plus relation and action vocabulary
+product-facing can_* action names
 model rules and relationship semantics
 application enforcement points
 the narrow AuthorizationService boundary
 allow, deny, and error behavior
-the canonical permission contract
+the canonical action contract
 ```
 
 These parts are deliberately replaced:
@@ -94,7 +94,7 @@ only when a small teaching example needs to expose a concept.
 |---|---|
 | `rebac.Relationship` | relationship tuple |
 | `rebac.Resource` | object ID, e.g. `document:roadmapDocument` |
-| `rebac.Permission` | computed relation used in an OpenFGA Check |
+| `rebac.Action` | computed relation used in an OpenFGA Check |
 | `rebac.Subject` with `#` | subject set, e.g. `team:platformTeam#member` |
 | `internal/authz/model.go` | authorization model DSL |
 | `authz.InMemoryStore` | OpenFGA tuple store |
@@ -143,7 +143,7 @@ make openfga/seed
 make server-openfga
 ```
 
-`openfga/model-test` runs the executable permission matrix in
+`openfga/model-test` runs the executable action matrix in
 `deployments/openfga/model.fga.yaml`. It does not require a running server.
 
 `openfga/seed` does four things:
@@ -203,7 +203,7 @@ requirements such as:
 - deeply nested groups
 - intersections or exclusions
 - contextual or conditional access
-- permission-aware listing and search
+- action-aware listing and search
 - immediate grant/revocation behavior
 - policy migrations
 - backend outages and latency budgets
@@ -237,8 +237,8 @@ the production decision maker.”
 
 Write down:
 
-- stable subject, resource, relation, and permission names
-- which business operation checks each `can_*` permission
+- stable subject, resource, relation, and action names
+- which business operation checks each `can_*` action
 - representative direct and inherited allows
 - near-miss, unrelated-user, revocation, and cross-tenant denies
 - the distinction between policy denial and engine failure
@@ -255,7 +255,7 @@ Model two or three real workflows, including a difficult one. Include tenant
 boundaries, nested groups, resource inheritance, custom sharing, or contextual
 rules if the product needs them. Decide which relations may appear in stored
 relationships and which are purely derived, and which `can_*` names are domain
-permissions represented as computed relations in OpenFGA. Only concrete
+actions represented as computed relations in OpenFGA. Only concrete
 relationships are written as facts.
 
 Run OpenFGA model tests for allows and denies. Check the required listing and
@@ -270,7 +270,7 @@ its derivation rules.
 Application use cases should depend on a small capability such as:
 
 ```text
-Check(subject, permission, resource)
+Check(subject, action, resource)
 WriteRelationships(...)
 DeleteRelationships(...)
 ```
@@ -278,7 +278,7 @@ DeleteRelationships(...)
 The documents service already does this. A larger organization may place a
 domain-specific authorization service in front of OpenFGA, or let services use
 an SDK through a shared library. Either choice should keep OpenFGA transport
-types out of business rules and keep permission names stable.
+types out of business rules and keep action names stable.
 
 Exit gate: changing the concrete backend does not change domain or handler
 logic.
@@ -347,7 +347,7 @@ Keep the existing authorization path authoritative. Send a sampled copy of
 real checks to OpenFGA asynchronously and compare:
 
 ```text
-subject, permission, resource
+subject, action, resource
 old decision and error
 OpenFGA decision and error
 old and new policy/model identity
@@ -377,7 +377,7 @@ rates.
 
 Do not “fail open to the old engine” indefinitely without a written policy: two
 authoritative engines can disagree after policy or data changes. A rollback is
-a controlled operational action, not a hidden per-request permission bypass.
+a controlled operational change, not a hidden per-request authorization bypass.
 
 Exit gate: OpenFGA is the documented authority, the fallback policy is explicit,
 and the old decision path can be retired safely.
@@ -386,7 +386,7 @@ and the old decision path can be retired safely.
 
 For every production change:
 
-1. write or update the permission contract
+1. write or update the action contract
 2. create a new immutable model
 3. test old and new behavior
 4. migrate tuples or callers when required
@@ -407,7 +407,7 @@ The production engine is not done merely because `Check` returns the expected
 boolean. Before cutover, be able to answer yes to all of these:
 
 - Are identity mapping and tenant boundaries validated before every check?
-- Does application code ask stable permissions rather than duplicate policy?
+- Does application code ask stable actions rather than duplicate policy?
 - Does every relationship have an authoritative source and reconciliation?
 - Are model IDs pinned and migrated through a controlled pipeline?
 - Are allow, deny, error, revocation, and cross-tenant cases tested?
@@ -424,7 +424,7 @@ hidden assumption.
 
 Before selecting the engine at work:
 
-1. model real workflows and write their permission contract
+1. model real workflows and write their action contract
 2. prototype source-of-truth relationship delivery and reconciliation
 3. measure Check and listing at representative depth and cardinality
 4. test revocation freshness, outages, and model rollout

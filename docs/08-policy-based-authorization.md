@@ -227,7 +227,7 @@ success. Re-read the big trace comment above `hasRelation` in
 backward-chaining evaluation, and OpenFGA's Check resolves the same way.
 
 Forward evaluation appears in one place in practice: materializing derived
-permissions into storage so lookups are trivial. Doc 07 explains why that
+access into storage so lookups are trivial. Doc 07 explains why that
 trades write amplification and slow revocation for read speed; ReBAC systems
 avoid it by default.
 
@@ -496,7 +496,7 @@ language cannot recurse; every new depth is a policy rewrite.
 **2. Materialize the closure.** Precompute derived facts (all effective
 members of every team; all effective editors of every document) and give the
 engine flat data, or encode them as Cedar parents. Reads are trivial.
-The costs are the ones doc 07 warns about for storing implied permissions:
+The costs are the ones doc 07 warns about for storing implied access:
 write amplification (one team change fans out to many derived rows), and
 revocation that is only as fast as your recomputation pipeline.
 
@@ -574,8 +574,8 @@ Map the anatomy from earlier onto the code:
 
 | Policy-engine concept | Where it is in this repo |
 |---|---|
-| policy language | permission mapping plus direct relationship, subject set, implied-by rule, and workspace inheritance |
-| compiled policy | the `permissionRules` and `impliedBy` tables in `internal/authz/model.go` |
+| policy language | action mapping plus direct relationship, subject set, implied-by rule, and workspace inheritance |
+| compiled policy | the `actionRules` and `impliedBy` tables in `internal/authz/model.go` |
 | PAP | editing those tables in a reviewed Go change |
 | PIP / facts | `InMemoryStore` through `RelationshipReader` (`internal/authz/store.go`) |
 | decision request | `rebac.CheckRequest` |
@@ -586,7 +586,7 @@ Map the anatomy from earlier onto the code:
 | explanation | the `Trace` in `CheckResult` |
 | policy versioning | none — the gap doc 26 discusses when migrating to OpenFGA's immutable model IDs |
 
-After `Evaluate` maps the requested permission to a base relation, the four
+After `Evaluate` maps the requested action to a base relation, the four
 steps `hasRelation` tries in order are the relation-resolution part of the
 policy language. Each step is one rule form the engine knows how to evaluate:
 
@@ -628,7 +628,7 @@ Suggested answers (reason before reading):
 
 ```text
 1. code at the boundary — facts: token claims; the request has them
-2. model — a can_comment permission derived over existing relations
+2. model — a can_comment action derived over existing relations
 3. relationship — a fact changed, no rule changed
 4. model (exclusion) or code guard — pick deliberately; exclusions carry
    testing cost, a code guard splits the policy; both defensible
@@ -642,7 +642,7 @@ You understand policy-based authorization when you can answer:
 
 - Why do code, policy, and data deserve different change cadences, and what
   goes wrong when they share one?
-- Which PEP in this repo enforces document permissions, and why is it the
+- Which PEP in this repo enforces document actions, and why is it the
   domain service rather than the HTTP handler?
 - What does default deny mean, and where does the graph evaluator implement
   it?

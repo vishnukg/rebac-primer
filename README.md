@@ -6,14 +6,14 @@ backend. Programmers who are new to Go can begin with the language foundation;
 experienced Go programmers can skip directly to the ReBAC implementation.
 
 The project domain is a collaborative document workspace. Workspaces contain
-documents, teams get workspace access, and users inherit permissions through a
+documents, teams get workspace access, and users inherit access through a
 relationship graph. The domain is small enough to trace by hand but rich enough
 to show the important ReBAC ideas.
 
 ## Repository Map
 
 ```text
-internal/rebac/          Domain vocabulary: subjects, resources, relations, relationships, permissions, decisions
+internal/rebac/          Domain vocabulary: subjects, resources, relations, relationships, actions, decisions
 internal/authz/          AuthZ service, relationship store, graph evaluator, policy rules
 internal/openfga/        OpenFGA-backed authorization service
 internal/documents/      Documents service, repository, demo token verifier

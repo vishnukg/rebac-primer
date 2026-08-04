@@ -123,7 +123,7 @@ go test -v -run TestTrace ./internal/authz
 ```
 
 Read the output as a graph walk, not as a wall of strings. The evaluator starts
-at the requested document permission and works backward through relationships
+at the requested document action and works backward through relationships
 until it either finds the user or runs out of branches.
 
 ### Drill 3: Break Encapsulation On Purpose
@@ -134,7 +134,7 @@ Find where scope slices are copied. Temporarily remove a copy, write or adjust a
 test that mutates the returned slice, and observe the bug. Then restore the
 copy. This teaches slice aliasing faster than a diagram.
 
-### Drill 4: Add One Permission Case
+### Drill 4: Add One Action Case
 
 Add a denied case to an authorization table test. Good authorization tests prove
 both sides:
@@ -198,7 +198,7 @@ This pace assumes you already program and can spend focused time each day.
 | 3 | Read `12`; add one table test and one fake-backed service test |
 | 4 | Read `13`; run the HTTP tests and trace one request |
 | 5 | Read `14`; refactor one tiny thing, then revert if it was not better |
-| 6 | Read `02`-`05`; draw the Alice permission path |
+| 6 | Read `02`-`05`; draw the Alice access path |
 | 7 | Read `07` and `27`; run `make trace` |
 | 8 | Read `20`, `21`, `28`; explain package dependencies out loud |
 | 9 | Read `22`; run race tests; write the benchmark suggested there |

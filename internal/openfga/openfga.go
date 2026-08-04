@@ -71,9 +71,9 @@ func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.Chec
 	}
 	resp, err := s.client.Check(ctx).Body(openfga.ClientCheckRequest{
 		// OpenFGA's transport vocabulary is user/relation/object. In the
-		// application domain these values are subject/permission/resource.
+		// application domain these values are subject/action/resource.
 		User:     string(req.Subject),
-		Relation: string(req.Permission),
+		Relation: string(req.Action),
 		Object:   string(req.Resource),
 	}).Execute()
 	if err != nil {
@@ -83,8 +83,8 @@ func (s *Service) Check(ctx context.Context, req rebac.CheckRequest) (rebac.Chec
 	return rebac.CheckResult{
 		Allowed: allowed,
 		Trace: []string{fmt.Sprintf(
-			"OpenFGA: subject=%s permission=%s resource=%s -> %t",
-			req.Subject, req.Permission, req.Resource, allowed,
+			"OpenFGA: subject=%s action=%s resource=%s -> %t",
+			req.Subject, req.Action, req.Resource, allowed,
 		)},
 	}, nil
 }

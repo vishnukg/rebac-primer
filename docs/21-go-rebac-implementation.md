@@ -21,7 +21,7 @@ Open `internal/rebac/rebac.go`.
 ```go
 type Resource string
 type Relation string
-type Permission string
+type Action string
 type Subject string
 ```
 
@@ -84,8 +84,8 @@ mistakes into silent denials or storing facts that can never match.
 
 Open `internal/authz/evaluator.go`.
 
-For each `Check(subject, permission, resource)`, the evaluator first maps the
-permission to the relation required by policy. It then tries:
+For each `Check(subject, action, resource)`, the evaluator first maps the
+action to the relation required by policy. It then tries:
 
 1. direct relationship
 2. subject-set relationship
@@ -94,8 +94,8 @@ permission to the relation required by policy. It then tries:
 
 `docs/27-graph-evaluator-walkthrough.md` traces those steps line by line.
 
-Computed `can_*` permissions cannot be written as relationships because
-`Permission` and `Relation` are separate domain types. For example, `can_edit`
+Computed `can_*` actions cannot be written as relationships because
+`Action` and `Relation` are separate domain types. For example, `can_edit`
 maps to the `editor` relation and is then proved from the relationship graph.
 
 The evaluator is intentionally a small subset, not a replacement OpenFGA
@@ -165,7 +165,7 @@ After each package, answer one question:
 
 - `rebac`: what values can represent a graph edge?
 - `authz`: where are policy facts stored, and where are rules stored?
-- `documents`: which business operations require which permissions?
+- `documents`: which business operations require which actions?
 - `api`: which failures are authentication, scope, ReBAC, or malformed input?
 - `cmd/server`: which concrete implementations are selected?
 

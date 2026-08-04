@@ -71,7 +71,7 @@ go test -run TestGraphEvaluator_TeamMemberCanEditDocument ./internal/authz
 Run one subtest:
 
 ```bash
-go test -run 'TestGraphEvaluator_PermissionMatrix/editor_can_edit' ./internal/authz
+go test -run 'TestGraphEvaluator_ActionMatrix/editor_can_edit' ./internal/authz
 ```
 
 Add `-v` when test logs or subtest names matter:
@@ -302,7 +302,7 @@ ask better questions.
 ```bash
 go test ./internal/authz
 go test -v -run TestTrace ./internal/authz
-go test -run TestGraphEvaluator_PermissionMatrix ./internal/authz
+go test -run TestGraphEvaluator_ActionMatrix ./internal/authz
 go test -bench=. -benchtime=5s ./internal/authz
 go test -fuzz=FuzzParseResource -fuzztime=30s ./internal/rebac
 go test -race ./...
@@ -327,7 +327,7 @@ go test -race ./...
 | Pattern | Example |
 |---|---|
 | Arrange/Act/Assert | `internal/authz/evaluator_test.go` |
-| table-driven tests | permission matrix tests |
+| table-driven tests | action matrix tests |
 | subtests | parser and matrix tests |
 | fakes/stubs | document service tests |
 | contract tests | `internal/authz/contract` |

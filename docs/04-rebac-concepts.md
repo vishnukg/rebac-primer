@@ -3,13 +3,13 @@
 Relationship-based access control answers:
 
 ```text
-does subject S have permission P on resource R?
+may subject S perform action A on resource R?
 ```
 
 In this repo:
 
 ```text
-does user:alice have can_edit on document:roadmapDocument?
+may user:alice perform can_edit on document:roadmapDocument?
 ```
 
 This chapter gives names to the pieces you already saw in the graph chapter.
@@ -29,7 +29,7 @@ Editors can edit documents in that workspace.
 ```
 
 The first three sentences are facts that can change at runtime. They become
-relationships. The last sentence is a rule about how facts imply permission. It belongs
+relationships. The last sentence is a rule about how facts imply access. It belongs
 in the model.
 
 That split is the main design move:
@@ -43,7 +43,7 @@ check        -> one authorization question at request time
 When you model another domain, ask this first:
 
 - Is this a business relationship that can be created or removed? Store a relationship.
-- Is this an action the application wants to allow or deny? Define a permission.
+- Is this an operation the application wants to allow or deny? Define an action.
 - Is this a rule that should apply to many resources? Put it in the model.
 - Is this true only for one request, such as time or device state? Treat it as
   context, not as a long-lived relationship.
@@ -65,6 +65,12 @@ Go models them in `internal/rebac/rebac.go`:
 type Resource string
 ```
 
+Ids are constrained: no `#` and no whitespace (`rebac.ValidateID`). `#` is
+reserved because resources and subject sets share one string space — a team id
+of `t#x` would make `SubjectSet` build `team:t#x#member`, which reads back as
+the relation `x#member` on the *different* team `team:t`. OpenFGA restricts
+object ids the same way: exactly one `:`, no `#`, no spaces.
+
 ## Relations
 
 Relations name associations or sets used as policy evidence:
@@ -76,9 +82,9 @@ viewer
 workspace
 ```
 
-## Permissions
+## Actions
 
-Permissions name policy-derived authority:
+Actions name policy-derived authority:
 
 ```text
 can_read
@@ -143,8 +149,8 @@ OpenFGA: user,    relation, object
 ```
 
 A relationship is a stored fact, not the complete effective policy. The model
-derives permissions from several relationships. Alice has the `can_edit`
-permission on the roadmap document even though no `can_edit` relationship is
+derives actions from several relationships. Alice is allowed the `can_edit`
+action on the roadmap document even though no `can_edit` relationship is
 stored.
 
 ## Why Relationships
@@ -158,12 +164,12 @@ authorization model.
 | Alice joins a team | write `user:alice member team:platformTeam` | none |
 | Bob loses workspace access | delete `user:bob viewer workspace:productWorkspace` | none |
 | a document moves workspace | replace its `workspace` relationship | none |
-| editors gain a new permission | none | update the model rule |
+| editors gain a new action | none | update the model rule |
 
 This is why the repo does not store `can_edit` or `can_read` relationships. Those are
-derived permissions. Storing derived permissions would duplicate the model's
+derived actions. Storing derived actions would duplicate the model's
 work and make revocation harder: removing Alice from the team would also require
-finding and deleting every materialized permission she inherited from that team.
+finding and deleting every materialized decision she inherited from that team.
 
 Good relationship candidates usually answer one of these questions:
 
@@ -195,13 +201,13 @@ team:platformTeam#member  editor  workspace:productWorkspace
 
 ## Checks
 
-A check asks whether a subject belongs to the effective set for a permission:
+A check asks whether a subject belongs to the effective set for an action:
 
 ```go
 rebac.CheckRequest{
-    Subject:    rebac.User("alice"),
-    Permission: rebac.PermissionDocumentEdit,
-    Resource:   rebac.Document("roadmapDocument"),
+    Subject:  rebac.User("alice"),
+    Action:   rebac.ActionDocumentEdit,
+    Resource: rebac.Document("roadmapDocument"),
 }
 ```
 
@@ -264,4 +270,4 @@ The first is one subject. The second is a set of subjects defined by a relation
 on another resource.
 
 Next: [OpenFGA model](05-openfga-model.md) shows how the schema decides which
-relationship paths count for a permission.
+relationship paths count for an action.

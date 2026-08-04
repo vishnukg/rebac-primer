@@ -2,7 +2,7 @@
 // collaborative documents, gating every operation on an authorization check.
 //
 // New builds a *Service from the things it needs — a DocumentRepository for
-// persistence and an AuthorizationService for permission checks. This package
+// persistence and an AuthorizationService for action checks. This package
 // ships an in-memory DocumentRepository (NewInMemoryRepository) and a demo token
 // verifier (NewDemoTokenVerifier); production swaps either for a real
 // implementation.
@@ -54,7 +54,7 @@ type DocumentRepository interface {
 }
 
 // AuthorizationService is what the document service needs from authorization:
-// check a permission and write the relationships a new document implies.
+// check an action and write the relationships a new document implies.
 //
 // Both the in-process service and the OpenFGA adapter satisfy this interface
 // implicitly, as could an HTTP client to a standalone authorization server.
@@ -122,7 +122,7 @@ func (e *DocumentNotFoundError) Error() string {
 	return fmt.Sprintf("document not found: %s", e.ID)
 }
 
-// ForbiddenError is returned when a subject lacks the required permission. The
+// ForbiddenError is returned when a subject lacks the required action. The
 // HTTP layer maps it to 403 Forbidden.
 type ForbiddenError struct {
 	Message string

@@ -12,7 +12,7 @@ import (
 
 // erroringStore is a RelationshipReader whose reads always fail. It proves the
 // evaluator surfaces a backend failure as an error instead of silently denying
-// access — a silent deny would look identical to "no permission", hiding outages.
+// access — a silent deny would look identical to "no action", hiding outages.
 type erroringStore struct{ err error }
 
 func (e erroringStore) Has(context.Context, rebac.Subject, rebac.Relation, rebac.Resource) (bool, error) {
@@ -28,9 +28,9 @@ func TestGraphEvaluator_PropagatesStoreError(t *testing.T) {
 
 	// Act
 	_, err := ev.Evaluate(t.Context(), rebac.CheckRequest{
-		Subject:    fixtures.Alice,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Alice,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	})
 
 	// Assert
@@ -48,9 +48,9 @@ func TestGraphEvaluator_CancelledContextReturnsError(t *testing.T) {
 
 	// Act
 	_, err := ev.Evaluate(ctx, rebac.CheckRequest{
-		Subject:    fixtures.Alice,
-		Permission: rebac.PermissionDocumentEdit,
-		Resource:   fixtures.RoadmapDocument,
+		Subject:  fixtures.Alice,
+		Action:   rebac.ActionDocumentEdit,
+		Resource: fixtures.RoadmapDocument,
 	})
 
 	// Assert

@@ -37,7 +37,7 @@ tuples:
     object: workspace:productWorkspace
 
 tests:
-  - name: document permission matrix
+  - name: document action matrix
     check:
       # Alice is an inherited editor, not an owner — so she cannot delete.
       # This now matches what the Go evaluator returns for the same fixtures.

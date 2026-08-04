@@ -1,4 +1,4 @@
-// GraphEvaluator answers permission checks by walking the relationship
+// GraphEvaluator answers action checks by walking the relationship
 // graph. It implements the [Evaluator] interface.
 //
 // # Graphs in one paragraph
@@ -14,9 +14,9 @@
 //
 // reads "user:alice is a member of team:platformTeam".
 //
-// # What a permission check is
+// # What an action check is
 //
-// A check answers: "does <subject> have <permission> on <resource>?"
+// A check answers: "may <subject> perform <action> on <resource>?"
 //
 // For example, "does user:alice have can_edit on document:roadmapDocument?"
 // maps can_edit to the editor relation, then asks whether Alice belongs to the
@@ -29,13 +29,13 @@
 //	workspace:productWorkspace --workspace of--> document:roadmapDocument
 //
 // The implementation resolves that chain in reverse, beginning with the
-// requested resource and the relation required by the permission, then searching
+// requested resource and the relation required by the action, then searching
 // for the subject.
 //
 // # The traversal algorithm (depth-first search)
 //
 // The evaluator performs depth-first search (DFS): it picks a branch and
-// follows it all the way down before trying another. After the checked permission
+// follows it all the way down before trying another. After the checked action
 // is mapped to a required relation, the evaluator tries four things in order:
 //
 //  1. Direct lookup      — is there a relationship (subject, relation, resource)?
@@ -108,14 +108,14 @@ type resolution struct {
 	visiting map[relationVisit]bool
 }
 
-// Evaluate is the entry point for a permission check.
+// Evaluate is the entry point for an action check.
 //
-// It answers: "does req.Subject have req.Permission on req.Resource?"
+// It answers: "may req.Subject perform req.Action on req.Resource?"
 //
 // Example input:
 //
 //	req.Subject    = "user:alice"
-//	req.Permission = "can_edit"
+//	req.Action = "can_edit"
 //	req.Resource   = "document:roadmapDocument"
 //
 // It returns a CheckResult with Allowed=true/false and a Trace: a human-readable
@@ -137,16 +137,16 @@ func (g *GraphEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
 		ctx: ctx,
 		// Start the trace with the question being asked.
 		trace: []string{
-			fmt.Sprintf("Check whether %s has permission %s on %s",
-				req.Subject, req.Permission, req.Resource),
+			fmt.Sprintf("Check whether %s may perform action %s on %s",
+				req.Subject, req.Action, req.Resource),
 		},
 		visiting: make(map[relationVisit]bool),
 	}
 
 	var allowed bool
-	for _, relation := range permissionRelationsFor(resourceType, req.Permission) {
+	for _, relation := range actionRelationsFor(resourceType, req.Action) {
 		r.trace = append(r.trace, fmt.Sprintf(
-			"Permission %s requires relation %s", req.Permission, relation,
+			"Action %s requires relation %s", req.Action, relation,
 		))
 		allowed, err = r.hasRelation(req.Subject, req.Resource, relation, 0)
 		if err != nil {
@@ -178,7 +178,7 @@ func (g *GraphEvaluator) Evaluate(ctx context.Context, req rebac.CheckRequest) (
 //
 // Concrete trace for "alice / can_edit / document:roadmapDocument":
 //
-//	permission can_edit requires relation editor
+//	action can_edit requires relation editor
 //	hasRelation(alice, document:roadmapDocument, editor)
 //	      step 1: hasRelationship → no direct relationship for alice/editor
 //	      step 3: expand: editor is implied by owner (documentRules)
@@ -346,7 +346,7 @@ func (r *resolution) subjectSetContains(
 //
 // The table says things like "viewer is implied by editor" and "editor is
 // implied by owner". If we failed to find <relation> directly, we check each
-// stronger relation that would satisfy it. Permission-to-relation mapping has
+// stronger relation that would satisfy it. Action-to-relation mapping has
 // already happened in Evaluate before this traversal begins.
 //
 // Example — checking "editor" on workspace:productWorkspace:
@@ -396,7 +396,7 @@ func (r *resolution) expandByRules(
 //
 // In code: follow every "workspace" relationship on this document to its parent
 // workspace, then recursively check the same relation on that workspace.
-// Only owner, editor, and viewer are inheritable. Evaluate maps a permission
+// Only owner, editor, and viewer are inheritable. Evaluate maps an action
 // such as can_edit to one of those relations before traversal begins.
 func (r *resolution) expandDocument(
 	subject rebac.Resource,
@@ -415,7 +415,7 @@ func (r *resolution) expandDocument(
 
 	// Step 4: workspace inheritance.
 	// Only base relations (owner, editor, viewer) propagate from workspace to
-	// document. Permissions have already been mapped to a required relation.
+	// document. Actions have already been mapped to a required relation.
 	if isDocumentBaseRelation(relation) {
 
 		// A document can have multiple workspace relationships in theory.

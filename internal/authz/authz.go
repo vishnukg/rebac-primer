@@ -1,6 +1,6 @@
 // Package authz is the in-process authorization service.
 //
-// It answers permission checks ("does subject S have permission P on resource R?")
+// It answers action checks ("may subject S perform action A on resource R?")
 // by walking a graph of relationships, and it stores those relationships. The public
 // surface is small:
 //
@@ -70,7 +70,7 @@ type RelationshipFilter struct {
 	Relation rebac.Relation
 }
 
-// Evaluator decides a single permission check. The service delegates Check to it,
+// Evaluator decides a single action check. The service delegates Check to it,
 // which lets the evaluation strategy vary (the in-process graph walk here, or a
 // remote engine) without touching the service.
 type Evaluator interface {
@@ -87,7 +87,7 @@ func (e *RelationshipValidationError) Error() string {
 	return fmt.Sprintf("relationship validation: %s", e.Message)
 }
 
-// CheckValidationError signals that a permission check is semantically invalid.
+// CheckValidationError signals that an action check is semantically invalid.
 type CheckValidationError struct {
 	Message string
 }

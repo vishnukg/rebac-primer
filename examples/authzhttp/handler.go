@@ -22,27 +22,27 @@ func (h *handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 // handleCheck handles POST /check.
 //
-// Request body: { "subject": "user:alice", "permission": "can_edit", "resource": "document:roadmapDocument" }
+// Request body: { "subject": "user:alice", "action": "can_edit", "resource": "document:roadmapDocument" }
 // Response:     { "allowed": true, "trace": ["Check whether ...", "Result: allowed"] }
 func (h *handler) handleCheck(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Subject    string `json:"subject"`
-		Permission string `json:"permission"`
-		Resource   string `json:"resource"`
+		Subject  string `json:"subject"`
+		Action   string `json:"action"`
+		Resource string `json:"resource"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeJSON(w, http.StatusBadRequest, errorBody("invalid JSON: "+err.Error()))
 		return
 	}
-	if body.Subject == "" || body.Permission == "" || body.Resource == "" {
-		writeJSON(w, http.StatusBadRequest, errorBody("subject, permission, and resource are required"))
+	if body.Subject == "" || body.Action == "" || body.Resource == "" {
+		writeJSON(w, http.StatusBadRequest, errorBody("subject, action, and resource are required"))
 		return
 	}
 
 	result, err := h.authz.Check(r.Context(), rebac.CheckRequest{
-		Subject:    rebac.Resource(body.Subject),
-		Permission: rebac.Permission(body.Permission),
-		Resource:   rebac.Resource(body.Resource),
+		Subject:  rebac.Resource(body.Subject),
+		Action:   rebac.Action(body.Action),
+		Resource: rebac.Resource(body.Resource),
 	})
 	if err != nil {
 		h.writeError(w, err)

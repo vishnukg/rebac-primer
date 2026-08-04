@@ -44,9 +44,9 @@ func TestAuthzHandler_Check_AllowedForEditor(t *testing.T) {
 	handler := authzhttp.NewServer(svc)
 
 	payload, err := json.Marshal(map[string]string{
-		"subject":    string(fixtures.Alice),
-		"permission": string(rebac.PermissionDocumentEdit),
-		"resource":   string(fixtures.RoadmapDocument),
+		"subject":  string(fixtures.Alice),
+		"action":   string(rebac.ActionDocumentEdit),
+		"resource": string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal check payload: %v", err)
@@ -78,9 +78,9 @@ func TestAuthzHandler_Check_DeniedForViewer(t *testing.T) {
 	handler := authzhttp.NewServer(svc)
 
 	payload, err := json.Marshal(map[string]string{
-		"subject":    string(fixtures.Bob),
-		"permission": string(rebac.PermissionDocumentEdit),
-		"resource":   string(fixtures.RoadmapDocument),
+		"subject":  string(fixtures.Bob),
+		"action":   string(rebac.ActionDocumentEdit),
+		"resource": string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal check payload: %v", err)
@@ -112,9 +112,9 @@ func TestAuthzHandler_Check_IncludesTrace(t *testing.T) {
 	handler := authzhttp.NewServer(svc)
 
 	payload, err := json.Marshal(map[string]string{
-		"subject":    string(fixtures.Casey),
-		"permission": string(rebac.PermissionDocumentRead),
-		"resource":   string(fixtures.RoadmapDocument),
+		"subject":  string(fixtures.Casey),
+		"action":   string(rebac.ActionDocumentRead),
+		"resource": string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal check payload: %v", err)
@@ -182,7 +182,7 @@ func TestAuthzHandler_WriteRelationships_ThenCheck(t *testing.T) {
 	}
 
 	checkPayload, err := json.Marshal(map[string]string{
-		"subject": string(fixtures.Alice), "permission": string(rebac.PermissionDocumentRead), "resource": string(fixtures.RoadmapDocument),
+		"subject": string(fixtures.Alice), "action": string(rebac.ActionDocumentRead), "resource": string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal check payload: %v", err)
@@ -205,14 +205,14 @@ func TestAuthzHandler_WriteRelationships_ThenCheck(t *testing.T) {
 	}
 }
 
-func TestAuthzHandler_DeleteRelationships_RevokesPermission(t *testing.T) {
+func TestAuthzHandler_DeleteRelationships_RevokesAction(t *testing.T) {
 	// Arrange
 	store := authz.NewInMemoryStore(fixtures.SeedRelationships()...)
 	svc := authz.New(store, authz.NewGraphEvaluator(store))
 	handler := authzhttp.NewServer(svc)
 
 	beforePayload, err := json.Marshal(map[string]string{
-		"subject": string(fixtures.Bob), "permission": string(rebac.PermissionDocumentRead), "resource": string(fixtures.RoadmapDocument),
+		"subject": string(fixtures.Bob), "action": string(rebac.ActionDocumentRead), "resource": string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal before-check payload: %v", err)
@@ -256,7 +256,7 @@ func TestAuthzHandler_DeleteRelationships_RevokesPermission(t *testing.T) {
 	}
 
 	afterPayload, err := json.Marshal(map[string]string{
-		"subject": string(fixtures.Bob), "permission": string(rebac.PermissionDocumentRead), "resource": string(fixtures.RoadmapDocument),
+		"subject": string(fixtures.Bob), "action": string(rebac.ActionDocumentRead), "resource": string(fixtures.RoadmapDocument),
 	})
 	if err != nil {
 		t.Fatalf("marshal after-check payload: %v", err)

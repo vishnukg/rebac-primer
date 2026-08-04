@@ -1,6 +1,6 @@
 // Package concurrency is a Go-language teaching example, NOT part of the
 // production ReBAC path. It demonstrates goroutines, channels, and WaitGroups by
-// fanning out permission checks. See docs/22-go-concurrency.md.
+// fanning out action checks. See docs/22-go-concurrency.md.
 package concurrency
 
 import (
@@ -11,55 +11,55 @@ import (
 	"rebac-primer/internal/rebac"
 )
 
-// Checker is the permission-evaluation capability consumed by this example.
+// Checker is the action-evaluation capability consumed by this example.
 type Checker interface {
 	Evaluate(ctx context.Context, req rebac.CheckRequest) (rebac.CheckResult, error)
 }
 
-// PermissionSummary maps a Permission to whether it is allowed for a subject
-// and resource. It is the return type of [AllPermissions].
-type PermissionSummary map[rebac.Permission]bool
+// ActionSummary maps an Action to whether it is allowed for a subject
+// and resource. It is the return type of [AllActions].
+type ActionSummary map[rebac.Action]bool
 
-// AllPermissions checks every permission on a resource for a subject
-// concurrently. It spawns one goroutine per permission and collects results
+// AllActions checks every action on a resource for a subject
+// concurrently. It spawns one goroutine per action and collects results
 // through a channel, returning when all checks complete or the context is done.
 //
 // Use this to build a "what can this subject do?" summary—for example, when a
 // UI needs to know which action buttons to render.
-func AllPermissions(ctx context.Context, auth Checker, subject rebac.Resource, resource rebac.Resource) (PermissionSummary, error) {
-	permissions := permissionsFor(resource)
-	if len(permissions) == 0 {
-		return PermissionSummary{}, nil
+func AllActions(ctx context.Context, auth Checker, subject rebac.Resource, resource rebac.Resource) (ActionSummary, error) {
+	actions := actionsFor(resource)
+	if len(actions) == 0 {
+		return ActionSummary{}, nil
 	}
 
 	type outcome struct {
-		permission rebac.Permission
-		allowed    bool
-		err        error
+		action  rebac.Action
+		allowed bool
+		err     error
 	}
 
 	// Buffer the channel so goroutines never block if the receiver is slow.
-	ch := make(chan outcome, len(permissions))
+	ch := make(chan outcome, len(actions))
 
-	for _, permission := range permissions {
-		go func(permission rebac.Permission) {
+	for _, action := range actions {
+		go func(action rebac.Action) {
 			result, err := auth.Evaluate(ctx, rebac.CheckRequest{
-				Subject: subject, Permission: permission, Resource: resource,
+				Subject: subject, Action: action, Resource: resource,
 			})
-			ch <- outcome{permission: permission, allowed: result.Allowed, err: err}
-		}(permission)
+			ch <- outcome{action: action, allowed: result.Allowed, err: err}
+		}(action)
 	}
 
-	summary := make(PermissionSummary, len(permissions))
-	for range len(permissions) {
+	summary := make(ActionSummary, len(actions))
+	for range len(actions) {
 		// select waits on whichever happens first: the next result arriving, or
 		// the caller's context being cancelled / timing out.
 		select {
 		case out := <-ch:
 			if out.err != nil {
-				return nil, fmt.Errorf("check %s: %w", out.permission, out.err)
+				return nil, fmt.Errorf("check %s: %w", out.action, out.err)
 			}
-			summary[out.permission] = out.allowed
+			summary[out.action] = out.allowed
 		case <-ctx.Done():
 			// Caller cancelled or timed out. Return its reason immediately.
 			// The still-running goroutines each send one value into ch, which is
@@ -73,8 +73,8 @@ func AllPermissions(ctx context.Context, auth Checker, subject rebac.Resource, r
 }
 
 // BulkCheck runs a list of CheckRequests concurrently using a WaitGroup and
-// returns results in the same order as the input slice.  Unlike AllPermissions,
-// it works with arbitrary (subject, permission, resource) combinations.
+// returns results in the same order as the input slice.  Unlike AllActions,
+// it works with arbitrary (subject, action, resource) combinations.
 //
 // If any check returns an error the corresponding Err field is set; the other
 // results are still returned.  The caller decides whether to treat any error as
@@ -101,18 +101,18 @@ type BulkResult struct {
 	Err     error
 }
 
-// permissionsFor returns the permissions that make sense for a resource type.
-func permissionsFor(resource rebac.Resource) []rebac.Permission {
+// actionsFor returns the actions that make sense for a resource type.
+func actionsFor(resource rebac.Resource) []rebac.Action {
 	typ, _, err := rebac.ParseResource(string(resource))
 	if err != nil {
 		return nil
 	}
 	if typ == rebac.ResourceTypeDocument {
-		return []rebac.Permission{
-			rebac.PermissionDocumentRead,
-			rebac.PermissionDocumentComment,
-			rebac.PermissionDocumentEdit,
-			rebac.PermissionDocumentDelete,
+		return []rebac.Action{
+			rebac.ActionDocumentRead,
+			rebac.ActionDocumentComment,
+			rebac.ActionDocumentEdit,
+			rebac.ActionDocumentDelete,
 		}
 	}
 	return nil

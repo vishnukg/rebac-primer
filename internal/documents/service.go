@@ -23,7 +23,7 @@ func New(repo DocumentRepository, authz AuthorizationService) *Service {
 
 // ── Operations ────────────────────────────────────────────────────────────────
 
-// Create saves a new document if the subject has can_create_document permission
+// Create saves a new document if the subject has can_create_document action
 // on the workspace.
 //
 // After persisting the document it writes two relationships to the authz
@@ -32,14 +32,14 @@ func New(repo DocumentRepository, authz AuthorizationService) *Service {
 //	(workspace:X, workspace, document:id) — records where the document lives, so
 //	                                        workspace members inherit access.
 //	(user:subject, owner, document:id)     — the creator directly owns the document
-//	                                        (e.g. can_delete, an owner-only permission).
+//	                                        (e.g. can_delete, an owner-only action).
 //
 // This is the write-back pattern: the documents service owns document-level
 // relationships; the authz service owns workspace/team relationships.
 func (s *Service) Create(ctx context.Context, input CreateDocumentInput) (*CollaborativeDocument, error) {
 	if err := s.requireAllowed(ctx,
 		input.Subject,
-		rebac.PermissionWorkspaceCreateDocument,
+		rebac.ActionWorkspaceCreateDocument,
 		input.Workspace,
 		"create documents in",
 	); err != nil {
@@ -60,7 +60,7 @@ func (s *Service) Create(ctx context.Context, input CreateDocumentInput) (*Colla
 	}
 
 	// Register the document relationships so the graph evaluator can resolve
-	// can_read / can_edit for workspace members and owner-only permissions for the
+	// can_read / can_edit for workspace members and owner-only actions for the
 	// creator.
 	relationships := []rebac.Relationship{
 		rebac.NewRelationship(
@@ -113,7 +113,7 @@ func (s *Service) Read(ctx context.Context, id string, subject rebac.Resource) (
 
 	if err := s.requireAllowed(ctx,
 		subject,
-		rebac.PermissionDocumentRead,
+		rebac.ActionDocumentRead,
 		rebac.Document(id),
 		"read",
 	); err != nil {
@@ -132,7 +132,7 @@ func (s *Service) Update(ctx context.Context, input UpdateDocumentInput) (*Colla
 
 	if err := s.requireAllowed(ctx,
 		input.Subject,
-		rebac.PermissionDocumentEdit,
+		rebac.ActionDocumentEdit,
 		rebac.Document(input.ID),
 		"edit",
 	); err != nil {
@@ -167,20 +167,20 @@ func (s *Service) requireDocument(ctx context.Context, id string) (*Collaborativ
 func (s *Service) requireAllowed(
 	ctx context.Context,
 	subject rebac.Resource,
-	permission rebac.Permission,
+	action rebac.Action,
 	resource rebac.Resource,
-	action string,
+	verb string,
 ) error {
 	result, err := s.authz.Check(ctx, rebac.CheckRequest{
-		Subject:    subject,
-		Permission: permission,
-		Resource:   resource,
+		Subject:  subject,
+		Action:   action,
+		Resource: resource,
 	})
 	if err != nil {
 		return err
 	}
 	if !result.Allowed {
-		return &ForbiddenError{Message: fmt.Sprintf("%s cannot %s %s", subject, action, resource)}
+		return &ForbiddenError{Message: fmt.Sprintf("%s cannot %s %s", subject, verb, resource)}
 	}
 	return nil
 }
